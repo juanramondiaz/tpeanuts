@@ -9,6 +9,7 @@ __pycache__/
 # Notebook and editor caches
 .ipynb_checkpoints/
 *.ipynb_checkpoints/
+.spyproject/
 
 # Local/generated artifacts
 .cache_exposure/
@@ -31,4 +32,5 @@ env/
 .DS_Store
 Thumbs.db
 
+# Local scratch files
 head.py
