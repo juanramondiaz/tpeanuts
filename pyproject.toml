@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tpeanuts"
+version = "0.1.0"
+description = "Torch-based neutrino oscillation and flux propagation utilities."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "joblib",
+    "matplotlib",
+    "mpmath",
+    "numba",
+    "numpy",
+    "pandas",
+    "scipy",
+    "torch",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+atmosphere = ["pymsis"]
+mceq = ["MCEq", "crflux"]
+test = ["pytest"]
+dev = ["pytest", "pymsis", "MCEq", "crflux"]
+
+[tool.setuptools]
+packages = [
+    "tpeanuts",
+    "tpeanuts.analysis",
+    "tpeanuts.atmosphere",
+    "tpeanuts.coherent",
+    "tpeanuts.core",
+    "tpeanuts.earth",
+    "tpeanuts.external",
+    "tpeanuts.flux_propagation",
+    "tpeanuts.io",
+    "tpeanuts.external.honda",
+    "tpeanuts.external.mceq",
+    "tpeanuts.solar",
+    "tpeanuts.tests",
+    "tpeanuts.util",
+    "tpeanuts.vacuum",
+    "peanuts",
+]
+package-dir = { "tpeanuts" = ".", "peanuts" = "peanuts" }
+include-package-data = true
+
+[tool.setuptools.package-data]
+tpeanuts = ["data/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test*.py"]

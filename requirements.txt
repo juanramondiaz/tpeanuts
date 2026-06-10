@@ -1,0 +1,14 @@
+joblib
+matplotlib
+mpmath
+numba
+numpy
+pandas
+scipy
+torch
+tqdm
+
+# Optional features used by selected atmosphere/MCEq workflows:
+# pymsis
+# Install MCEq workflows with:
+# python -m pip install -e .[mceq]

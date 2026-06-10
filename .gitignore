@@ -1,0 +1,34 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Notebook and editor caches
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Local/generated artifacts
+.cache_exposure/
+cache_exposure/
+outputs/
+Outputs/
+_avast_/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+head.py
