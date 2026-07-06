@@ -17,11 +17,11 @@
 # =============================================================================
 
 """
-Small atmospheric-analysis helpers shared by notebooks.
+Small Atmosphere-analysis helpers shared by notebooks.
 
-The functions here are intentionally lightweight: they do not load atmospheric
+The functions here are intentionally lightweight: they do not load Atmosphere
 datasets or perform physics calculations, but provide common labels and grid
-selection rules used by atmospheric notebooks.
+selection rules used by Atmosphere notebooks.
 """
 
 from __future__ import annotations
@@ -31,10 +31,10 @@ from typing import Any
 
 def angle_grid_for(group: dict[str, Any]) -> tuple[str, Any]:
     """
-    Return the angular-grid name and values stored in an atmospheric group.
+    Return the angular-grid name and values stored in an Atmosphere group.
 
     Args:
-        group: Loaded atmospheric group returned by the atmospheric I/O layer.
+        group: Loaded Atmosphere group returned by the Atmosphere I/O layer.
 
     Returns:
         Tuple with the angle name, either "alpha" or "theta", and the
@@ -49,7 +49,7 @@ def angle_grid_for(group: dict[str, Any]) -> tuple[str, Any]:
     if "theta_grid_deg" in group:
         return "theta", group["theta_grid_deg"]
 
-    raise KeyError("Atmospheric group must contain alpha_grid_deg or theta_grid_deg.")
+    raise KeyError("Atmosphere group must contain alpha_grid_deg or theta_grid_deg.")
 
 
 def particle_label(name: str) -> str:

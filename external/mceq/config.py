@@ -17,19 +17,48 @@
 # =============================================================================
 
 """
-Configuration objects for the mceq atmospheric-flux pipeline.
+Configuration objects for the mceq Atmosphere-flux pipeline.
 
-This module defines:
+This module is pure tpeanuts-native configuration: it only declares
+constants and dataclasses, and never constructs or calls an external
+MCEqRun instance. The constants here name (but do not import or
+construct) MCEq physics models:
 
-    - available interaction models
-    - available primary cosmic-ray models
-    - available atmospheric density models
-    - grid configuration
-    - smoothing/profile configuration
+    - interaction_model: the hadronic interaction model used by MCEq to
+      generate secondary particles in each air-shower interaction
+      (e.g. SIBYLL, QGSJET, EPOS, DPMJET families). It controls the
+      particle-production yields of the cascade-equation source terms.
+    - primary_model: the primary cosmic-ray flux model from the external
+      crflux package, giving the all-particle/per-nucleus flux injected
+      at the top of the atmosphere as a function of energy. This is the
+      boundary condition for MCEq's cascade-equation solve.
+    - density_model: the Atmosphere density/overburden model used by
+      MCEq to convert altitude h (km) into atmospheric slant depth X
+      (g/cm^2), i.e. the column density of air traversed along the
+      shower axis. Different models correspond to different
+      site/season atmosphere profiles (US Standard Atmosphere via
+      CORSIKA, NRLMSISE-00 at the South Pole for NASA/ICECUBE, or a
+      simple isothermal profile).
+
+This module also defines:
+
+    - grid configuration (zenith angle, atmospheric depth, altitude
+      grids, and the observation depth X_obs at which the flux is
+      reported)
+    - smoothing/profile-reconstruction configuration
     - output configuration
-    - global run configuration
+    - global run configuration aggregating all of the above plus the
+      neutrino-flavour-to-MCEq-particle-name mapping
 
 No mceq solver is initialized here.
+
+Module functions:
+    default_config:
+        Build and validate a RunConfig populated with default values.
+    make_config:
+        Build and validate a RunConfig from individual keyword
+        arguments, constructing the nested grid/model/smoothing/output/
+        parallel sub-configs.
 """
 
 
@@ -40,9 +69,9 @@ from dataclasses import dataclass, field
 from typing import Optional, Union, Dict, Any
 import torch
 
-from tpeanuts.io.io_atmosphere import OutputConfig
+from tpeanuts.medium.atmosphere.io import OutputConfig
 from tpeanuts.util.parallel import ParallelConfig
-from tpeanuts.util.type import _as_tensor
+from tpeanuts.util.type import as_tensor
 # ============================================================
 # Optional CRflux import
 # ============================================================
@@ -122,7 +151,32 @@ DEFAULT_FLAVOURS = {
 @dataclass
 class MCEqModelConfig:
     """
-    Configuration of the physical mceq models.
+    Configuration of the physical mceq models used to build an MCEqRun.
+
+    This dataclass only names the physics models; it does not import or
+    construct MCEq/crflux objects itself (see
+    tpeanuts.external.mceq.core.init_mceq, which resolves these names
+    into actual MCEq/crflux objects and builds the MCEqRun instance).
+
+    Attributes:
+        interaction_model: Name of the hadronic interaction model used
+            by MCEq for particle production in each cascade-equation
+            interaction (e.g. "SIBYLL23D", "QGSJETII04", "EPOSLHC").
+            Must be one of INTERACTION_MODELS.
+        primary_model: Name of the primary cosmic-ray flux model (from
+            the optional crflux package) that sets the boundary
+            condition injected at the top of the atmosphere, or a raw
+            (model_class, model_tag) tuple understood directly by MCEq.
+            Must be a key of PRIMARY_MODELS when given as a string.
+        density_model: Name of the Atmosphere density/overburden model
+            used by MCEq to relate altitude h (km) to atmospheric slant
+            depth X (g/cm^2). Must be one of DENSITY_MODELS.
+        info: If True, MCEq's internal logger is set to INFO level
+            (verbose); otherwise it is restricted to ERROR level.
+
+    Raises:
+        ValueError: Via validate(), if any of the above names is not
+            recognised.
     """
 
     interaction_model: str = DEFAULT_INTERACTION_MODEL
@@ -131,6 +185,16 @@ class MCEqModelConfig:
     info: bool = False
 
     def validate(self) -> None:
+        """
+        Check that interaction_model, primary_model and density_model
+        are all recognised names.
+
+        Raises:
+            ValueError: If interaction_model is not in
+                INTERACTION_MODELS, if primary_model is a string not in
+                PRIMARY_MODELS, or if density_model is not in
+                DENSITY_MODELS.
+        """
         if self.interaction_model not in INTERACTION_MODELS:
             raise ValueError(
                 f"Unknown interaction_model='{self.interaction_model}'. "
@@ -154,19 +218,34 @@ class MCEqModelConfig:
 @dataclass
 class GridConfig:
     """
-    Numerical grids used in the reconstruction.
+    Numerical grids used in the height-flux reconstruction pipeline.
 
-    X_grid_gcm2:
-        Atmospheric depth grid in g/cm^2.
-
-    h_grid_km:
-        Altitude grid in km.
+    These grids are tpeanuts-native (plain torch tensors); MCEq is
+    queried at the points they define, but the grids themselves are not
+    MCEq objects.
 
     theta_grid_deg:
-        Zenith-angle grid in degrees.
+        Grid of zenith angles in degrees, 0 <= theta < 90. theta=0 is a
+        vertically downward-going trajectory (shortest atmospheric
+        path); larger theta corresponds to more inclined trajectories
+        with a longer atmospheric slant depth for a given altitude.
+
+    X_grid_gcm2:
+        Atmosphere depth grid in g/cm^2, i.e. the slant column density
+        of air (integral of mass density along the line of sight) at
+        which the cascade-equation flux Phi(E, X, theta) is evaluated
+        by MCEq. Must be strictly increasing.
+
+    h_grid_km:
+        Altitude-above-sea-level grid in km at which the reconstructed
+        height-differential production profile f(h | E, theta) and flux
+        Phi(E, h, theta) are reported. Must be strictly increasing.
 
     X_obs_gcm2:
-        Observation depth in g/cm^2.
+        Observation slant depth in g/cm^2 (e.g. the depth of a detector
+        or the ground) at which the energy-differential flux Phi(E,
+        X_obs, theta) is extracted/interpolated from the MCEq solution.
+        Must lie within the range covered by X_grid_gcm2.
     """
 
     theta_grid_deg: torch.ndarray = field(
@@ -184,14 +263,23 @@ class GridConfig:
     X_obs_gcm2: float = 1030.0
 
     def __post_init__(self) -> None:
-        self.theta_grid_deg = _as_tensor(self.theta_grid_deg, dtype=torch.float64)
-        self.X_grid_gcm2 = _as_tensor(self.X_grid_gcm2, dtype=torch.float64)
-        self.h_grid_km = _as_tensor(self.h_grid_km, dtype=torch.float64)
+        self.theta_grid_deg = as_tensor(self.theta_grid_deg, dtype=torch.float64)
+        self.X_grid_gcm2 = as_tensor(self.X_grid_gcm2, dtype=torch.float64)
+        self.h_grid_km = as_tensor(self.h_grid_km, dtype=torch.float64)
 
     def validate(self) -> None:
-        self.theta_grid_deg = _as_tensor(self.theta_grid_deg, dtype=torch.float64)
-        self.X_grid_gcm2 = _as_tensor(self.X_grid_gcm2, dtype=torch.float64)
-        self.h_grid_km = _as_tensor(self.h_grid_km, dtype=torch.float64)
+        """
+        Coerce grids to 1-D float64 tensors and check physical bounds.
+
+        Raises:
+            ValueError: If any grid is not one-dimensional, if
+                theta_grid_deg has values outside [0, 90) degrees, if
+                X_grid_gcm2 or h_grid_km is not strictly increasing, or
+                if X_obs_gcm2 falls outside the range of X_grid_gcm2.
+        """
+        self.theta_grid_deg = as_tensor(self.theta_grid_deg, dtype=torch.float64)
+        self.X_grid_gcm2 = as_tensor(self.X_grid_gcm2, dtype=torch.float64)
+        self.h_grid_km = as_tensor(self.h_grid_km, dtype=torch.float64)
 
         if self.theta_grid_deg.ndim != 1:
             raise ValueError("theta_grid_deg must be one-dimensional.")
@@ -221,7 +309,32 @@ class GridConfig:
 @dataclass
 class SmoothingConfig:
     """
-    Configuration for flux smoothing and derivative extraction.
+    Configuration for flux smoothing and depth-derivative extraction.
+
+    This config is purely tpeanuts-native (consumed by
+    tpeanuts.external.mceq.smoothing) and does not call MCEq. It
+    controls how the raw MCEq flux Phi(E, X, theta), which can be noisy
+    along the depth axis X, is smoothed before the numerical derivative
+    dPhi/dX is taken. dPhi/dX is the depth-differential particle
+    production source term used downstream to reconstruct the
+    height-dependent production profile f(h | E, theta).
+
+    Attributes:
+        method: Smoothing method applied along the depth axis before
+            differentiation. One of {None, "none", "spline",
+            "gaussian"}. "spline" is implemented as a log-domain moving
+            average (see smooth_flux_log_moving_average), "gaussian"
+            applies a Gaussian kernel convolution, and None/"none"
+            disables smoothing.
+        smoothing: Smoothing strength used by the "spline"/
+            "log_moving_average" method to determine the moving-average
+            window size; must be non-negative.
+        gaussian_sigma: Standard deviation, in grid-point units, of the
+            Gaussian kernel used by the "gaussian" method; must be
+            non-negative.
+        positive_only: If True, the computed dPhi/dX derivative is
+            clamped to be non-negative (unphysical negative production
+            rates from numerical noise are zeroed out).
     """
 
     method: Optional[str] = "spline"
@@ -230,6 +343,14 @@ class SmoothingConfig:
     positive_only: bool = True
 
     def validate(self) -> None:
+        """
+        Check that method, smoothing and gaussian_sigma have valid
+        values.
+
+        Raises:
+            ValueError: If method is not one of the allowed smoothing
+                methods, or if smoothing/gaussian_sigma is negative.
+        """
         allowed = {None, "none", "spline", "gaussian"}
 
         if self.method not in allowed:
@@ -249,6 +370,28 @@ class SmoothingConfig:
 class RunConfig:
     """
     Full configuration object for the mceq height-flux pipeline.
+
+    Aggregates the physics-model selection (model), the numerical grids
+    (grid), the flux smoothing/derivative settings (smoothing), the
+    output file settings (output), the parallel-execution settings
+    (parallel), and the mapping from tpeanuts neutrino-flavour names to
+    the corresponding MCEq particle names (flavours, e.g.
+    {"numu": "numu", "antinumu": "antinumu", ...}). This object is
+    consumed by tpeanuts.external.mceq.builder to drive the full
+    theta-grid x flavour build of Atmosphere height-flux datasets.
+
+    Attributes:
+        model: MCEqModelConfig selecting the interaction model, primary
+            cosmic-ray model and Atmosphere density model.
+        grid: GridConfig with the theta, X and h grids and the
+            observation depth X_obs_gcm2.
+        smoothing: SmoothingConfig controlling flux smoothing and
+            depth-derivative extraction.
+        output: OutputConfig controlling where/how results are saved.
+        parallel: ParallelConfig controlling whether/how the build loop
+            is parallelized across angles.
+        flavours: Mapping from tpeanuts flavour name to the MCEq
+            particle name used in calls such as mceq.get_solution(...).
     """
 
     model: MCEqModelConfig = field(default_factory=MCEqModelConfig)
@@ -262,6 +405,14 @@ class RunConfig:
     )
 
     def validate(self) -> None:
+        """
+        Validate every nested sub-config and the flavours mapping.
+
+        Raises:
+            ValueError: If any nested sub-config fails its own
+                validate(), if flavours is not a non-empty dict, or if
+                any flavour/particle name in it is not a string.
+        """
         self.model.validate()
         self.grid.validate()
         self.smoothing.validate()
@@ -284,6 +435,16 @@ class RunConfig:
 # ============================================================
 
 def default_config() -> RunConfig:
+    """
+    Build a validated RunConfig populated entirely with default values.
+
+    Returns:
+        A RunConfig using DEFAULT_INTERACTION_MODEL,
+        DEFAULT_PRIMARY_MODEL, DEFAULT_DENSITY_MODEL, the default
+        theta/X/h grids and X_obs_gcm2, default smoothing settings,
+        default output settings, parallel execution disabled, and
+        DEFAULT_FLAVOURS as the flavour mapping.
+    """
     config = RunConfig()
     config.validate()
     return config
@@ -309,6 +470,51 @@ def make_config(
     n_jobs: int = 4,
     flavours: Optional[Dict[str, str]] = None,
 ) -> RunConfig:
+    """
+    Build a validated RunConfig from individual keyword arguments.
+
+    Convenience constructor that assembles the nested GridConfig,
+    MCEqModelConfig, SmoothingConfig, OutputConfig and ParallelConfig
+    from flat keyword arguments, rather than requiring the caller to
+    build each sub-config object explicitly.
+
+    Args:
+        theta_grid_deg: Zenith-angle grid in degrees (0 <= theta < 90);
+            defaults to 18 points linearly spaced in [0, 85].
+        X_grid_gcm2: Atmospheric slant-depth grid in g/cm^2 at which
+            MCEq's cascade-equation flux is solved; defaults to 220
+            points linearly spaced in [1, 1030].
+        h_grid_km: Altitude grid in km at which the reconstructed
+            height-differential profile/flux is reported; defaults to
+            300 points linearly spaced in [0, 80].
+        X_obs_gcm2: Observation slant depth in g/cm^2 at which the
+            energy-differential flux Phi(E, X_obs, theta) is extracted.
+        interaction_model: Name of the MCEq hadronic interaction model
+            (see INTERACTION_MODELS).
+        primary_model: Name of the crflux primary cosmic-ray flux model
+            (see PRIMARY_MODELS), or a raw (class, tag) tuple.
+        density_model: Name of the MCEq Atmosphere density model (see
+            DENSITY_MODELS).
+        smoothing_method: Flux-smoothing method passed to
+            SmoothingConfig.method.
+        smoothing: Smoothing strength passed to
+            SmoothingConfig.smoothing.
+        positive_only: Whether the depth derivative dPhi/dX is clamped
+            to non-negative values; passed to
+            SmoothingConfig.positive_only.
+        output_dir: Directory in which generated flux files are saved.
+        filename: Output file name template for generated flux files.
+        dtype: Torch dtype used when persisting tensors to disk.
+        compressed: Whether the saved output archive is compressed.
+        parallel: Whether the build loop over zenith angles is
+            parallelized across worker processes/threads.
+        n_jobs: Number of parallel workers used when parallel is True.
+        flavours: Mapping from tpeanuts neutrino-flavour name to MCEq
+            particle name; defaults to a copy of DEFAULT_FLAVOURS.
+
+    Returns:
+        A validated RunConfig built from the above arguments.
+    """
     grid = GridConfig(
         theta_grid_deg=(
             torch.linspace(0.0, 85.0, 18)

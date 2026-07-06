@@ -20,7 +20,38 @@
 core mceq initialization utilities.
 
 This module contains only the logic required to create and configure
-an mceqRun instance.
+an mceqRun instance (an alias for MCEq.core.MCEqRun, the external MCEq
+package's cascade-equation solver object). It is the single place in
+tpeanuts where an MCEqRun is constructed: init_mceq() resolves
+tpeanuts-native model names (interaction_model, primary_model,
+density_model) into the actual MCEq/crflux objects, instantiates
+MCEqRun for a given zenith angle, and attaches an Atmosphere density
+model to it. Everything else in this module
+(resolve_primary_model/resolve_density_model/theta_to_float/
+set_mceq_logging/ensure_mceq_available) is thin tpeanuts-native
+configuration plumbing around that one external call.
+
+Module functions:
+    ensure_mceq_available:
+        Raise ImportError with an actionable message if the optional
+        MCEq dependency was not installed.
+    resolve_primary_model:
+        Resolve a tpeanuts primary-model name (or raw tuple) into the
+        crflux model object/tag pair expected by MCEqRun.
+    resolve_density_model:
+        Resolve a tpeanuts density-model name into the
+        (model_name, (location, season)) tuple expected by
+        MCEqRun.set_density_model.
+    theta_to_float:
+        Convert a tensor-like zenith angle to a validated Python float
+        in degrees, as required by the MCEqRun constructor.
+    set_mceq_logging:
+        Set the verbosity of MCEq's internal Python logger.
+    init_mceq:
+        Build and return a fully configured MCEqRun instance for a
+        given zenith angle and physics-model selection. This is the
+        only function in this module that directly constructs an
+        external MCEq object.
 """
 
 
@@ -32,7 +63,7 @@ from typing import Optional, Union
 
 import torch
 
-from tpeanuts.util.type import _as_tensor
+from tpeanuts.util.type import as_tensor
 
 from tpeanuts.external.mceq.config import (
     MCEqModelConfig,
@@ -58,6 +89,18 @@ MCEQ_IMPORT_ERROR = (
 
 
 def ensure_mceq_available() -> None:
+    """
+    Raise an actionable ImportError if the optional MCEq package is
+    unavailable in the current Python environment.
+
+    This is tpeanuts-native plumbing: it does not call MCEq itself, it
+    only checks whether the earlier `from MCEq.core import MCEqRun`
+    import at module load time succeeded.
+
+    Raises:
+        ImportError: If MCEq.core.MCEqRun could not be imported,
+            instructing the user to install the optional mceq extras.
+    """
     if mceqRun is None:
         raise ImportError(MCEQ_IMPORT_ERROR)
 
@@ -72,6 +115,31 @@ TensorLike = Union[float, int, torch.Tensor]
 def resolve_primary_model(
     primary_model: Optional[Union[str, tuple]] = DEFAULT_PRIMARY_MODEL,
 ):
+    """
+    Resolve a tpeanuts primary cosmic-ray model name into the crflux
+    object/tag pair expected by the MCEqRun constructor.
+
+    The primary model is the cosmic-ray flux injected at the top of the
+    atmosphere (the boundary condition for MCEq's cascade-equation
+    solve), expressed as all-particle/per-nucleus flux versus energy.
+    Physical model choices (e.g. Hillas-Gaisser, Gaisser-Stanev-Tilav)
+    differ in their assumed cosmic-ray source/propagation physics and
+    therefore in the resulting atmospheric secondary flux.
+
+    Args:
+        primary_model: Either a key of PRIMARY_MODELS (a human-readable
+            tpeanuts name such as "HillasGaisser H3a"), a raw
+            (model_class, model_tag) tuple already in the form MCEq
+            expects, or None to fall back to DEFAULT_PRIMARY_MODEL.
+
+    Returns:
+        A (model_class, model_tag) tuple from the crflux.models module,
+        ready to be passed as primary_model to MCEqRun.
+
+    Raises:
+        ValueError: If primary_model is a string not found in
+            PRIMARY_MODELS.
+    """
     if primary_model is None:
         primary_model = DEFAULT_PRIMARY_MODEL
 
@@ -90,6 +158,29 @@ def resolve_primary_model(
 def resolve_density_model(
     density_model: Optional[str] = DEFAULT_DENSITY_MODEL,
 ):
+    """
+    Resolve a tpeanuts Atmosphere density-model name into the
+    (model_name, (location, season)) tuple expected by
+    MCEqRun.set_density_model.
+
+    The density model determines the Atmosphere mass-density profile
+    rho(h) (and hence the altitude <-> slant-depth mapping X(h, theta))
+    used by MCEq's cascade-equation solve; different choices represent
+    different site/season Atmosphere conditions (e.g. US Standard
+    Atmosphere, NRLMSISE-00 at the South Pole).
+
+    Args:
+        density_model: A key of DENSITY_MODELS (e.g. "CORSIKA", "NASA",
+            "ICECUBE", "ISOTHERMAL"), or None to fall back to
+            DEFAULT_DENSITY_MODEL.
+
+    Returns:
+        A (model_name, (location, season)) tuple as required by
+        MCEqRun.set_density_model.
+
+    Raises:
+        ValueError: If density_model is not a key of DENSITY_MODELS.
+    """
     if density_model is None:
         density_model = DEFAULT_DENSITY_MODEL
 
@@ -103,7 +194,25 @@ def resolve_density_model(
 
 
 def theta_to_float(theta_deg: TensorLike) -> float:
-    theta_t = _as_tensor(theta_deg, device="cpu", dtype=torch.float64)
+    """
+    Convert a tensor-like zenith angle to a validated Python float in
+    degrees, as required by the MCEqRun constructor.
+
+    Args:
+        theta_deg: Scalar or tensor-like zenith angle in degrees. Only
+            the first element is used if more than one is given.
+            theta_deg=0 corresponds to a vertically downward-going
+            trajectory; theta_deg must stay below 90 degrees so that
+            the trajectory still reaches the ground/observation depth
+            (cos(theta) > 0).
+
+    Returns:
+        The zenith angle as a plain Python float in degrees.
+
+    Raises:
+        ValueError: If theta_deg is not in [0, 90) degrees.
+    """
+    theta_t = as_tensor(theta_deg, device="cpu", dtype=torch.float64)
     theta_float = float(theta_t.detach().cpu().reshape(-1)[0].item())
 
     if theta_float < 0.0 or theta_float >= 90.0:
@@ -116,6 +225,15 @@ def theta_to_float(theta_deg: TensorLike) -> float:
 
 
 def set_mceq_logging(info: bool = False) -> None:
+    """
+    Set the verbosity of MCEq's internal Python logger.
+
+    Args:
+        info: If True, set the root logger level to INFO (MCEq prints
+            verbose diagnostic messages during initialization and
+            solving). If False, restrict it to ERROR level to suppress
+            MCEq's routine console output.
+    """
     if info:
         logging.getLogger().setLevel(logging.INFO)
     else:
@@ -134,6 +252,50 @@ def init_mceq(
     density_model: Optional[str] = None,
     info: Optional[bool] = None,
 ):
+    """
+    Build and return a fully configured MCEqRun instance.
+
+    This is the single entry point in tpeanuts that directly constructs
+    an external MCEq object: it instantiates MCEq.core.MCEqRun for the
+    requested zenith angle, hadronic interaction model and primary
+    cosmic-ray flux model, then attaches the requested Atmosphere
+    density model via MCEqRun.set_density_model. The returned object
+    encapsulates the cascade-equation transport problem (production and
+    propagation of secondary hadrons, muons and neutrinos through the
+    atmosphere) and can subsequently be solved (mceq.solve(...)) and
+    queried (mceq.get_solution(...)) by the solver module.
+
+    Args:
+        theta_deg: Zenith angle in degrees (0 <= theta_deg < 90) of the
+            shower/neutrino trajectory; theta_deg=0 is vertical.
+        config: Optional MCEqModelConfig providing defaults for
+            interaction_model, primary_model, density_model and info.
+            Ignored on a per-field basis whenever the corresponding
+            explicit keyword argument below is given.
+        interaction_model: Optional override for the MCEq hadronic
+            interaction model name (see INTERACTION_MODELS); defaults
+            to config.interaction_model.
+        primary_model: Optional override for the crflux primary
+            cosmic-ray flux model name or raw (class, tag) tuple (see
+            PRIMARY_MODELS); defaults to config.primary_model.
+        density_model: Optional override for the Atmosphere density
+            model name (see DENSITY_MODELS); defaults to
+            config.density_model.
+        info: Optional override for MCEq logger verbosity; defaults to
+            config.info.
+
+    Returns:
+        An initialized MCEq.core.MCEqRun instance (returned under the
+        local alias mceqRun) for the given zenith angle, with its
+        density model already set, ready to be solved.
+
+    Raises:
+        ImportError: If the optional MCEq package is not installed (via
+            ensure_mceq_available).
+        ValueError: If the resolved interaction_model, primary_model or
+            density_model is not recognised, or if theta_deg is outside
+            [0, 90) degrees.
+    """
     ensure_mceq_available()
 
     if config is None:

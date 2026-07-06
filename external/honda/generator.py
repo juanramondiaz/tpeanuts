@@ -18,6 +18,41 @@
 
 """
 Generate TPeanuts height-differential source flux files from Honda tables.
+
+This module is tpeanuts-native logic built on top of the Honda/HKKM table
+reader in ``external.honda.tables``: it does not call any external Python
+package, only the local parser for the Honda ``.d.gz`` text files. Its job is
+to turn the height-integrated Honda flux Phi(E, cosZ) and the Honda
+production-height quantiles into the height-differential source flux
+
+    Phi(E,h) = Phi(E; X_obs) * f(h|E,theta)
+
+used as the upper boundary condition for atmosphere-neutrino propagation
+through the atmosphere and Earth. Phi(E; X_obs) is interpolated (log-log in
+energy, linear in cos(zenith)) from the Honda flux table onto a requested
+energy grid and zenith/detector angle; f(h|E,theta) is reconstructed as the
+derivative of the production-height cumulative distribution built from the
+Honda quantiles (or, for particles without a Honda height table such as tau
+neutrinos, approximated as a flat density over the requested height grid,
+or set to zero flux for particles absent from the Honda flavour set).
+
+Angle convention: theta is the MCEq/TPeanuts atmosphere zenith angle in
+degrees (0 = vertically downward, 90 = horizontal), and cosZ = cos(theta)
+is the Honda binning coordinate. Detector angle alpha (also in degrees) is
+optionally converted to a surface theta via
+``medium.atmosphere.geometry.detector_alpha_to_surface_theta`` before table
+lookup, to account for detector depth.
+
+Module functions:
+    load_honda_tables(...)
+        Locate and parse the Honda flux table and per-particle
+        production-height tables needed for a set of particles.
+    generate_flux_for_particle_angle(...)
+        Build and optionally save one height-differential flux file
+        Phi(E,h) for a single particle and zenith/detector angle.
+    generate_flux_for_particles_angle_grid(...)
+        Run generate_flux_for_particle_angle over a grid of particles and
+        angles, optionally in parallel, and group results by flavour.
 """
 
 from __future__ import annotations
@@ -40,15 +75,15 @@ from tpeanuts.external.honda.tables import (
     read_height_table,
 )
 from tpeanuts.util.parallel import ParallelConfig
-from tpeanuts.atmosphere.geometry import detector_alpha_to_surface_theta
-from tpeanuts.io.io_atmosphere import (
+from tpeanuts.medium.atmosphere.geometry import detector_alpha_to_surface_theta
+from tpeanuts.medium.atmosphere.io import (
     build_angle_output_path,
     OutputConfig,
     save_phi_Eh_theta_result,
 )
 from tpeanuts.util.parallel import run_task_dicts
-from tpeanuts.util.torch_util import _default_device
-from tpeanuts.util.type import _as_tensor
+from tpeanuts.util.torch_util import default_device
+from tpeanuts.util.type import as_tensor
 
 
 TensorLike = Union[float, int, torch.Tensor]
@@ -58,11 +93,11 @@ M2_TO_CM2_FLUX = 1.0e-4
 def _resolve_device(device: Optional[Union[str, torch.device]]) -> torch.device:
     if callable(device):
         device = device()
-    return _default_device(device)
+    return default_device(device)
 
 
 def _scalar_float(value: TensorLike) -> float:
-    value_t = _as_tensor(value, device="cpu", dtype=torch.float64)
+    value_t = as_tensor(value, device="cpu", dtype=torch.float64)
     return float(value_t.detach().cpu().reshape(-1)[0].item())
 
 
@@ -84,6 +119,7 @@ def _expected_output_path(
 
 
 def _interp_logx(x: np.ndarray, xp: np.ndarray, fp: np.ndarray) -> np.ndarray:
+    """Linearly interpolate fp(xp) in log10(x), matching Honda's log-spaced energy grid."""
     return np.interp(np.log10(x), np.log10(xp), fp)
 
 
@@ -94,6 +130,25 @@ def _interpolate_flux_cm2(
     cosz: float,
     energy_grid: np.ndarray,
 ) -> np.ndarray:
+    """
+    Interpolate a Honda flux table onto a requested energy grid and cos(zenith).
+
+    Interpolation is log-linear in energy (matching the Honda grid spacing)
+    and linear in cos(zenith) between the 20 Honda zenith bin centers.
+
+    Args:
+        flux_table: Parsed Honda flux table, as returned by
+            external.honda.tables.read_flux_table.
+        honda_flavour: Honda flux column name (e.g. "NuMu", "NuEbar").
+        cosz: cos(zenith) at the detector; cosz=1 is vertically downward.
+        energy_grid: 1D array of neutrino energies in GeV at which to
+            evaluate the flux.
+
+    Returns:
+        1D array of differential flux in (cm^2 s sr GeV)^-1 (converted from
+        the Honda (m^2 s sr GeV)^-1 units via M2_TO_CM2_FLUX), matching
+        energy_grid.
+    """
     source_energy = flux_table["energy_GeV"]
     source_cosz = flux_table["cosz_center"]
     values = flux_table["flux_m2"][honda_flavour]
@@ -113,6 +168,23 @@ def _select_height_source(
     height_tables: dict[str, Optional[dict[str, Any]]],
     particle: str,
 ) -> Optional[dict[str, Any]]:
+    """
+    Pick a production-height table for a particle, with a tau-neutrino fallback.
+
+    Honda does not publish production-height tables for tau neutrinos
+    (they are not produced directly in cosmic-ray air showers). As an
+    approximation, nutau/antinutau fall back to the numu/antinumu height
+    table, since both come from the same hadronic shower region.
+
+    Args:
+        height_tables: Mapping from particle name to parsed Honda
+            production-height table (or None if unavailable).
+        particle: tpeanuts particle/flavour name.
+
+    Returns:
+        The matching production-height table dictionary, or None if no
+        table (including no fallback) is available for this particle.
+    """
     if height_tables.get(particle) is not None:
         return height_tables[particle]
 
@@ -129,6 +201,25 @@ def _interpolate_quantiles(
     cosz: float,
     energy_grid: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Interpolate Honda production-height quantiles onto an energy grid and cos(zenith).
+
+    Each quantile (e.g. the 10%, 20%, ... height of the production-height
+    cumulative distribution) is interpolated independently: log-linear in
+    energy, then linear in cos(zenith) between Honda zenith bin centers.
+
+    Args:
+        height_table: Parsed Honda production-height table, as returned by
+            external.honda.tables.read_height_table.
+        cosz: cos(zenith) at the detector.
+        energy_grid: 1D array of neutrino energies in GeV.
+
+    Returns:
+        Pair (probabilities, q) where probabilities is the 1D array of
+        quantile probability levels in [0, 1] and q is a 2D array of shape
+        (n_energy, n_probabilities) with the corresponding production
+        heights in km.
+    """
     source_energy = height_table["energy_GeV"]
     source_cosz = height_table["cosz_center"]
     probabilities = height_table["probabilities"]
@@ -143,10 +234,16 @@ def _interpolate_quantiles(
                 quantiles[iz, :, ip],
             )
 
+    # Guarantee ascending xp for np.interp (Honda height tables are keyed by
+    # zenith_bin, which yields *decreasing* cosz if not re-sorted at read time).
+    sort_idx = np.argsort(source_cosz)
+    source_cosz_asc = source_cosz[sort_idx]
+    q_energy_asc = q_energy[sort_idx]
+
     q = np.empty((energy_grid.size, probabilities.size), dtype=float)
     for ie in range(energy_grid.size):
         for ip in range(probabilities.size):
-            q[ie, ip] = np.interp(cosz, source_cosz, q_energy[:, ie, ip])
+            q[ie, ip] = np.interp(cosz, source_cosz_asc, q_energy_asc[:, ie, ip])
 
     return probabilities, q
 
@@ -156,6 +253,29 @@ def _density_from_quantiles(
     quantile_heights_km: np.ndarray,
     h_grid_km: np.ndarray,
 ) -> np.ndarray:
+    """
+    Reconstruct a normalized production-height density f(h|E) from quantiles.
+
+    For each energy row, the (probability, height) quantile pairs define a
+    piecewise-linear cumulative distribution function (CDF) of production
+    height, anchored at h=0 (CDF=0) and at the top of the grid (CDF=1). The
+    density is obtained as the numerical derivative dCDF/dh on h_grid_km,
+    clipped to be non-negative and renormalized so that its integral over
+    h_grid_km equals 1. If the quantile data is degenerate (zero or
+    non-finite normalization), a narrow delta-like density at h=0 is used
+    instead.
+
+    Args:
+        probabilities: 1D array of quantile probability levels in [0, 1].
+        quantile_heights_km: 2D array of shape (n_energy, n_probabilities)
+            with production-height quantiles in km, one row per energy.
+        h_grid_km: 1D altitude grid in km on which to evaluate the density.
+
+    Returns:
+        2D array of shape (n_energy, h_grid_km.size) with the
+        height-density f(h|E) in 1/km, normalized so that
+        integral f(h|E) dh = 1 for each energy row.
+    """
     f = np.zeros((quantile_heights_km.shape[0], h_grid_km.size), dtype=float)
 
     for ie, heights in enumerate(quantile_heights_km):
@@ -186,6 +306,24 @@ def _density_from_quantiles(
 
 
 def _flat_height_density(energy_grid: np.ndarray, h_grid_km: np.ndarray) -> np.ndarray:
+    """
+    Build a uniform (energy-independent) production-height density.
+
+    Used as a fallback when no Honda production-height table is available
+    for a particle (e.g. no flavour-specific table and no tau-neutrino
+    fallback). Approximates ignorance of the true height distribution by
+    spreading the flux uniformly over the requested height grid.
+
+    Args:
+        energy_grid: 1D array of neutrino energies in GeV (only its size is
+            used).
+        h_grid_km: 1D altitude grid in km.
+
+    Returns:
+        2D array of shape (energy_grid.size, h_grid_km.size), uniform along
+        the height axis and normalized so that integral f(h) dh = 1 for
+        each energy row.
+    """
     density = np.ones((energy_grid.size, h_grid_km.size), dtype=float)
     norm = np.trapz(density, x=h_grid_km, axis=1)
     return density / norm[:, None]
@@ -197,6 +335,29 @@ def load_honda_tables(
     selection: HondaTableSelection,
     particles: list[str],
 ) -> dict[str, Any]:
+    """
+    Locate and parse the Honda flux table and per-particle height tables.
+
+    This loads the data once so that it can be reused across many
+    particle/angle combinations (see generate_flux_for_particles_angle_grid),
+    instead of re-reading the gzip files for every call.
+
+    Args:
+        honda_data_dir: Optional directory hint forwarded to
+            find_honda_data_dir.
+        selection: Honda table variant (site, season, solar, mountain,
+            angular mode) to load.
+        particles: List of tpeanuts particle/flavour names for which a
+            production-height table should be loaded (entries without a
+            matching Honda height table are stored as None).
+
+    Returns:
+        Dictionary with keys "data_dir" (resolved Honda data directory as
+        str), "flux_table" (parsed flux table dict, see
+        external.honda.tables.read_flux_table), and "height_tables" (dict
+        mapping each requested particle to its parsed production-height
+        table, or None).
+    """
     data_dir = find_honda_data_dir(honda_data_dir)
     flux_path = choose_flux_file(data_dir, selection)
     flux_table = read_flux_table(flux_path)
@@ -226,8 +387,29 @@ def _metadata_extra(
     synthetic_zero_flux: bool,
     build_time_sec: float,
 ) -> dict[str, Any]:
+    """
+    Assemble provenance/units metadata for one generated Honda flux file.
+
+    Args:
+        alpha_deg: Detector angle in degrees, if used, else None.
+        theta_deg: Resolved atmosphere surface zenith angle in degrees.
+        cosz: cos(theta_deg) used for table interpolation.
+        selection: Honda table variant that was loaded.
+        honda_data_dir: Resolved Honda data directory.
+        flux_table: Parsed flux table dict (for its "path").
+        height_table: Parsed height table dict, or None.
+        source_honda_flavour: Honda flux column used, or None if the
+            particle has no Honda flavour (synthetic zero flux).
+        synthetic_zero_flux: Whether the flux was set to all zeros because
+            no Honda flavour matched the particle.
+        build_time_sec: Wall-clock seconds spent building this result.
+
+    Returns:
+        JSON-serializable metadata dictionary describing units, file
+        provenance, and the angle/height reconstruction conventions used.
+    """
     return {
-        "description": "Atmospheric height-differential flux generated from Honda/HKKM tables.",
+        "description": "Atmosphere height-differential flux generated from Honda/HKKM tables.",
         "source": "Honda/HKKM",
         "honda_data_dir": honda_data_dir,
         "honda_flux_file": flux_table["path"],
@@ -240,7 +422,7 @@ def _metadata_extra(
         "theta_surface_deg": float(theta_deg),
         "theta_mceq_deg": float(theta_deg),
         "alpha_detector_deg": alpha_deg,
-        "angle_relation": "cosZ = cos(theta_surface); theta_surface is the MCEq/TPeanuts atmospheric zenith angle. If alpha is provided, theta_surface is computed from detector alpha and detector depth.",
+        "angle_relation": "cosZ = cos(theta_surface); theta_surface is the MCEq/TPeanuts Atmosphere zenith angle. If alpha is provided, theta_surface is computed from detector alpha and detector depth.",
         "site_code": selection.site_code,
         "season_code": selection.season_code,
         "solar": selection.solar,
@@ -272,6 +454,69 @@ def generate_flux_for_particle_angle(
     dtype: torch.dtype = torch.float64,
     debug: bool = False,
 ) -> dict[str, Any]:
+    """
+    Build one Honda-derived height-differential flux file Phi(E,h).
+
+    This is the main entry point of the Honda generator. For a single
+    particle and zenith/detector angle, it interpolates the Honda
+    height-integrated flux Phi(E; X_obs) and production-height density
+    f(h|E,theta) (see module docstring) from the loaded Honda tables, forms
+    Phi(E,h) = Phi(E; X_obs) * f(h|E,theta), and optionally saves the
+    result as a tpeanuts torch flux file using
+    ``medium.atmosphere.io.save_phi_Eh_theta_result``.
+
+    Args:
+        particle: tpeanuts particle/flavour name (e.g. "numu", "antinue").
+            Particles without a matching Honda flux flavour get a
+            synthetic all-zero flux; particles without a height table fall
+            back to a flat height density (see _select_height_source).
+        alpha_deg: Detector zenith angle in degrees. Mutually exclusive
+            with theta_deg; converted internally to a surface theta via
+            detector_alpha_to_surface_theta using detector_depth_m.
+        theta_deg: Atmosphere surface zenith angle in degrees (MCEq
+            convention: 0 = vertically downward, 90 = horizontal). Mutually
+            exclusive with alpha_deg. Must satisfy 0 <= theta_deg < 90.
+        detector_depth_m: Detector depth below the Earth surface in metres,
+            used only when alpha_deg is given.
+        flavour_name: Optional grouping label stored in the output
+            filename/metadata; defaults to particle when omitted downstream.
+        honda_data_dir: Optional directory hint forwarded to
+            find_honda_data_dir, used only when tables is None.
+        selection: Honda table variant to load when tables is None.
+        tables: Optional pre-loaded tables dict from load_honda_tables, to
+            avoid re-reading the Honda files for every angle in a grid.
+        energy_grid_GeV: Optional neutrino energy grid in GeV. Defaults to
+            the Honda table's native energy grid.
+        h_grid_km: Optional altitude grid in km for the height axis.
+            Defaults to 501 points linearly spaced from 0 to 120 km.
+        output_config: Output directory/filename/dtype settings used when
+            save=True.
+        save: If True, write the result to disk via
+            save_phi_Eh_theta_result.
+        skip_existing: If True and the expected output file already exists
+            (and output_config.overwrite is False), skip recomputation and
+            return early with "skipped": True.
+        device: Optional torch device for the returned tensors.
+        dtype: Real torch dtype for the returned tensors.
+        debug: If True, print progress/skip/save messages.
+
+    Returns:
+        Dictionary with the computed tensors and metadata. Always includes
+        "particle", "flavour_name", "theta_deg" (and "alpha_deg" when
+        applicable). On a full (non-skipped) computation, also includes
+        "E_grid_GeV"/"E_grid" (energy grid in GeV), "h_grid_km" (height grid
+        in km), "phi_E_obs"/"phi_E" (Phi(E; X_obs) in (cm^2 s sr GeV)^-1),
+        "f_Eh"/"f_E_h" (normalized height density in 1/km),
+        "phi_Eh"/"phi_E_h" (the product, the height-differential flux),
+        "cosz" (cos(theta_deg)), "metadata_extra" (provenance/units
+        metadata), and "output_path" when save=True. When skip_existing
+        short-circuits, the dictionary instead contains
+        "output_path"/"skipped": True without the tensor fields.
+
+    Raises:
+        ValueError: If neither alpha_deg nor theta_deg is given, or if the
+            resolved theta_deg falls outside 0 <= theta_deg < 90.
+    """
     if theta_deg is None and alpha_deg is None:
         raise ValueError("Provide either alpha_deg or theta_deg.")
 
@@ -334,12 +579,12 @@ def generate_flux_for_particle_angle(
     if energy_grid_GeV is None:
         energy_np = np.asarray(flux_table["energy_GeV"], dtype=float)
     else:
-        energy_np = _as_tensor(energy_grid_GeV, device="cpu", dtype=torch.float64).numpy()
+        energy_np = as_tensor(energy_grid_GeV, device="cpu", dtype=torch.float64).numpy()
 
     if h_grid_km is None:
         h_np = np.linspace(0.0, 120.0, 501, dtype=float)
     else:
-        h_np = _as_tensor(h_grid_km, device="cpu", dtype=torch.float64).numpy()
+        h_np = as_tensor(h_grid_km, device="cpu", dtype=torch.float64).numpy()
 
     cosz = float(np.cos(np.deg2rad(theta_value)))
     honda_flavour = TPEANUTS_TO_HONDA.get(str(particle).lower())
@@ -425,6 +670,7 @@ def generate_flux_for_particle_angle(
 
 
 def _generate_particle_angle_task(**kwargs):
+    """Keyword-only adapter so generate_flux_for_particle_angle can run as a parallel task."""
     return generate_flux_for_particle_angle(**kwargs)
 
 
@@ -447,6 +693,53 @@ def generate_flux_for_particles_angle_grid(
     dtype: torch.dtype = torch.float64,
     debug: bool = False,
 ) -> dict[str, Any]:
+    """
+    Build Honda-derived height-differential flux files over a particle/angle grid.
+
+    Runs generate_flux_for_particle_angle for every combination of the
+    requested particles and angle grid, sharing one set of loaded Honda
+    tables across all of them, optionally in parallel
+    (see ``util.parallel.run_task_dicts``), and groups the per-angle results
+    by flavour.
+
+    Args:
+        particles: Either a dict mapping flavour_name -> particle name, or
+            a list/tuple of particle names (in which case flavour_name
+            equals particle for each).
+        alpha_grid_deg: 1D grid of detector zenith angles in degrees.
+            Mutually exclusive with theta_grid_deg.
+        theta_grid_deg: 1D grid of atmosphere surface zenith angles in
+            degrees. Mutually exclusive with alpha_grid_deg.
+        detector_depth_m: Detector depth below the Earth surface in metres,
+            used only with alpha_grid_deg.
+        honda_data_dir: Optional directory hint forwarded to
+            find_honda_data_dir.
+        selection: Honda table variant to load.
+        energy_grid_GeV: Optional neutrino energy grid in GeV, forwarded to
+            every per-angle call.
+        h_grid_km: Optional altitude grid in km, forwarded to every
+            per-angle call.
+        output_config: Output directory/filename/dtype settings.
+        parallel_config: Parallel-execution settings for the per-task grid;
+            defaults to sequential execution.
+        save: If True, write each result to disk.
+        skip_existing: If True, skip recomputation for files that already
+            exist.
+        device: Optional torch device for the returned tensors.
+        dtype: Real torch dtype for the returned tensors.
+        debug: If True, print progress and per-job summary messages.
+
+    Returns:
+        Dictionary keyed by flavour_name. Each value is a dictionary with
+        "particle", "flavour_name", "angle_mode" ("alpha" or "theta"),
+        "input_angle_grid_deg" (the requested angle tensor), and "results"
+        (a dict mapping the resolved theta_deg float to the corresponding
+        generate_flux_for_particle_angle result dictionary).
+
+    Raises:
+        ValueError: If neither or both of alpha_grid_deg/theta_grid_deg are
+            given.
+    """
     if alpha_grid_deg is None and theta_grid_deg is None:
         raise ValueError("Provide either alpha_grid_deg or theta_grid_deg.")
     if alpha_grid_deg is not None and theta_grid_deg is not None:
@@ -459,7 +752,7 @@ def generate_flux_for_particles_angle_grid(
 
     angle_mode = "alpha" if alpha_grid_deg is not None else "theta"
     angle_grid = alpha_grid_deg if alpha_grid_deg is not None else theta_grid_deg
-    angle_grid = _as_tensor(angle_grid, device="cpu", dtype=torch.float64).reshape(-1)
+    angle_grid = as_tensor(angle_grid, device="cpu", dtype=torch.float64).reshape(-1)
 
     output_config = output_config or OutputConfig(
         output_dir="honda_height_flux_outputs",

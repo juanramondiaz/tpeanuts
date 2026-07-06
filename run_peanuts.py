@@ -82,7 +82,7 @@ for param in settings.scan:
 
   if settings.vacuum:
 
-    if settings.probabilities:
+    if settings.probability:
       # Calculate vacuum probabilities
       out["vacuum"] = Pvacuum(nustate, pmns, param.dm21, param.dm3l, param.energy, param.baseline, antinu=settings.antinu, massbasis=massbasis)
 
@@ -96,7 +96,7 @@ for param in settings.scan:
       out["flux"] = solar_model.flux(settings.fraction)
 
     # Compute probability for the given sample fraction and energy
-    if settings.probabilities:
+    if settings.probability:
       out["solar"] = Psolar(pmns, param.dm21, param.dm3l, param.energy, solar_model.radius(), solar_model.density(), solar_model.fraction(settings.fraction))
 
     # Add undistorted or distorted spectrum if requested

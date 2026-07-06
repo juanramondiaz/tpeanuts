@@ -1,8 +1,48 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# =============================================================================
+#  This module is part of the Master's Thesis (MSc Dissertation):
+#  - Fast Simulation of Neutrino Oscillations in Matter
+#  
+#  Author:
+#      Juan Ramon Diaz Santos <diazjuan@alumni.uv.es>
+#
+#  Supervisors:
+#      Roberto Ruiz de Austri Bazan <rruiz@ific.uv.es>
+#      Michele Lucente <michele.lucente@unibo.it>
+#
+#  Date:
+#      June 2026
+# =============================================================================
+
 """
 Shared helpers for TPeanuts notebooks.
 
 The helpers in this module keep notebook boilerplate small while preserving the
 original Python modules as the source of truth for tests and runs.
+
+Module functions:
+    find_repo_root(...): Locate the TPeanuts repository root from a notebook
+        working directory.
+    add_repo_to_sys_path(...): Add the repository root and its parent to
+        sys.path for notebook execution.
+    safe_label(...): Return a filesystem-friendly label for generated
+        figures.
+    print_error_table(...): Print a compact text table in a notebook output
+        cell.
+    print_comparison(...): Print absolute/relative errors between two
+        array-like values.
+    save_figure(...): Save a matplotlib figure to a notebook output
+        directory.
+    show_figure(...): Display or close a matplotlib figure per notebook
+        configuration.
+    save_and_show(...): Save a figure and then apply the display policy.
+    build_notebook_test_runner(...): Factory creating a NotebookTestRunner.
+
+Module classes:
+    NotebookTestRunner: Runs imported test functions from a notebook with
+        shared figure-saving and output-directory handling.
 """
 
 from __future__ import annotations
@@ -41,7 +81,18 @@ def find_repo_root(start: Path | str | None = None, folder: str = "tests") -> Pa
 
 
 def add_repo_to_sys_path(repo_root: Path | str | None = None, folder: str = "tests") -> Path:
-    """Add the repository and its parent to sys.path for notebook execution."""
+    """Add the repository and its parent to sys.path for notebook execution.
+
+    Args:
+        repo_root: Explicit repository root, or a starting path passed to
+            find_repo_root. None searches from the current working
+            directory.
+        folder: Notebook subfolder used to validate the repository root, as
+            in find_repo_root.
+
+    Returns:
+        Resolved repository root path that was added to sys.path.
+    """
     root = find_repo_root(repo_root, folder=folder)
     for path in [root.parent, root]:
         path_s = str(path)
@@ -51,7 +102,16 @@ def add_repo_to_sys_path(repo_root: Path | str | None = None, folder: str = "tes
 
 
 def safe_label(label: Any) -> str:
-    """Return a filesystem-friendly label for generated notebook figures."""
+    """Return a filesystem-friendly label for generated notebook figures.
+
+    Args:
+        label: Value to convert. Converted to a string first.
+
+    Returns:
+        String with only alphanumeric characters, ".", "_", and "-"
+        retained (others replaced by "_"), surrounding underscores
+        stripped, and "figure" returned if the result would be empty.
+    """
     text = str(label)
     safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in text)
     return safe.strip("_") or "figure"
@@ -200,7 +260,13 @@ def save_and_show(
 
 
 class NotebookTestRunner:
-    """Run imported test functions from a notebook with shared output handling."""
+    """Run imported test functions from a notebook with shared output handling.
+
+    Wraps an imported test module so its tests can be executed cell-by-cell
+    inside a notebook while figures are automatically saved to a common
+    output directory and matplotlib's interactive ``show`` is redirected
+    consistently with the notebook's display policy.
+    """
 
     def __init__(
         self,
@@ -211,6 +277,17 @@ class NotebookTestRunner:
         auto_save_figures: bool = True,
         extra_module_attrs: dict[str, Any] | None = None,
     ) -> None:
+        """
+        Args:
+            test_module: Imported Python test module whose functions will be
+                executed via run_test/run_call.
+            output_dir: Directory where generated figures are saved.
+            show_plots: Whether figures should also be displayed inline.
+            auto_save_figures: Whether open matplotlib figures are saved
+                automatically after each test runs.
+            extra_module_attrs: Optional extra attributes to set on
+                test_module before running tests (e.g. shared fixtures).
+        """
         self.test_module = test_module
         self.output_dir = Path(output_dir)
         self.show_plots = bool(show_plots)
@@ -268,6 +345,13 @@ class NotebookTestRunner:
         return None
 
     def prepare_module(self) -> None:
+        """Configure test_module's output directory, plot flag, and matplotlib hook.
+
+        Creates output_dir if missing, propagates output_dir/show_plots onto
+        any matching attributes found on test_module (OUTPUT_DIR,
+        OUTPUT_CONFIG.output_dir, SHOW_PLOTS), and installs the controlled
+        plt.show wrapper so figures are captured instead of blocking.
+        """
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         if hasattr(self.test_module, "OUTPUT_DIR"):
@@ -297,6 +381,19 @@ class NotebookTestRunner:
             self.test_module.plt.show = self.original_plt_show
 
     def run_test(self, test_func: Callable[..., Any]) -> Any:
+        """Run a single test function with output/figure handling.
+
+        Args:
+            test_func: Zero-argument callable to execute, typically a test
+                function imported from test_module.
+
+        Returns:
+            Value returned by test_func.
+
+        Raises:
+            Exception: Re-raises any exception from test_func after printing
+                a failure banner and a traceback.
+        """
         self.prepare_module()
         self.current_label = test_func.__name__
         print(f"Running {test_func.__name__} ...")
@@ -326,6 +423,25 @@ class NotebookTestRunner:
         requires_real_data: bool = False,
         run_real_data: bool = True,
     ) -> Any:
+        """Run an arbitrary callable with the same output/figure handling as run_test.
+
+        Args:
+            label: Description used in progress messages and as the figure
+                filename prefix.
+            call: Zero-argument callable to execute.
+            requires_real_data: Whether call needs real (non-synthetic) data
+                files to run.
+            run_real_data: Whether real-data calls are permitted to run in
+                this notebook session. When False and requires_real_data is
+                True, the call is skipped.
+
+        Returns:
+            Value returned by call, or None if the call was skipped.
+
+        Raises:
+            Exception: Re-raises any exception from call after printing a
+                failure banner and a traceback.
+        """
         if requires_real_data and not run_real_data:
             print(f"SKIPPED: {label} requires real data. Enable the real-data flag to run it.")
             return None
@@ -359,7 +475,20 @@ def build_notebook_test_runner(
     auto_save_figures: bool = True,
     extra_module_attrs: dict[str, Any] | None = None,
 ) -> NotebookTestRunner:
-    """Factory used by test notebooks for a compact import line."""
+    """Factory used by test notebooks for a compact import line.
+
+    Args:
+        test_module: Imported Python test module to run.
+        output_dir: Directory where generated figures are saved.
+        show_plots: Whether figures should also be displayed inline.
+        auto_save_figures: Whether open matplotlib figures are saved
+            automatically after each test runs.
+        extra_module_attrs: Optional extra attributes to set on test_module
+            before running tests.
+
+    Returns:
+        Configured NotebookTestRunner instance.
+    """
     return NotebookTestRunner(
         test_module,
         output_dir,
