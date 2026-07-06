@@ -17,7 +17,7 @@
 # =============================================================================
 
 """
-MCEq atmospheric-density utilities.
+MCEq atmosphere-density utilities.
 
 This module bridges MCEq density-model objects with the tensor-based
 TPeanuts code. MCEq itself is CPU/Python based, so calls to
@@ -34,10 +34,10 @@ Main functions:
         Evaluate the MCEq mass density at one altitude in km.
     get_mass_overburden_gcm2_from_mceq:
         Evaluate the MCEq mass overburden at one altitude in km.
-    atmospheric_mass_density_profile_from_mceq:
-        Build a torch tensor with the atmospheric mass-density profile.
-    atmospheric_mass_overburden_profile_from_mceq:
-        Build a torch tensor with the atmospheric overburden profile.
+    atmosphere_mass_density_profile_from_mceq:
+        Build a torch tensor with the atmosphere mass-density profile.
+    atmosphere_mass_overburden_profile_from_mceq:
+        Build a torch tensor with the atmosphere overburden profile.
     save_mceq_density_profile:
         Save a two-column altitude-density table extracted from MCEq.
 """
@@ -51,8 +51,8 @@ from typing import Optional, Union
 
 import torch
 
-from tpeanuts.util.type import _as_tensor
-from tpeanuts.util.torch_util import _default_device
+from tpeanuts.util.type import as_tensor
+from tpeanuts.util.torch_util import default_device
 
 from tpeanuts.external.mceq.config import (
     MCEqModelConfig,
@@ -93,7 +93,7 @@ def get_mass_density_gcm3_from_mceq(
     h_km: float,
 ) -> float:
     """
-    Evaluate MCEq atmospheric mass density at a single altitude.
+    Evaluate MCEq atmosphere mass density at a single altitude.
 
     Args:
         mceq: Initialized MCEq object whose density_model provides
@@ -115,7 +115,7 @@ def get_mass_overburden_gcm2_from_mceq(
     h_km: float,
 ) -> float:
     """
-    Evaluate MCEq atmospheric mass overburden at a single altitude.
+    Evaluate MCEq atmosphere mass overburden at a single altitude.
 
     Args:
         mceq: Initialized MCEq object whose density_model provides
@@ -146,7 +146,7 @@ def get_mass_overburden_gcm2_from_mceq(
 # ============================================================
 
 @torch.no_grad()
-def atmospheric_mass_density_profile_from_mceq(
+def atmosphere_mass_density_profile_from_mceq(
     h_km: TensorLike,
     mceq=None,
     theta_deg: TensorLike = 0.0,
@@ -159,7 +159,7 @@ def atmospheric_mass_density_profile_from_mceq(
     dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
     """
-    Build a tensor-valued atmospheric mass-density profile from MCEq.
+    Build a tensor-valued atmosphere mass-density profile from MCEq.
 
     Args:
         h_km: Scalar or tensor-like altitude values in kilometres. The returned
@@ -177,9 +177,9 @@ def atmospheric_mass_density_profile_from_mceq(
     Returns:
         Tensor of mass density values in g/cm^3 with the same shape as h_km.
     """
-    dev = _default_device(device)
+    dev = default_device(device)
 
-    h_t = _as_tensor(h_km, device=dev, dtype=dtype)
+    h_t = as_tensor(h_km, device=dev, dtype=dtype)
     original_shape = h_t.shape
 
     if mceq is None:
@@ -210,7 +210,7 @@ def atmospheric_mass_density_profile_from_mceq(
 
 
 @torch.no_grad()
-def atmospheric_mass_overburden_profile_from_mceq(
+def atmosphere_mass_overburden_profile_from_mceq(
     h_km: TensorLike,
     mceq=None,
     theta_deg: TensorLike = 0.0,
@@ -223,7 +223,7 @@ def atmospheric_mass_overburden_profile_from_mceq(
     dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
     """
-    Build a tensor-valued atmospheric overburden profile from MCEq.
+    Build a tensor-valued atmosphere overburden profile from MCEq.
 
     Args:
         h_km: Scalar or tensor-like altitude values in kilometres. The returned
@@ -239,12 +239,12 @@ def atmospheric_mass_overburden_profile_from_mceq(
         dtype: Floating dtype used for input conversion and output tensor.
 
     Returns:
-        Tensor of atmospheric mass overburden values in g/cm^2 with the same
+        Tensor of atmosphere mass overburden values in g/cm^2 with the same
         shape as h_km.
     """
-    dev = _default_device(device)
+    dev = default_device(device)
 
-    h_t = _as_tensor(h_km, device=dev, dtype=dtype)
+    h_t = as_tensor(h_km, device=dev, dtype=dtype)
     original_shape = h_t.shape
 
     if mceq is None:
@@ -330,11 +330,11 @@ def save_mceq_density_profile(
     if output_dir != "":
         os.makedirs(output_dir, exist_ok=True)
 
-    dev = _default_device(device)
+    dev = default_device(device)
 
     if h_grid_km is None:
-        h_min_t = _as_tensor(h_min_km, device=dev, dtype=dtype)
-        h_max_t = _as_tensor(h_max_km, device=dev, dtype=dtype)
+        h_min_t = as_tensor(h_min_km, device=dev, dtype=dtype)
+        h_max_t = as_tensor(h_max_km, device=dev, dtype=dtype)
 
         h_grid_t = torch.linspace(
             float(h_min_t.item()),
@@ -345,9 +345,9 @@ def save_mceq_density_profile(
         )
 
     else:
-        h_grid_t = _as_tensor(h_grid_km, device=dev, dtype=dtype)
+        h_grid_t = as_tensor(h_grid_km, device=dev, dtype=dtype)
 
-    rho_t = atmospheric_mass_density_profile_from_mceq(
+    rho_t = atmosphere_mass_density_profile_from_mceq(
         h_km=h_grid_t,
         mceq=mceq,
         theta_deg=theta_deg,

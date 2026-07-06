@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Diagrama de flujo de modulos y pipelines de tpeanuts</title>
+  <desc id="desc">Diagrama estatico del flujo entre scripts, pipeline, medios fisicos, core, datos y salidas.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .band { fill: #eef2f7; stroke: #d8dee9; stroke-width: 1.2; }
+      .box { fill: #ffffff; stroke: #596579; stroke-width: 1.6; rx: 10; ry: 10; }
+      .solar { fill: #fff7e6; stroke: #b87510; }
+      .atm { fill: #eaf7ff; stroke: #1574a6; }
+      .core { fill: #edf8f0; stroke: #25824a; }
+      .data { fill: #f4edff; stroke: #7450a8; }
+      .out { fill: #fff0f0; stroke: #b94a48; }
+      .legacy { fill: #f6f6f6; stroke: #6f6f6f; }
+      .title { font: 700 34px Arial, sans-serif; fill: #1d2430; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #536071; }
+      .label { font: 700 18px Arial, sans-serif; fill: #1f2937; }
+      .small { font: 400 14px Arial, sans-serif; fill: #3f4a5a; }
+      .tiny { font: 400 12px Arial, sans-serif; fill: #5a6575; }
+      .section { font: 700 16px Arial, sans-serif; fill: #394456; }
+      .arrow { stroke: #485569; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .arrow-soft { stroke: #7a8799; stroke-width: 1.8; fill: none; marker-end: url(#arrowSoft); }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#485569"/>
+    </marker>
+    <marker id="arrowSoft" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7a8799"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="980"/>
+  <text class="title" x="70" y="62">tpeanuts: flujo de modulos y pipelines</text>
+  <text class="subtitle" x="70" y="94">Vista estatica de las rutas solar, atmosferica y legacy desde entradas hasta salidas .pt</text>
+
+  <rect class="band" x="48" y="128" width="1504" height="118"/>
+  <text class="section" x="70" y="158">Entrada y orquestacion</text>
+
+  <rect class="box" x="76" y="178" width="250" height="48"/>
+  <text class="label" x="96" y="201">Scripts / notebooks</text>
+  <text class="tiny" x="96" y="219">notebooks/runs/*, run_*.py</text>
+
+  <rect class="box" x="406" y="168" width="270" height="68"/>
+  <text class="label" x="426" y="194">pipeline/</text>
+  <text class="small" x="426" y="214">orquestacion de workflows</text>
+
+  <rect class="box" x="756" y="158" width="250" height="88"/>
+  <text class="label" x="776" y="184">PropagationConfig</text>
+  <text class="tiny" x="776" y="204">runtime, oscillation</text>
+  <text class="tiny" x="776" y="221">earth, solar, atmosphere</text>
+
+  <rect class="box" x="1086" y="158" width="330" height="88"/>
+  <text class="label" x="1106" y="184">pipeline_common.py</text>
+  <text class="tiny" x="1106" y="204">EarthProfile, distancia Sol-Tierra</text>
+  <text class="tiny" x="1106" y="221">estado inicial, rutas de datos</text>
+
+  <path class="arrow" d="M 326 202 L 404 202"/>
+  <path class="arrow" d="M 676 202 L 754 202"/>
+  <path class="arrow" d="M 1006 202 L 1084 202"/>
+
+  <rect class="band" x="48" y="286" width="730" height="430"/>
+  <text class="section" x="70" y="316">Pipeline solar</text>
+
+  <rect class="box solar" x="76" y="342" width="262" height="74"/>
+  <text class="label" x="96" y="368">pipeline_coherent.py</text>
+  <text class="tiny" x="96" y="388">estado coherente hasta detector</text>
+  <text class="tiny" x="96" y="404">rho: point/coherent/incoherent</text>
+
+  <rect class="box solar" x="76" y="452" width="262" height="74"/>
+  <text class="label" x="96" y="478">pipeline_incoherent.py</text>
+  <text class="tiny" x="96" y="498">pesos de masa solares</text>
+  <text class="tiny" x="96" y="514">Pearth con massbasis=True</text>
+
+  <rect class="box legacy" x="76" y="562" width="262" height="74"/>
+  <text class="label" x="96" y="588">pipeline_legacypeanuts.py</text>
+  <text class="tiny" x="96" y="608">ruta legacy NumPy/Numba</text>
+  <text class="tiny" x="96" y="624">validacion y compatibilidad</text>
+
+  <rect class="box solar" x="426" y="324" width="280" height="74"/>
+  <text class="label" x="446" y="350">medium/solar</text>
+  <text class="tiny" x="446" y="370">perfil, fuente, materia solar</text>
+  <text class="tiny" x="446" y="386">psolar, solar_probability_mass</text>
+
+  <rect class="box solar" x="426" y="430" width="280" height="64"/>
+  <text class="label" x="446" y="456">medium/vacuum</text>
+  <text class="tiny" x="446" y="476">evolucion superficie solar -> Tierra</text>
+
+  <rect class="box solar" x="426" y="526" width="280" height="74"/>
+  <text class="label" x="446" y="552">medium/earth</text>
+  <text class="tiny" x="446" y="572">EarthProfile, Pearth, evolutor</text>
+  <text class="tiny" x="446" y="588">exposicion nadir</text>
+
+  <rect class="box solar" x="426" y="632" width="280" height="54"/>
+  <text class="label" x="446" y="657">coherent/</text>
+  <text class="tiny" x="446" y="676">solar_surface_state</text>
+
+  <path class="arrow-soft" d="M 338 379 C 372 379 390 361 424 361"/>
+  <path class="arrow-soft" d="M 338 379 C 382 404 382 448 424 462"/>
+  <path class="arrow-soft" d="M 338 379 C 384 438 384 535 424 563"/>
+  <path class="arrow-soft" d="M 338 379 C 378 486 382 634 424 659"/>
+  <path class="arrow-soft" d="M 338 489 C 374 489 390 438 424 361"/>
+  <path class="arrow-soft" d="M 338 489 C 374 489 390 538 424 563"/>
+  <path class="arrow-soft" d="M 338 599 L 424 563"/>
+
+  <rect class="band" x="822" y="286" width="730" height="430"/>
+  <text class="section" x="844" y="316">Pipeline atmosferico</text>
+
+  <rect class="box atm" x="850" y="342" width="270" height="74"/>
+  <text class="label" x="870" y="368">external/mceq, honda</text>
+  <text class="tiny" x="870" y="388">flujos Phi_beta(E, theta, h)</text>
+  <text class="tiny" x="870" y="404">generacion y tablas externas</text>
+
+  <rect class="box atm" x="850" y="454" width="270" height="74"/>
+  <text class="label" x="870" y="480">medium.atmosphere.io</text>
+  <text class="tiny" x="870" y="500">load_directory</text>
+  <text class="tiny" x="870" y="516">seleccion de datos de flujo</text>
+
+  <rect class="box atm" x="850" y="566" width="270" height="86"/>
+  <text class="label" x="870" y="592">pipeline_atmosphere.py</text>
+  <text class="tiny" x="870" y="612">select particle + angle</text>
+  <text class="tiny" x="870" y="629">propaga atmosfera y Tierra</text>
+  <text class="tiny" x="870" y="646">integra sobre altura h</text>
+
+  <rect class="box atm" x="1210" y="330" width="270" height="74"/>
+  <text class="label" x="1230" y="356">medium/atmosphere</text>
+  <text class="tiny" x="1230" y="376">geometria, densidad</text>
+  <text class="tiny" x="1230" y="392">S_atm(E,h,theta)</text>
+
+  <rect class="box atm" x="1210" y="442" width="270" height="74"/>
+  <text class="label" x="1230" y="468">medium/earth</text>
+  <text class="tiny" x="1230" y="488">S_earth(E,theta)</text>
+  <text class="tiny" x="1230" y="504">detector depth</text>
+
+  <rect class="box atm" x="1210" y="554" width="270" height="74"/>
+  <text class="label" x="1230" y="580">atmosphere_flux.py</text>
+  <text class="tiny" x="1230" y="600">P = |S_earth S_atm|^2</text>
+  <text class="tiny" x="1230" y="616">propagacion directa de flujo</text>
+
+  <path class="arrow" d="M 985 416 L 985 452"/>
+  <path class="arrow" d="M 985 528 L 985 564"/>
+  <path class="arrow-soft" d="M 1120 609 C 1164 609 1164 367 1208 367"/>
+  <path class="arrow-soft" d="M 1120 609 C 1164 609 1164 479 1208 479"/>
+  <path class="arrow-soft" d="M 1120 609 L 1208 591"/>
+
+  <rect class="band" x="48" y="756" width="1504" height="156"/>
+  <text class="section" x="70" y="786">Capas compartidas y salida</text>
+
+  <rect class="box core" x="86" y="820" width="330" height="64"/>
+  <text class="label" x="106" y="846">core/</text>
+  <text class="tiny" x="106" y="866">PMNS, Hamiltonianos, potenciales, evolutores, probabilidades</text>
+
+  <rect class="box data" x="486" y="820" width="260" height="64"/>
+  <text class="label" x="506" y="846">data/</text>
+  <text class="tiny" x="506" y="866">perfiles, densidades, espectros, tablas</text>
+
+  <rect class="box" x="816" y="820" width="250" height="64"/>
+  <text class="label" x="836" y="846">util/</text>
+  <text class="tiny" x="836" y="866">contexto, tipos, IO, constantes</text>
+
+  <rect class="box out" x="1136" y="810" width="330" height="84"/>
+  <text class="label" x="1156" y="836">Salidas .pt</text>
+  <text class="tiny" x="1156" y="856">metadata + tensores</text>
+  <text class="tiny" x="1156" y="873">probabilidades, fluxes, grids, estados</text>
+
+  <path class="arrow" d="M 566 686 C 566 746 330 746 275 818"/>
+  <path class="arrow" d="M 1345 628 C 1345 746 370 746 290 818"/>
+  <path class="arrow-soft" d="M 566 686 C 600 758 610 778 616 818"/>
+  <path class="arrow-soft" d="M 985 652 C 1016 744 704 766 641 818"/>
+  <path class="arrow-soft" d="M 706 563 C 798 658 898 752 932 818"/>
+  <path class="arrow-soft" d="M 1210 479 C 1098 624 1016 746 951 818"/>
+  <path class="arrow" d="M 706 563 C 826 650 1068 754 1218 808"/>
+  <path class="arrow" d="M 1120 609 C 1196 668 1260 748 1300 808"/>
+  <path class="arrow" d="M 1416 202 C 1488 278 1502 700 1332 808"/>
+
+  <text class="tiny" x="70" y="944">Archivo generado para visualizacion estatica. Fuente conceptual: estructura actual de carpetas y modulos pipeline/*, medium/*, core/*, external/* y peanuts/*.</text>
+</svg>

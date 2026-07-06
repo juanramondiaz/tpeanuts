@@ -18,6 +18,18 @@
 
 """
 Small solar-analysis helpers shared by notebooks.
+
+These helpers load and interpolate tabulated solar neutrino source spectra
+(differential flux shape vs. neutrino energy) used by solar-oscillation
+analysis notebooks; they do not perform oscillation physics themselves.
+
+Module functions:
+    load_spectrum_table(...): Load a solar source spectrum CSV as energy and
+        density arrays.
+    normalized_spectrum(...): Interpolate and normalize a solar source
+        spectrum on an energy grid.
+    relative_flux_density(...): Scale a normalized solar source spectrum by
+        a total flux value.
 """
 
 from __future__ import annotations

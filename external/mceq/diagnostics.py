@@ -17,7 +17,7 @@
 # =============================================================================
 
 """
-Diagnostics and validation utilities for atmospheric height-flux datasets.
+Diagnostics and validation utilities for Atmosphere height-flux datasets.
 
 This module provides consistency checks for:
 
@@ -28,6 +28,48 @@ This module provides consistency checks for:
     - positivity
     - finite values
     - profile reconstruction quality
+
+All checks here are tpeanuts-native tensor arithmetic; nothing in this
+module calls MCEq directly. It instead operates on the torch tensors
+produced upstream by tpeanuts.external.mceq.profiles (height-dependent
+production profile f(h | E, theta) and flux Phi(E, h, theta) derived
+from an MCEq cascade-equation solve), and is used to sanity-check that
+those derived quantities are physically well-behaved: that the
+production-height profile f(h | E, theta) integrates to 1 over altitude
+for each energy (it is a normalized probability density in h), and that
+integrating the height-differential flux Phi(E, h, theta) back over h
+reproduces the energy-differential flux Phi(E, X_obs, theta) originally
+extracted from MCEq at the observation depth.
+
+Module functions:
+    tensor_summary:
+        Compute basic descriptive statistics (shape, dtype, device,
+        min/max/mean/std, NaN/Inf flags) for a tensor.
+    check_no_nan_inf:
+        Check that a tensor contains no NaN or Inf values.
+    check_monotonic_increasing:
+        Check that a 1-D tensor is (strictly or weakly) increasing.
+    check_positive:
+        Check that a tensor has no negative values.
+    compute_profile_normalization:
+        Integrate a height-differential profile f(h | E, theta) over
+        altitude h for each energy, which should equal 1 if f is a
+        properly normalized probability density.
+    check_profile_normalization:
+        Check that compute_profile_normalization is close to 1 within
+        tolerance for every energy.
+    reconstruct_flux_from_profile:
+        Integrate a height-differential flux Phi(E, h, theta) over
+        altitude h to reconstruct the energy-differential flux at the
+        observation depth.
+    check_flux_reconstruction:
+        Check that reconstruct_flux_from_profile agrees with the
+        originally extracted observation-depth flux within tolerance.
+    diagnose_result:
+        Run the full battery of checks above on a height-flux result
+        dictionary (as produced by
+        tpeanuts.external.mceq.profiles.production_profiles_all_energies_from_flux_gradient)
+        and return a structured diagnostics report.
 """
 
 
@@ -38,8 +80,8 @@ from typing import Dict, Optional, Union
 
 import torch
 
-from tpeanuts.util.type import _as_tensor
-from tpeanuts.util.torch_util import _default_device
+from tpeanuts.util.type import as_tensor
+from tpeanuts.util.torch_util import default_device
 
 
 TensorLike = Union[float, int, torch.Tensor]
@@ -56,9 +98,24 @@ def tensor_summary(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ) -> Dict:
-    dev = _default_device(device)
+    """
+    Compute basic descriptive statistics for a tensor-like value.
 
-    x_t = _as_tensor(
+    Args:
+        x: Tensor-like input of any shape.
+        name: Label to attach to the summary, for identification in
+            reports.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        Dict with keys "name", "shape", "dtype", "device", "min",
+        "max", "mean", "std", "has_nan" and "has_inf" describing x.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
         x,
         device=dev,
         dtype=dtype,
@@ -86,9 +143,27 @@ def check_no_nan_inf(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ) -> bool:
-    dev = _default_device(device)
+    """
+    Check that a tensor-like value contains no NaN or Inf entries.
 
-    x_t = _as_tensor(
+    Args:
+        x: Tensor-like input of any shape.
+        name: Label used in the raised error message, if any.
+        raise_error: If True, raise ValueError when the check fails
+            instead of just returning False.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        True if x has no NaN or Inf values, False otherwise.
+
+    Raises:
+        ValueError: If raise_error is True and x contains NaN or Inf.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
         x,
         device=dev,
         dtype=dtype,
@@ -116,9 +191,34 @@ def check_monotonic_increasing(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ) -> bool:
-    dev = _default_device(device)
+    """
+    Check that a 1-D tensor-like value is monotonically increasing.
 
-    x_t = _as_tensor(
+    Used to validate that grids such as E_grid_GeV, X_grid_gcm2 and
+    h_grid_km are properly ordered, a requirement of the interpolation
+    and integration routines elsewhere in this package.
+
+    Args:
+        x: Tensor-like input, flattened to 1-D before the check.
+        strict: If True, require strictly increasing values (no ties);
+            if False, allow equal consecutive values.
+        raise_error: If True, raise ValueError when the check fails
+            instead of just returning False.
+        name: Label used in the raised error message, if any.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        True if x is monotonically increasing under the given
+        strictness, False otherwise.
+
+    Raises:
+        ValueError: If raise_error is True and the check fails.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
         x,
         device=dev,
         dtype=dtype,
@@ -148,9 +248,35 @@ def check_positive(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ) -> bool:
-    dev = _default_device(device)
+    """
+    Check that a tensor-like value has no negative entries.
 
-    x_t = _as_tensor(
+    Used to validate that physical quantities which must be
+    non-negative by construction (fluxes, production-height densities)
+    are not corrupted by numerical noise (e.g. from smoothing or
+    interpolation) into negative values.
+
+    Args:
+        x: Tensor-like input of any shape.
+        allow_zero: If True, zero values are considered valid (check is
+            x >= 0); if False, require strictly positive values (x > 0).
+        raise_error: If True, raise ValueError when the check fails
+            instead of just returning False.
+        name: Label used in the raised error message, if any.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        True if x satisfies the positivity condition, False otherwise.
+
+    Raises:
+        ValueError: If raise_error is True and x contains negative
+            values.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
         x,
         device=dev,
         dtype=dtype,
@@ -181,15 +307,44 @@ def compute_profile_normalization(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
-    dev = _default_device(device)
+    """
+    Integrate a height-differential production profile over altitude
+    for each energy.
 
-    h_t = _as_tensor(
+    f(h | E, theta) is the conditional probability density of particle
+    production at altitude h given energy E and zenith angle theta (see
+    tpeanuts.external.mceq.profiles); by construction it should
+    integrate to 1 over h for every energy. This function computes that
+    integral via the trapezoidal rule so callers can verify the
+    normalization (see check_profile_normalization).
+
+    Args:
+        h_grid_km: Strictly increasing 1-D altitude grid in kilometres
+            on which f_Eh is sampled.
+        f_Eh: Production-height profile tensor of shape (n_E, n_h),
+            dimensionless (probability density in h, units of 1/km).
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        1-D tensor of length n_E with the integral of f_Eh over h_grid_km
+        for each energy; should be close to 1 for a properly normalized
+        profile.
+
+    Raises:
+        ValueError: If f_Eh does not have shape (n_E, n_h) matching
+            h_grid_km.
+    """
+    dev = default_device(device)
+
+    h_t = as_tensor(
         h_grid_km,
         device=dev,
         dtype=dtype,
     ).reshape(-1)
 
-    f_t = _as_tensor(
+    f_t = as_tensor(
         f_Eh,
         device=dev,
         dtype=dtype,
@@ -221,6 +376,31 @@ def check_profile_normalization(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ):
+    """
+    Check that the production-height profile f(h | E, theta) integrates
+    to 1 over altitude for every energy, within tolerance.
+
+    Args:
+        h_grid_km: Strictly increasing 1-D altitude grid in kilometres.
+        f_Eh: Production-height profile tensor of shape (n_E, n_h).
+        atol: Absolute tolerance passed to torch.allclose when comparing
+            the per-energy integral to 1.
+        rtol: Relative tolerance passed to torch.allclose.
+        raise_error: If True, raise ValueError when the check fails
+            instead of just reporting it in the returned dict.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        Dict with keys "valid" (bool), "norm_E" (per-energy integral
+        tensor) and "max_abs_deviation" (float, largest |integral - 1|
+        across energies).
+
+    Raises:
+        ValueError: If raise_error is True and the normalization check
+            fails.
+    """
     norm_E = compute_profile_normalization(
         h_grid_km=h_grid_km,
         f_Eh=f_Eh,
@@ -268,15 +448,41 @@ def reconstruct_flux_from_profile(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ):
-    dev = _default_device(device)
+    """
+    Integrate a height-differential flux Phi(E, h, theta) over altitude
+    to reconstruct the energy-differential flux at the observation
+    depth.
 
-    h_t = _as_tensor(
+    Since Phi(E, h, theta) = Phi(E, X_obs, theta) * f(h | E, theta) and
+    f integrates to 1 over h, integrating Phi(E, h, theta) over h_grid_km
+    should reproduce the original observation-depth flux Phi(E, X_obs,
+    theta) extracted from the MCEq solve. This function performs that
+    integration via the trapezoidal rule (see check_flux_reconstruction
+    for the corresponding consistency check).
+
+    Args:
+        h_grid_km: Strictly increasing 1-D altitude grid in kilometres
+            on which phi_Eh is sampled.
+        phi_Eh: Height-differential flux tensor of shape (n_E, n_h), in
+            units of (cm^2 s sr GeV km)^-1.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        1-D tensor of length n_E with the reconstructed
+        energy-differential flux Phi(E, X_obs, theta), in units of
+        (cm^2 s sr GeV)^-1.
+    """
+    dev = default_device(device)
+
+    h_t = as_tensor(
         h_grid_km,
         device=dev,
         dtype=dtype,
     ).reshape(-1)
 
-    phi_t = _as_tensor(
+    phi_t = as_tensor(
         phi_Eh,
         device=dev,
         dtype=dtype,
@@ -301,9 +507,39 @@ def check_flux_reconstruction(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ):
-    dev = _default_device(device)
+    """
+    Check that integrating the height-differential flux Phi(E, h,
+    theta) over altitude reproduces the energy-differential flux
+    Phi(E, X_obs, theta) originally extracted from the MCEq solve.
 
-    phi_obs_t = _as_tensor(
+    Args:
+        h_grid_km: Strictly increasing 1-D altitude grid in kilometres.
+        phi_Eh: Height-differential flux tensor of shape (n_E, n_h), in
+            units of (cm^2 s sr GeV km)^-1.
+        phi_E_obs: Energy-differential flux at the observation depth, in
+            units of (cm^2 s sr GeV)^-1, as originally interpolated from
+            the MCEq solution (e.g. via
+            tpeanuts.external.mceq.solver.interpolate_flux_at_Xobs).
+        atol: Absolute tolerance passed to torch.allclose.
+        rtol: Relative tolerance passed to torch.allclose.
+        raise_error: If True, raise ValueError when the check fails
+            instead of just reporting it in the returned dict.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        Dict with keys "valid" (bool), "phi_reconstructed" (tensor),
+        "residual" (phi_reconstructed - phi_E_obs), "max_abs_error" and
+        "max_rel_error" (floats).
+
+    Raises:
+        ValueError: If raise_error is True and the reconstruction check
+            fails.
+    """
+    dev = default_device(device)
+
+    phi_obs_t = as_tensor(
         phi_E_obs,
         device=dev,
         dtype=dtype,
@@ -368,6 +604,48 @@ def diagnose_result(
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
 ):
+    """
+    Run the full battery of diagnostic checks on an Atmosphere
+    height-flux result dictionary.
+
+    Accepts the dict produced by
+    tpeanuts.external.mceq.profiles.production_profiles_all_energies_from_flux_gradient
+    (or compatible results, e.g. from the Honda backend) and reports,
+    for whichever of the recognised keys are present: tensor summaries,
+    grid monotonicity, positivity, NaN/Inf detection, production-profile
+    normalization, and flux-reconstruction accuracy. Recognised tensor
+    keys include "E_grid_GeV" (energy grid, GeV), "X_grid_gcm2"
+    (Atmosphere slant-depth grid, g/cm^2), "h_grid_km" (altitude grid,
+    km), "flux_XE"/"flux_smooth_XE"/"dPhi_dX_XE" (MCEq flux and its
+    smoothed depth-derivative versus depth and energy), "f_Eh"
+    (normalized production-height profile), "phi_E_obs"
+    (energy-differential flux at the observation depth) and "phi_Eh"
+    (height-differential flux).
+
+    Args:
+        result: Height-flux result dictionary; only keys that are
+            present are checked, all checks are skipped gracefully for
+            missing keys.
+        profile_atol: Absolute tolerance for the profile-normalization
+            check (passed to check_profile_normalization).
+        profile_rtol: Relative tolerance for the profile-normalization
+            check.
+        reconstruction_atol: Absolute tolerance for the
+            flux-reconstruction check (passed to
+            check_flux_reconstruction).
+        reconstruction_rtol: Relative tolerance for the
+            flux-reconstruction check.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computations.
+
+    Returns:
+        Dict with keys "tensor_summaries", "grid_checks",
+        "positivity_checks", "nan_inf_checks", and, when the relevant
+        input keys are present, "profile_normalization" and
+        "flux_reconstruction", each holding the corresponding
+        per-quantity diagnostic results.
+    """
     diagnostics = {}
 
     # --------------------------------------------------------

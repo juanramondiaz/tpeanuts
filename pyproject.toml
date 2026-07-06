@@ -23,26 +23,34 @@ dependencies = [
 [project.optional-dependencies]
 atmosphere = ["pymsis"]
 mceq = ["MCEq", "crflux"]
+nusquids = ["nusquids"]
 test = ["pytest"]
-dev = ["pytest", "pymsis", "MCEq", "crflux"]
+dev = ["pytest", "pymsis", "MCEq", "crflux", "nusquids"]
 
 [tool.setuptools]
 packages = [
     "tpeanuts",
     "tpeanuts.analysis",
-    "tpeanuts.atmosphere",
     "tpeanuts.coherent",
     "tpeanuts.core",
-    "tpeanuts.earth",
+    "tpeanuts.core.BSM",
+    "tpeanuts.core.common",
+    "tpeanuts.core.numerical",
+    "tpeanuts.core.perturbative",
+    "tpeanuts.core.SM",
     "tpeanuts.external",
-    "tpeanuts.flux_propagation",
-    "tpeanuts.io",
+    "tpeanuts.pipeline",
     "tpeanuts.external.honda",
     "tpeanuts.external.mceq",
-    "tpeanuts.solar",
+    "tpeanuts.external.nusquids",
+    "tpeanuts.external.pymsis",
+    "tpeanuts.medium",
+    "tpeanuts.medium.atmosphere",
+    "tpeanuts.medium.earth",
+    "tpeanuts.medium.solar",
+    "tpeanuts.medium.vacuum",
     "tpeanuts.tests",
     "tpeanuts.util",
-    "tpeanuts.vacuum",
     "peanuts",
 ]
 package-dir = { "tpeanuts" = ".", "peanuts" = "peanuts" }

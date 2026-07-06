@@ -33,8 +33,18 @@ _trapz(...)
     Compute trapezoidal integration along the last tensor axis.
 normalize_trapz(...)
     Normalize a tensor so its trapezoidal integral is one along a chosen axis.
+trapz_weights(...)
+    Build one-dimensional trapezoidal quadrature weights for a coordinate grid.
 relative_error_summary(...)
     Summarize maximum per-flavour and total relative errors.
+clamp_positive(...)
+    Clamp tensor-like values to a strictly positive lower bound.
+nearest_index(...)
+    Return the index of the grid point closest to a target value.
+selected_indices(...)
+    Select approximately evenly spaced indices from a range.
+relative_error(...)
+    Compute element-wise relative error against a reference value.
 csin(...), ccos(...), ctan(...), casin(...)
     Thin torch trigonometric wrappers used by analytic formulae.
 csqrt(...)
@@ -49,7 +59,9 @@ project_to_unitary(...)
     Project a square matrix onto the nearest unitary matrix via SVD.
 interp1d_linear(...)
     Perform one-dimensional linear interpolation with explicit edge values.
-_binom(...)
+tree_reduce_matmul(...)
+    Reduce a stack of square matrices to a single product via a binary tree.
+binom(...)
     Return a binomial coefficient as a torch scalar.
 """
 
@@ -62,7 +74,7 @@ import numpy as np
 
 from typing import Any, Dict, Union, Optional
 
-from tpeanuts.util.type import TensorLike, _as_tensor, to_numpy
+from tpeanuts.util.type import TensorLike, as_tensor, to_numpy
 
 
 def intersection(
@@ -207,6 +219,32 @@ def normalize_trapz(
         return out, norm.squeeze()
 
     return out
+
+
+def trapz_weights(grid: torch.Tensor) -> torch.Tensor:
+    """Build trapezoidal quadrature weights for a one-dimensional grid.
+
+    Args:
+        grid: One-dimensional coordinate tensor.
+
+    Returns:
+        Tensor with the same shape as ``grid`` containing the trapezoidal
+        integration weights. A single-point grid receives weight one.
+
+    Raises:
+        ValueError: If ``grid`` is not one-dimensional.
+    """
+    if grid.ndim != 1:
+        raise ValueError("Trapz weights require a one-dimensional grid.")
+    if grid.numel() == 1:
+        return torch.ones_like(grid)
+
+    weights = torch.empty_like(grid)
+    weights[0] = 0.5 * (grid[1] - grid[0])
+    weights[-1] = 0.5 * (grid[-1] - grid[-2])
+    if grid.numel() > 2:
+        weights[1:-1] = 0.5 * (grid[2:] - grid[:-2])
+    return weights
 
 
 def relative_error_summary(
@@ -652,7 +690,7 @@ def interp1d_linear(
         ValueError: If xp or fp are not 1D, have different lengths, or contain
             fewer than two points.
     """
-    x = _as_tensor(x, device=device if device is not None else xp.device, dtype=dtype)
+    x = as_tensor(x, device=device if device is not None else xp.device, dtype=dtype)
 
     xp = xp.to(device=x.device, dtype=dtype)
     fp = fp.to(device=x.device, dtype=dtype)
@@ -666,8 +704,8 @@ def interp1d_linear(
     if xp.numel() < 2:
         raise ValueError("At least two interpolation points are required.")
 
-    left_val = fp[0] if left is None else _as_tensor(left, device=x.device, dtype=dtype)
-    right_val = fp[-1] if right is None else _as_tensor(right, device=x.device, dtype=dtype)
+    left_val = fp[0] if left is None else as_tensor(left, device=x.device, dtype=dtype)
+    right_val = fp[-1] if right is None else as_tensor(right, device=x.device, dtype=dtype)
 
     idx = torch.searchsorted(xp, x, right=False)
 
@@ -692,7 +730,60 @@ def interp1d_linear(
 
     return y
 
-def _binom(
+def tree_reduce_matmul(mats: torch.Tensor, *, left: bool = True) -> torch.Tensor:
+    """Reduce a stack of square matrices to a single product using a binary tree.
+
+    The reduction proceeds by pairwise matmul at each level, halving the stack
+    depth per level.  The total number of batched matmul launches is O(N log N)
+    instead of the O(N) sequential launches of a plain loop.  On GPU the paired
+    operations at each level are independent and can be dispatched in parallel.
+
+    Args:
+        mats: Tensor shaped ``(..., N, d, d)`` where ``N`` is the number of
+            matrices to reduce and ``d`` is the matrix size.  The ``N``
+            dimension is the penultimate-2 axis (index ``-3`` for square
+            matrices).
+        left: When ``True`` (default), the product is evaluated left-to-right:
+            ``mats[..., 0, :, :] @ mats[..., 1, :, :] @ ... @ mats[..., N-1, :, :]``.
+            When ``False``, the order is reversed.
+
+    Returns:
+        Reduced matrix shaped ``(..., d, d)``.
+
+    Raises:
+        ValueError: If ``mats`` has fewer than three dimensions or the last two
+            dimensions are not square.
+    """
+    if mats.ndim < 3:
+        raise ValueError("mats must have at least 3 dimensions (..., N, d, d).")
+    d1, d2 = mats.shape[-2], mats.shape[-1]
+    if d1 != d2:
+        raise ValueError(
+            f"mats must have square matrices in the last two dimensions, got ({d1}, {d2})."
+        )
+
+    # Single-matrix shortcut.
+    if mats.shape[-3] == 1:
+        return mats[..., 0, :, :]
+
+    while mats.shape[-3] > 1:
+        n = mats.shape[-3]
+        if n % 2 == 1:
+            # Odd length: carry the last matrix forward unpaired.
+            tail = mats[..., -1:, :, :]
+            even = mats[..., 0:-1:2, :, :]   # indices 0, 2, 4, …
+            odd  = mats[..., 1:-1:2, :, :]   # indices 1, 3, 5, …
+            paired = even @ odd if left else odd @ even
+            mats = torch.cat([paired, tail], dim=-3)
+        else:
+            even = mats[..., 0::2, :, :]
+            odd  = mats[..., 1::2, :, :]
+            mats = even @ odd if left else odd @ even
+
+    return mats[..., 0, :, :]
+
+
+def binom(
     n: int,
     k: int,
     device: torch.device,

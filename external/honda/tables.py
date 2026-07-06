@@ -17,12 +17,56 @@
 # =============================================================================
 
 """
-Readers for Honda/HKKM atmospheric-neutrino tables.
+Readers for Honda/HKKM Atmosphere-neutrino tables.
+
+This module is the parsing layer for the external Honda/HKKM data files: it
+contains no propagation physics and does not call into any external Python
+package. It only locates, classifies, and parses the plain-text (gzip
+compressed) ``.d.gz`` tables that Honda et al. distribute for a given
+experimental site, and exposes them as NumPy arrays keyed by energy and
+cos(zenith).
 
 Honda flux tables are tabulated as differential fluxes in
-(m^2 s sr GeV)^-1. TPeanuts atmospheric source files use the same spectral
+(m^2 s sr GeV)^-1. TPeanuts Atmosphere source files use the same spectral
 quantity per cm^2, so generator code divides Honda fluxes by 1e4 before
 saving.
+
+There are two kinds of Honda tables read here:
+
+    flux tables
+        Differential flux Phi(E, cosZ) per neutrino flavour (NuMu, NuMubar,
+        NuE, NuEbar), binned in neutrino energy E [GeV] and cos(zenith) at
+        the detector. Optionally also binned in azimuth, depending on the
+        selected angular mode.
+
+    production-height tables
+        For each (energy, cos(zenith)) bin, the quantiles of the altitude
+        [km] at which the neutrino's parent meson/muon decayed in the
+        atmosphere. These are used to reconstruct a height-differential
+        flux Phi(E,h) from the height-integrated flux Phi(E).
+
+Module functions:
+    HondaTableSelection
+        Dataclass selecting which Honda table variant (site, season, solar
+        activity, mountain profile, angular binning) to read.
+    find_honda_data_dir(...)
+        Locate the local directory containing Honda .d.gz table files.
+    classify_table_name(...)
+        Parse a Honda filename into site/season/solar/angular metadata.
+    choose_flux_file(...)
+        Select the flux table file matching a HondaTableSelection.
+    choose_height_file(...)
+        Select the production-height table file for one flavour.
+    honda_cosz_centers(...)
+        Return the fixed cos(zenith) bin centers used by the standard
+        20-bin Honda zenith binning.
+    zenith_bin_to_cosz_center(...)
+        Convert a 1-indexed Honda zenith bin number to its cos(zenith)
+        center.
+    read_flux_table(...)
+        Parse a Honda flux .d.gz file into energy/cosz-indexed flux arrays.
+    read_height_table(...)
+        Parse a Honda production-height .d.gz file into quantile arrays.
 """
 
 from __future__ import annotations
@@ -61,6 +105,33 @@ TPEANUTS_TO_HONDA_HEIGHT = {
 
 @dataclass(frozen=True)
 class HondaTableSelection:
+    """
+    Selects which Honda/HKKM table variant to read for a given site.
+
+    Honda publishes several variants of the flux and production-height
+    tables per experimental site, differing in the assumed solar activity,
+    season averaging, presence of a nearby mountain (which shields part of
+    the downward-going sky), and angular binning. This dataclass identifies
+    one such variant; it carries no physics itself and is only used to
+    select a filename via classify_table_name/choose_flux_file/
+    choose_height_file.
+
+    Attributes:
+        site_code: Three-letter Honda site code (e.g. "frj" for Frejus),
+            matching the first filename token.
+        season_code: Season-averaging code (e.g. "ally" for all-year
+            averaged), matching the second filename token.
+        solar: Solar activity assumption, "solmin" or "solmax", selecting
+            the solar-minimum or solar-maximum flux tables.
+        mountain: If True, select the table variant computed with a nearby
+            mountain profile shadowing part of the sky.
+        angular_mode: Angular binning of the flux table: "zenith+azimuth",
+            "azimuth-averaged", or "all-direction-averaged".
+        azimuth_averaged_height: If True, prefer the azimuth-averaged
+            production-height table file (filename token "aa") when
+            selecting a height file.
+    """
+
     site_code: str = "frj"
     season_code: str = "ally"
     solar: str = "solmin"
@@ -70,6 +141,26 @@ class HondaTableSelection:
 
 
 def find_honda_data_dir(path: str | os.PathLike[str] | None = None) -> Path:
+    """
+    Locate the local directory containing Honda/HKKM ``.d.gz`` table files.
+
+    This only resolves a filesystem path; it does not parse or validate the
+    physics content of the tables. Candidates are tried in order: an
+    explicit path argument, the ``HONDA_DATA_DIR`` environment variable,
+    then two hard-coded fallback locations used in this project's
+    development environment. The first candidate directory that exists and
+    contains at least one ``*.d.gz`` file is returned.
+
+    Args:
+        path: Optional explicit directory path to try first.
+
+    Returns:
+        Path to the first matching directory containing Honda tables.
+
+    Raises:
+        FileNotFoundError: If no candidate directory contains ``.d.gz``
+            files.
+    """
     candidates = []
 
     if path is not None:
@@ -98,6 +189,30 @@ def find_honda_data_dir(path: str | os.PathLike[str] | None = None) -> Path:
 
 
 def classify_table_name(name: str) -> dict[str, Any]:
+    """
+    Parse a Honda table filename into site/season/solar/angular metadata.
+
+    Honda filenames encode the table contents in dash-separated tokens,
+    e.g. ``frj-ally-20-12-solmin.d.gz`` for a flux table with 20 zenith bins
+    and 12 azimuth bins, or ``frj-ally-aa-numu.d.gz`` for an
+    azimuth-averaged muon-neutrino production-height table. This function
+    has no physics content; it only decodes those filename conventions so
+    that choose_flux_file/choose_height_file can select the correct file
+    for a given HondaTableSelection.
+
+    Args:
+        name: Honda table filename (with or without directory components),
+            ending in ".d.gz".
+
+    Returns:
+        Dictionary of metadata describing the table. Always includes "name",
+        "site_code", "season_code", and "table_type" ("flux",
+        "production_height", or "unknown"). For flux tables, also includes
+        "solar", "mountain", "zenith_bins", "azimuth_bins", and
+        "angular_mode" ("zenith+azimuth", "azimuth-averaged",
+        "all-direction-averaged", or "other"). For production-height
+        tables, also includes "flavour" and "azimuth_averaged_height".
+    """
     stem = name.removesuffix(".d.gz")
     parts = stem.split("-")
     meta: dict[str, Any] = {
@@ -135,6 +250,23 @@ def choose_flux_file(
     honda_data_dir: str | os.PathLike[str],
     selection: HondaTableSelection,
 ) -> Path:
+    """
+    Select the Honda flux table file matching a HondaTableSelection.
+
+    Args:
+        honda_data_dir: Directory (or candidate hint) containing Honda
+            ``.d.gz`` files, resolved through find_honda_data_dir.
+        selection: Site/season/solar/mountain/angular-mode selection to
+            match against each candidate file's parsed metadata.
+
+    Returns:
+        Path to the matching flux table file. If several files match, the
+        lexicographically first path is returned for determinism.
+
+    Raises:
+        FileNotFoundError: If no flux table in the data directory matches
+            the selection.
+    """
     data_dir = find_honda_data_dir(honda_data_dir)
     matches: list[Path] = []
 
@@ -164,6 +296,28 @@ def choose_height_file(
     selection: HondaTableSelection,
     particle: str,
 ) -> Optional[Path]:
+    """
+    Select the Honda production-height table file for one particle flavour.
+
+    The production-height table gives the distribution of the altitude at
+    which the parent meson/muon of a detected neutrino decayed, as a
+    function of neutrino energy and cos(zenith). It is used downstream to
+    turn the height-integrated Honda flux into a height-differential flux
+    Phi(E,h).
+
+    Args:
+        honda_data_dir: Directory (or candidate hint) containing Honda
+            ``.d.gz`` files, resolved through find_honda_data_dir.
+        selection: Site/season selection; only site_code, season_code, and
+            azimuth_averaged_height are used here.
+        particle: tpeanuts particle/flavour name (e.g. "nue", "antinumu").
+            Mapped to the Honda flavour token via TPEANUTS_TO_HONDA_HEIGHT.
+
+    Returns:
+        Path to the matching production-height file, or None if the
+        particle has no Honda height-table flavour (e.g. tau neutrinos) or
+        no matching file is found on disk.
+    """
     honda_flavour = TPEANUTS_TO_HONDA_HEIGHT.get(str(particle).lower())
     if honda_flavour is None:
         return None
@@ -184,14 +338,63 @@ def choose_height_file(
 
 
 def honda_cosz_centers() -> np.ndarray:
+    """
+    Return the cos(zenith) bin centers of the standard 20-bin Honda binning.
+
+    Honda's standard zenith-angle binning divides cos(zenith) in [-1, 1]
+    into 20 equal-width bins of width 0.10, ordered from cosZ=0.95
+    (near-vertically-downward) to cosZ=-0.95 (near-vertically-upward).
+    cos(zenith)=1 corresponds to a neutrino arriving straight down at the
+    detector, cos(zenith)=-1 to one arriving straight up through the Earth.
+
+    Returns:
+        1D float array of length 20 with the 20 bin-center cos(zenith)
+        values, in decreasing order.
+    """
     return np.array([0.95 - 0.10 * idx for idx in range(20)], dtype=float)
 
 
 def zenith_bin_to_cosz_center(zenith_bin: int) -> float:
+    """
+    Convert a 1-indexed Honda zenith bin number to its cos(zenith) center.
+
+    Args:
+        zenith_bin: 1-indexed zenith bin number as it appears in the
+            production-height table header (1 = most downward-going bin).
+
+    Returns:
+        cos(zenith) value at the center of that bin, consistent with the
+        ordering returned by honda_cosz_centers().
+    """
     return float(0.95 - 0.10 * (int(zenith_bin) - 1))
 
 
 def read_flux_table(path: str | os.PathLike[str]) -> dict[str, np.ndarray]:
+    """
+    Parse a Honda flux ``.d.gz`` file into energy/cos(zenith)-indexed arrays.
+
+    The file is a gzip-compressed plain-text table organized in blocks, each
+    headed by a line of the form
+    "average flux in [cosZ = c1 -- c2, phi_Az = p1 -- p2]" followed by rows
+    of "E_nu(GeV)  NuMu  NuMubar  NuE  NuEbar" differential flux values in
+    (m^2 s sr GeV)^-1 (azimuth-averaged tables use one phi_Az block per
+    cosZ bin). This function does not convert units or interpolate; it only
+    builds dense arrays indexed by the file's native energy and cos(zenith)
+    grids, leaving the physical flux values unchanged.
+
+    Args:
+        path: Path to a Honda flux ``.d.gz`` file.
+
+    Returns:
+        Dictionary with keys "path" (str), "energy_GeV" (1D sorted array of
+        unique neutrino energies in GeV), "cosz_center" (1D sorted array of
+        unique cos(zenith) bin centers), and "flux_m2" (dict mapping each
+        Honda flavour name in HONDA_FLUX_COLUMNS to a 2D array of shape
+        (n_cosz, n_energy) with differential flux in (m^2 s sr GeV)^-1).
+
+    Raises:
+        ValueError: If no flux rows could be parsed from the file.
+    """
     rows: list[dict[str, float]] = []
     current: Optional[dict[str, float]] = None
 
@@ -262,6 +465,37 @@ def read_flux_table(path: str | os.PathLike[str]) -> dict[str, np.ndarray]:
 
 
 def read_height_table(path: str | os.PathLike[str]) -> dict[str, np.ndarray]:
+    """
+    Parse a Honda production-height ``.d.gz`` file into quantile arrays.
+
+    The file is a gzip-compressed plain-text table organized in blocks per
+    (zenith bin, azimuth bin), each headed by a line with the probability
+    levels of the production-height distribution (e.g. 10%, 20%, ...,
+    90% quantiles), followed by rows of
+    "E_nu(GeV)  h_q1(m)  h_q2(m)  ...  h_qN(m)" giving, for each neutrino
+    energy, the altitude (in metres above sea level in the source file,
+    converted to km here) at which that fraction of parent mesons/muons
+    decayed. This function does not interpolate onto a new energy or
+    cos(zenith) grid; it only assembles the native quantile arrays.
+
+    Args:
+        path: Path to a Honda production-height ``.d.gz`` file.
+
+    Returns:
+        Dictionary with keys "path" (str), "energy_GeV" (1D array, the
+        common neutrino-energy grid shared by all zenith blocks),
+        "cosz_center" (1D array of cos(zenith) bin centers, one per zenith
+        block, via zenith_bin_to_cosz_center), "probabilities" (1D array of
+        quantile probability levels in [0, 1], shared by all blocks), and
+        "height_quantiles_km" (3D array of shape
+        (n_cosz, n_energy, n_probabilities) with production-height
+        quantiles in km).
+
+    Raises:
+        ValueError: If no height rows could be parsed, or if different
+            zenith blocks report inconsistent probability levels or energy
+            grids.
+    """
     blocks: dict[tuple[int, int], dict[str, Any]] = {}
     current_key: Optional[tuple[int, int]] = None
 
@@ -303,7 +537,9 @@ def read_height_table(path: str | os.PathLike[str]) -> dict[str, np.ndarray]:
     if not blocks:
         raise ValueError(f"Could not read Honda production-height rows from {path}.")
 
-    cosz = np.array(
+    # Build cosz and heights in the order blocks were read (sorted by zenith_bin,
+    # which maps to *decreasing* cosz: zenith_bin=1 → cosz=0.95, bin=2 → 0.85, …).
+    cosz_unsorted = np.array(
         [zenith_bin_to_cosz_center(key[0]) for key in sorted(blocks)],
         dtype=float,
     )
@@ -329,10 +565,17 @@ def read_height_table(path: str | os.PathLike[str]) -> dict[str, np.ndarray]:
 
         heights.append(height_km)
 
+    # np.interp requires xp to be strictly increasing.  Re-sort by ascending cosz
+    # so that downstream interpolation (generator._interpolate_quantiles) works
+    # correctly for any requested zenith angle.
+    sort_idx = np.argsort(cosz_unsorted)
+    cosz_sorted = cosz_unsorted[sort_idx]
+    quantiles_sorted = np.stack(heights, axis=0)[sort_idx]   # (n_cosz, n_E, n_prob)
+
     return {
         "path": str(path),
         "energy_GeV": energy_ref,
-        "cosz_center": cosz,
+        "cosz_center": cosz_sorted,
         "probabilities": probabilities_ref,
-        "height_quantiles_km": np.stack(heights, axis=0),
+        "height_quantiles_km": quantiles_sorted,
     }
