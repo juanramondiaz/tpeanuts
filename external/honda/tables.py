@@ -57,6 +57,9 @@ Module functions:
         Select the flux table file matching a HondaTableSelection.
     choose_height_file(...)
         Select the production-height table file for one flavour.
+    load_honda_tables(...)
+        Locate and parse one flux table plus the per-particle height tables
+        needed by the generator.
     honda_cosz_centers(...)
         Return the fixed cos(zenith) bin centers used by the standard
         20-bin Honda zenith binning.
@@ -79,6 +82,8 @@ import re
 from typing import Any, Optional
 
 import numpy as np
+
+import tpeanuts.util.default as default
 
 
 FLUX_BLOCK_RE = re.compile(
@@ -147,9 +152,9 @@ def find_honda_data_dir(path: str | os.PathLike[str] | None = None) -> Path:
     This only resolves a filesystem path; it does not parse or validate the
     physics content of the tables. Candidates are tried in order: an
     explicit path argument, the ``HONDA_DATA_DIR`` environment variable,
-    then two hard-coded fallback locations used in this project's
-    development environment. The first candidate directory that exists and
-    contains at least one ``*.d.gz`` file is returned.
+    then ``tpeanuts.util.default.honda_dataset``. The first candidate
+    directory that exists and contains at least one ``*.d.gz`` file is
+    returned.
 
     Args:
         path: Optional explicit directory path to try first.
@@ -170,12 +175,7 @@ def find_honda_data_dir(path: str | os.PathLike[str] | None = None) -> Path:
     if env_path:
         candidates.append(Path(env_path))
 
-    candidates.extend(
-        [
-            Path(r"G:\Mi unidad\04.Datasets\Honda"),
-            Path(r"G:\Mi unidad\03.Codigo\034.TFM.UV\External\Honda"),
-        ]
-    )
+    candidates.append(Path(default.honda_dataset))
 
     for candidate in candidates:
         if candidate.exists() and any(candidate.glob("*.d.gz")):
@@ -335,6 +335,81 @@ def choose_height_file(
         return fallback
 
     return None
+
+
+def _select_height_source(
+    height_tables: dict[str, Optional[dict[str, Any]]],
+    particle: str,
+) -> Optional[dict[str, Any]]:
+    """
+    Pick a production-height table for a particle, with a tau-neutrino fallback.
+
+    Honda does not publish production-height tables for tau neutrinos
+    (they are not produced directly in cosmic-ray air showers). As an
+    approximation, nutau/antinutau fall back to the numu/antinumu height
+    table, since both come from the same hadronic shower region.
+
+    Args:
+        height_tables: Mapping from particle name to parsed Honda
+            production-height table (or None if unavailable).
+        particle: tpeanuts particle/flavour name.
+
+    Returns:
+        The matching production-height table dictionary, or None if no
+        table (including no fallback) is available for this particle.
+    """
+    if height_tables.get(particle) is not None:
+        return height_tables[particle]
+
+    key = str(particle).lower()
+    if "tau" in key:
+        return height_tables.get("numu") if "anti" not in key else height_tables.get("antinumu")
+
+    return None
+
+
+def load_honda_tables(
+    *,
+    honda_data_dir: str | os.PathLike[str] | None,
+    selection: HondaTableSelection,
+    particles: list[str],
+) -> dict[str, Any]:
+    """
+    Locate and parse the Honda flux table and per-particle height tables.
+
+    This loads the data once so that it can be reused across many
+    particle/angle combinations, instead of re-reading the gzip files for
+    every call.
+
+    Args:
+        honda_data_dir: Optional directory hint forwarded to
+            find_honda_data_dir.
+        selection: Honda table variant (site, season, solar, mountain,
+            angular mode) to load.
+        particles: List of tpeanuts particle/flavour names for which a
+            production-height table should be loaded (entries without a
+            matching Honda height table are stored as None).
+
+    Returns:
+        Dictionary with keys "data_dir" (resolved Honda data directory as
+        str), "flux_table" (parsed flux table dict, see read_flux_table),
+        and "height_tables" (dict mapping each requested particle to its
+        parsed production-height table, or None).
+    """
+    data_dir = find_honda_data_dir(honda_data_dir)
+    flux_path = choose_flux_file(data_dir, selection)
+    flux_table = read_flux_table(flux_path)
+
+    height_tables: dict[str, Optional[dict[str, Any]]] = {}
+    for particle in particles:
+        path = choose_height_file(data_dir, selection, particle)
+        height_tables[particle] = read_height_table(path) if path is not None else None
+
+    return {
+        "data_dir": str(data_dir),
+        "flux_table": flux_table,
+        "height_tables": height_tables,
+    }
 
 
 def honda_cosz_centers() -> np.ndarray:

@@ -172,7 +172,7 @@ def pearth_integrated(
     eta_grid = exposure_table.eta
     w_eta = exposure_table.exposure
 
-    deta = torch.pi / exposure.exposure_ns
+    deta = eta_grid[1] - eta_grid[0]
 
     E, squeeze_E = _prepare_energy_grid(
         E_MeV,

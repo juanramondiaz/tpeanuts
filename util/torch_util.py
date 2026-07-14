@@ -27,6 +27,7 @@ Module functions:
     resolve_device(...): Resolve the configured torch device.
     infer_device_dtype(...): Infer device and dtype from tensor inputs.
     resolve_dtype(...): Resolve the real floating-point dtype.
+    scalar_float(...): Convert a scalar tensor-like value to a Python float.
     as_1d_tensor(...): Convert scalar or one-dimensional input to a 1D tensor.
     cast_tensor_tree(...): Recursively detach, move, and cast tensor leaves.
     broadcast_tensor(...): Convert and broadcast generic tensor-like values.
@@ -185,6 +186,21 @@ def resolve_dtype(dtype: Optional[torch.dtype], *values) -> torch.dtype:
             return value.dtype
 
     return torch.float64
+
+
+def scalar_float(value: TensorLike) -> float:
+    """
+    Convert a tensor-like scalar to a plain Python float.
+
+    Args:
+        value: Scalar or tensor-like value; only the first element is used if
+            more than one is given.
+
+    Returns:
+        The value as a Python float.
+    """
+    value_t = torch.as_tensor(value, device="cpu", dtype=torch.float64)
+    return float(value_t.detach().cpu().reshape(-1)[0].item())
 
 
 def as_1d_tensor(

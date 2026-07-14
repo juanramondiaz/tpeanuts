@@ -31,7 +31,7 @@ OutputConfig
     used by Atmosphere generators.
 build_angle_output_path(...)
     Builds the complete output path for one particle/flavour and Atmosphere
-    angle. It handles theta-only and alpha+theta filenames with one rule.
+    angle. Filenames always use an alpha angle label and never a theta label.
 build_result_metadata(...)
     Creates the metadata dictionary saved together with each tensor payload.
 save_phi_Eh_theta_result(...)
@@ -53,13 +53,13 @@ Private helpers
 _metadata_group_key(...)
     Resolves the grouping key used by load_directory.
 _required_tensor(...)
-    Fetches mandatory tensor fields while accepting legacy aliases.
+    Fetches mandatory tensor fields.
 _optional_scalar_float(...)
     Reads optional scalar metadata from either data or metadata.
 _assert_same_grid(...)
     Checks that loaded files share the same energy or height grid.
 _angle_sort_key(...)
-    Provides a stable sorting key for theta-only and alpha+theta datasets.
+    Provides a stable sorting key for theta-only and alpha+theta payloads.
 _theta_index(...)
     Selects the nearest theta entry within a tolerance.
 """
@@ -139,43 +139,40 @@ class OutputConfig:
 # Filename utilities
 # ============================================================
 
-
-
-
-
-
-
-
-
 def build_angle_output_path(
     output_config: OutputConfig,
-    theta_deg: float,
     *,
+    alpha_deg: float,
     particle: Optional[str] = None,
     flavour_name: Optional[str] = None,
-    alpha_deg: Optional[float] = None,
 ) -> str:
     """
     Build the full output path for one Atmosphere flux file.
 
-    This is the single filename/path builder for Atmosphere datasets. It
-    replaces the older theta-only and alpha+theta helpers by treating alpha as
-    optional. The generated filename always contains the base filename, a
+    This is the single filename/path builder for Atmosphere datasets. 
+    The generated filename always contains the base filename, a
     flavour or particle label, an optional particle label when it differs from
-    the flavour, an optional alpha angle, and the required theta angle.
+    the flavour, and one mandatory alpha angle label. The filename angle
+    label is always alpha, never theta.
 
     Args:
         output_config: Output settings containing directory and base filename.
-        theta_deg: Atmosphere surface-intersection angle in degrees.
+        alpha_deg: Surface/source zenith angle in degrees. This value is
+            always embedded in the filename as alpha_<value>deg.
         particle: Physical particle label stored in the file, if known.
         flavour_name: Grouping flavour label. If omitted, particle is used.
-        alpha_deg: Optional detector angle in degrees.
 
     Returns:
         Complete filesystem path for the output torch file.
     """
     base_filename = ensure_torch_extension(output_config.filename)
     base_name, ext = os.path.splitext(base_filename)
+    base_name = (
+        base_name
+        .replace("THETA", "ALPHA")
+        .replace("Theta", "Alpha")
+        .replace("theta", "alpha")
+    )
 
     flavour = flavour_name if flavour_name is not None else particle
     if flavour is None:
@@ -189,12 +186,8 @@ def build_angle_output_path(
     if particle is not None and str(particle) != str(flavour):
         parts.append(safe_filename_name(str(particle)))
 
-    if alpha_deg is not None:
-        alpha_safe = angle_to_filename(float(alpha_deg))
-        parts.append(f"alpha_{alpha_safe}deg")
-
-    theta_safe = angle_to_filename(float(theta_deg))
-    parts.append(f"theta_{theta_safe}deg")
+    alpha_safe = angle_to_filename(float(alpha_deg))
+    parts.append(f"alpha_{alpha_safe}deg")
 
     filename = "_".join(parts) + ext
 
@@ -203,16 +196,9 @@ def build_angle_output_path(
         filename=filename,
     )
 
-
-
-
 # ============================================================
 # Metadata
 # ============================================================
-
-
-
-
 
 def build_result_metadata(
     result: Dict[str, Any],
@@ -234,8 +220,8 @@ def build_result_metadata(
         result: Result dictionary that will be saved.
         flavour_name: Optional flavour grouping label.
         particle: Optional physical particle label.
-        alpha_deg: Optional detector angle in degrees.
-        theta_deg: Optional Atmosphere theta angle in degrees.
+        alpha_deg: Optional surface zenith angle in degrees.
+        theta_deg: Optional detector theta angle in degrees.
 
     Returns:
         JSON-serializable metadata dictionary.
@@ -268,8 +254,8 @@ def build_result_metadata(
         "theta_deg": theta_value,
         "angle_units": "deg",
         "angle_convention": {
-            "alpha_deg": "detector angle, when provided by the caller",
-            "theta_deg": "surface-intersection Atmosphere angle",
+            "theta_deg": "detector zenith angle used by atmosphere geometry",
+            "alpha_deg": "surface zenith angle used by source generators",
         },
         "tensor_shapes": tensor_shape_dict(result),
         "format": "torch",
@@ -287,17 +273,10 @@ def build_result_metadata(
     return metadata
 
 
-# ============================================================
-# Tensor preparation
-# ============================================================
-
-
 
 # ============================================================
 # Save
 # ============================================================
-
-
 
 def save_phi_Eh_theta_result(
     result: Dict[str, Any],
@@ -311,9 +290,10 @@ def save_phi_Eh_theta_result(
     """
     Save one Atmosphere height-differential flux result.
 
-    This is the canonical writer for both theta-only and alpha+theta datasets.
-    Passing alpha_deg simply adds alpha information to the filename, payload,
-    and metadata; no separate save function is needed.
+    This is the canonical writer for both detector-theta-only and
+    alpha+theta datasets. Passing alpha_deg adds the associated surface
+    angle to the filename, payload, and metadata; no separate save function
+    is needed.
 
     Args:
         result: Data dictionary containing at least theta_deg unless theta_deg
@@ -321,8 +301,8 @@ def save_phi_Eh_theta_result(
             h_grid_km, phi_Eh, phi_E_obs, and f_Eh.
         output_config: Output directory, base filename, dtype, and save flags.
         flavour_name: Optional flavour label used for grouping/loading.
-        alpha_deg: Optional detector angle in degrees.
-        theta_deg: Optional Atmosphere theta angle in degrees.
+        alpha_deg: Optional surface zenith angle in degrees.
+        theta_deg: Optional detector theta angle in degrees.
         particle: Optional physical particle label.
 
     Returns:
@@ -361,7 +341,6 @@ def save_phi_Eh_theta_result(
 
     output_path = build_angle_output_path(
         output_config=output_config,
-        theta_deg=theta_value,
         flavour_name=str(flavour),
         alpha_deg=alpha_value,
         particle=str(particle_value),
@@ -415,7 +394,7 @@ def load_phi_Eh_alpha_theta_from_config(
     device: Optional[str | torch.device] = None,
 ) -> Dict[str, Any]:
     """
-    Load one alpha+theta file by reconstructing its configured path.
+    Load one alpha-named file by reconstructing its configured path.
 
     This is a convenience function for callers that know the OutputConfig and
     angle labels but do not want to manually build the filename. It differs
@@ -424,8 +403,9 @@ def load_phi_Eh_alpha_theta_from_config(
     Args:
         output_config: Output settings used when the file was saved.
         particle: Physical particle label embedded in the filename.
-        alpha_deg: Detector angle in degrees embedded in the filename.
-        theta_deg: Atmosphere theta angle in degrees embedded in the filename.
+        alpha_deg: Surface zenith angle in degrees embedded in the filename.
+        theta_deg: Detector theta angle in degrees. Kept for compatibility and
+            metadata matching, but not embedded in the filename.
         flavour_name: Optional flavour label embedded in the filename.
         map_location: Torch map_location used while reading.
         dtype: Optional dtype applied to floating tensors after loading.
@@ -436,7 +416,6 @@ def load_phi_Eh_alpha_theta_from_config(
     """
     input_path = build_angle_output_path(
         output_config=output_config,
-        theta_deg=theta_deg,
         particle=particle,
         flavour_name=flavour_name,
         alpha_deg=alpha_deg,
@@ -554,35 +533,26 @@ def _metadata_group_key(
 def _required_tensor(
     data: Dict[str, Any],
     key: str,
-    *,
-    aliases: tuple[str, ...] = (),
 ) -> torch.Tensor:
     """
-    Return a mandatory tensor field, accepting legacy aliases.
+    Return a mandatory tensor field.
 
     Args:
         data: Loaded data dictionary.
         key: Canonical tensor key.
-        aliases: Alternative key names accepted for backwards compatibility.
 
     Returns:
-        Tensor stored under key or one of its aliases.
+        Tensor stored under key.
     """
-    candidate_keys = (key, *aliases)
+    if key in data:
+        value = data[key]
 
-    for candidate_key in candidate_keys:
-        if candidate_key in data:
-            value = data[candidate_key]
+        if not isinstance(value, torch.Tensor):
+            raise TypeError(f"{key} must be a torch.Tensor.")
 
-            if not isinstance(value, torch.Tensor):
-                raise TypeError(f"{candidate_key} must be a torch.Tensor.")
+        return value
 
-            return value
-
-    raise KeyError(
-        f"Missing required tensor '{key}'. "
-        f"Tried aliases: {candidate_keys}."
-    )
+    raise KeyError(f"Missing required tensor '{key}'.")
 
 
 def _optional_scalar_float(
@@ -636,8 +606,8 @@ def _angle_sort_key(entry: Dict[str, Any]) -> tuple[float, float]:
     """
     Sort entries by the angle that identifies the scan.
 
-    Alpha+theta datasets are primarily ordered by alpha and secondarily by
-    theta. Theta-only datasets are ordered by theta.
+    Datasets are primarily ordered by detector theta and secondarily by the
+    associated surface alpha when present.
 
     Args:
         entry: Internal load_directory entry dictionary.
@@ -648,8 +618,8 @@ def _angle_sort_key(entry: Dict[str, Any]) -> tuple[float, float]:
     alpha_deg = entry.get("alpha_deg", None)
     theta_deg = entry.get("theta_deg", None)
 
-    primary = theta_deg if alpha_deg is None else alpha_deg
-    secondary = theta_deg if alpha_deg is not None else alpha_deg
+    primary = theta_deg
+    secondary = alpha_deg
 
     if primary is None:
         primary = float("inf")
@@ -688,6 +658,8 @@ def load_directory(
         Dictionary keyed by particle/flavour. Each value contains paths,
         metadata, entries, E_grid_GeV, h_grid_km, theta_grid_deg,
         optional alpha_grid_deg, phi_E_theta_h, phi_E_theta, and f_theta_E_h.
+        Here theta_grid_deg is the detector-angle grid, while alpha_grid_deg
+        is the associated surface/source-angle grid when present.
     """
     files = list_torch_files(directory)
 
@@ -728,23 +700,19 @@ def load_directory(
                 "E_grid_GeV": _required_tensor(
                     loaded,
                     "E_grid_GeV",
-                    aliases=("E_grid",),
                 ),
                 "h_grid_km": _required_tensor(loaded, "h_grid_km"),
                 "phi_Eh": _required_tensor(
                     loaded,
                     "phi_Eh",
-                    aliases=("phi_E_h",),
                 ),
                 "phi_E_obs": _required_tensor(
                     loaded,
                     "phi_E_obs",
-                    aliases=("phi_E",),
                 ),
                 "f_Eh": _required_tensor(
                     loaded,
                     "f_Eh",
-                    aliases=("f_E_h",),
                 ),
                 "data": loaded,
             }

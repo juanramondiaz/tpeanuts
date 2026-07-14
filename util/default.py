@@ -49,7 +49,6 @@ data_dir = "data"
 solar_data_dir = "data/solar"
 # Directory containing legacy PEANUTS reference data, used for comparisons.
 legacy_data_dir = "data/peanuts"
-
 # Filename of the solar neutrino production-point distribution table.
 # Path is relative to solar_data_dir (i.e. data/solar/).
 # Default: zenodo SF3-AGSS09 extended profile (r ∈ [0, 1.0] R_sun, 2001 rows).
@@ -65,6 +64,9 @@ solar_sun_earth_distance_filename = "sun_earth_distance.csv"
 earth_density_dir = "data/density"
 # Filename of the default Earth density profile table.
 earth_density_filename = "earth_density.csv"
+
+# Default directory containing Honda/HKKM atmosphere-neutrino tables.
+honda_dataset = r"G:\Mi unidad\04.Datasets\Honda"
 
 # Default file extension used when saving torch tensors to disk.
 torch_default_extension = ".pt"
@@ -121,7 +123,15 @@ mceq_theta_deg = 0.0
 # Default hadronic interaction model used by MCEq for cosmic-ray air showers.
 mceq_interaction_model = "SIBYLL23D"
 # Default atmospheric density model used by MCEq for shower development.
+# "CORSIKA" (US Standard Atmosphere) is the generic mid-latitude profile
+# available in MCEq/CRFlux, closest of the bundled options to a
+# Frejus/JUNO-like mid-latitude site (no South-Pole bias, unlike NASA/ICECUBE).
 mceq_density_model = "CORSIKA"
+# Default primary cosmic-ray flux model shared between MCEq
+# (mceq_interaction_model/mceq_density_model above) and the CORSIKA/CRFlux
+# primary-sampling pipeline (run1/run2), so both sides inject the same
+# top-of-atmosphere spectrum and their outputs remain directly comparable.
+mceq_primary_model = "PolyGonato"
 
 
 # ============================================================

@@ -39,6 +39,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from tpeanuts.util.math import numpy_trapezoid
+
 
 def load_spectrum_table(source: str, spectra_dir: Path | str) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -80,7 +82,7 @@ def normalized_spectrum(
     """
     spec_E, spec_y = load_spectrum_table(source, spectra_dir)
     values = np.interp(energy_mev, spec_E, spec_y, left=0.0, right=0.0)
-    norm = np.trapz(values, x=energy_mev)
+    norm = numpy_trapezoid(values, x=energy_mev)
     return values / norm if norm > 0 else values
 
 

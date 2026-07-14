@@ -22,13 +22,13 @@ core mceq initialization utilities.
 This module contains only the logic required to create and configure
 an mceqRun instance (an alias for MCEq.core.MCEqRun, the external MCEq
 package's cascade-equation solver object). It is the single place in
-tpeanuts where an MCEqRun is constructed: init_mceq() resolves
-tpeanuts-native model names (interaction_model, primary_model,
-density_model) into the actual MCEq/crflux objects, instantiates
+tpeanuts where an MCEqRun is constructed: init_mceq() resolves the
+tpeanuts-native model names stored in MCEqModelConfig into the actual
+MCEq/crflux objects, instantiates
 MCEqRun for a given zenith angle, and attaches an Atmosphere density
 model to it. Everything else in this module
-(resolve_primary_model/resolve_density_model/theta_to_float/
-set_mceq_logging/ensure_mceq_available) is thin tpeanuts-native
+(resolve_primary_model/resolve_density_model/set_mceq_logging/
+ensure_mceq_available) is thin tpeanuts-native
 configuration plumbing around that one external call.
 
 Module functions:
@@ -42,9 +42,6 @@ Module functions:
         Resolve a tpeanuts density-model name into the
         (model_name, (location, season)) tuple expected by
         MCEqRun.set_density_model.
-    theta_to_float:
-        Convert a tensor-like zenith angle to a validated Python float
-        in degrees, as required by the MCEqRun constructor.
     set_mceq_logging:
         Set the verbosity of MCEq's internal Python logger.
     init_mceq:
@@ -63,7 +60,7 @@ from typing import Optional, Union
 
 import torch
 
-from tpeanuts.util.type import as_tensor
+from tpeanuts.util.torch_util import scalar_float
 
 from tpeanuts.external.mceq.config import (
     MCEqModelConfig,
@@ -164,7 +161,7 @@ def resolve_density_model(
     MCEqRun.set_density_model.
 
     The density model determines the Atmosphere mass-density profile
-    rho(h) (and hence the altitude <-> slant-depth mapping X(h, theta))
+    rho(h) (and hence the altitude <-> slant-depth mapping X(h, alpha))
     used by MCEq's cascade-equation solve; different choices represent
     different site/season Atmosphere conditions (e.g. US Standard
     Atmosphere, NRLMSISE-00 at the South Pole).
@@ -193,37 +190,6 @@ def resolve_density_model(
     return DENSITY_MODELS[density_model]
 
 
-def theta_to_float(theta_deg: TensorLike) -> float:
-    """
-    Convert a tensor-like zenith angle to a validated Python float in
-    degrees, as required by the MCEqRun constructor.
-
-    Args:
-        theta_deg: Scalar or tensor-like zenith angle in degrees. Only
-            the first element is used if more than one is given.
-            theta_deg=0 corresponds to a vertically downward-going
-            trajectory; theta_deg must stay below 90 degrees so that
-            the trajectory still reaches the ground/observation depth
-            (cos(theta) > 0).
-
-    Returns:
-        The zenith angle as a plain Python float in degrees.
-
-    Raises:
-        ValueError: If theta_deg is not in [0, 90) degrees.
-    """
-    theta_t = as_tensor(theta_deg, device="cpu", dtype=torch.float64)
-    theta_float = float(theta_t.detach().cpu().reshape(-1)[0].item())
-
-    if theta_float < 0.0 or theta_float >= 90.0:
-        raise ValueError(
-            f"theta_deg must satisfy 0 <= theta_deg < 90. "
-            f"Received theta_deg={theta_float}."
-        )
-
-    return theta_float
-
-
 def set_mceq_logging(info: bool = False) -> None:
     """
     Set the verbosity of MCEq's internal Python logger.
@@ -245,11 +211,8 @@ def set_mceq_logging(info: bool = False) -> None:
 # ============================================================
 
 def init_mceq(
-    theta_deg: TensorLike,
+    alpha_deg: TensorLike,
     config: Optional[MCEqModelConfig] = None,
-    interaction_model: Optional[str] = None,
-    primary_model: Optional[Union[str, tuple]] = None,
-    density_model: Optional[str] = None,
     info: Optional[bool] = None,
 ):
     """
@@ -257,7 +220,7 @@ def init_mceq(
 
     This is the single entry point in tpeanuts that directly constructs
     an external MCEq object: it instantiates MCEq.core.MCEqRun for the
-    requested zenith angle, hadronic interaction model and primary
+    requested surface zenith angle, hadronic interaction model and primary
     cosmic-ray flux model, then attaches the requested Atmosphere
     density model via MCEqRun.set_density_model. The returned object
     encapsulates the cascade-equation transport problem (production and
@@ -266,71 +229,49 @@ def init_mceq(
     queried (mceq.get_solution(...)) by the solver module.
 
     Args:
-        theta_deg: Zenith angle in degrees (0 <= theta_deg < 90) of the
-            shower/neutrino trajectory; theta_deg=0 is vertical.
-        config: Optional MCEqModelConfig providing defaults for
-            interaction_model, primary_model, density_model and info.
-            Ignored on a per-field basis whenever the corresponding
-            explicit keyword argument below is given.
-        interaction_model: Optional override for the MCEq hadronic
-            interaction model name (see INTERACTION_MODELS); defaults
-            to config.interaction_model.
-        primary_model: Optional override for the crflux primary
-            cosmic-ray flux model name or raw (class, tag) tuple (see
-            PRIMARY_MODELS); defaults to config.primary_model.
-        density_model: Optional override for the Atmosphere density
-            model name (see DENSITY_MODELS); defaults to
-            config.density_model.
+        alpha_deg: Surface/MCEq zenith angle in degrees
+            (0 <= alpha_deg < 90) of the shower/neutrino trajectory;
+            alpha_deg=0 is vertical.
+        config: Optional MCEqModelConfig providing interaction_model,
+            primary_model, density_model and info.
         info: Optional override for MCEq logger verbosity; defaults to
             config.info.
 
     Returns:
         An initialized MCEq.core.MCEqRun instance (returned under the
-        local alias mceqRun) for the given zenith angle, with its
+        local alias mceqRun) for the given surface zenith angle, with its
         density model already set, ready to be solved.
 
     Raises:
         ImportError: If the optional MCEq package is not installed (via
             ensure_mceq_available).
         ValueError: If the resolved interaction_model, primary_model or
-            density_model is not recognised, or if theta_deg is outside
+            density_model is not recognised, or if alpha_deg is outside
             [0, 90) degrees.
     """
-    ensure_mceq_available()
-
     if config is None:
         config = MCEqModelConfig()
-
-    interaction_model = (
-        config.interaction_model
-        if interaction_model is None
-        else interaction_model
-    )
-
-    primary_model = (
-        config.primary_model
-        if primary_model is None
-        else primary_model
-    )
-
-    density_model = (
-        config.density_model
-        if density_model is None
-        else density_model
-    )
 
     info = config.info if info is None else info
 
     effective_config = MCEqModelConfig(
-        interaction_model=interaction_model,
-        primary_model=primary_model,
-        density_model=density_model,
+        interaction_model=config.interaction_model,
+        primary_model=config.primary_model,
+        density_model=config.density_model,
         info=info,
     )
 
     effective_config.validate()
 
-    theta_float = theta_to_float(theta_deg)
+    alpha_float = scalar_float(alpha_deg)
+
+    if alpha_float < 0.0 or alpha_float >= 90.0:
+        raise ValueError(
+            f"alpha_deg must satisfy 0 <= alpha_deg < 90. "
+            f"Received alpha_deg={alpha_float}."
+        )
+
+    ensure_mceq_available()
 
     primary_model_obj = resolve_primary_model(effective_config.primary_model)
     density_model_obj = resolve_density_model(effective_config.density_model)
@@ -340,10 +281,9 @@ def init_mceq(
     mceq = mceqRun(
         interaction_model=effective_config.interaction_model,
         primary_model=primary_model_obj,
-        theta_deg=theta_float,
+        theta_deg=alpha_float,
     )
 
     mceq.set_density_model(density_model_obj)
 
     return mceq
-

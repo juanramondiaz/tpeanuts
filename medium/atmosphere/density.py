@@ -62,18 +62,18 @@ from tpeanuts.util.type import TensorLike, as_tensor
 
 from tpeanuts.external.nusquids.core import NuSQuIDSConfig
 from tpeanuts.external.nusquids.density import (
-    atmosphere_mass_density_profile_nusquids,
+    atmosphere_density_nusquids,
 )
 from tpeanuts.external.mceq.config import MCEqModelConfig
 try:
     from tpeanuts.external.mceq import density as mceq_density
 
-    atmosphere_mass_density_profile_from_mceq = getattr(
+    atmosphere_density_mceq = getattr(
         mceq_density,
-        "atmosphere_mass_density_profile_from_mceq",
+        "atmosphere_density_mceq",
     )
 except (ImportError, AttributeError):
-    atmosphere_mass_density_profile_from_mceq = None
+    atmosphere_density_mceq = None
 
 
 try:
@@ -248,7 +248,7 @@ def atmosphere_density(
     elif source in {"nusquids", "earthatm", "nusquids_earthatm"}:
         if nusquids_config is None:
             nusquids_config = NuSQuIDSConfig()
-        rho_gcm3 = atmosphere_mass_density_profile_nusquids(
+        rho_gcm3 = atmosphere_density_nusquids(
             h_km,
             config=nusquids_config,
             context=h_context,
@@ -262,14 +262,14 @@ def atmosphere_density(
             context=h_context,
         )
     elif source == "mceq":
-        if atmosphere_mass_density_profile_from_mceq is None:
+        if atmosphere_density_mceq is None:
             raise ImportError("source='mceq' requires the optional mceq package.")
         if mceq is None and mceq_config is None:
             raise ValueError("mceq_config must be provided when source='mceq' and mceq is None.")
-        rho_gcm3 = atmosphere_mass_density_profile_from_mceq(
+        rho_gcm3 = atmosphere_density_mceq(
             h_km=h_km,
             mceq=mceq,
-            theta_deg=theta_deg,
+            alpha_deg=theta_deg,
             config=mceq_config,
             device=h_km.device,
             dtype=dtype,

@@ -155,7 +155,7 @@ def select_particle_angle_flux(
     alpha_deg: Optional[float] = None,
     theta_deg: Optional[float] = None,
     angle_index: Optional[int] = None,
-    angle_mode: str = "alpha",
+    angle_mode: str = "theta",
     angle_tolerance_deg: Optional[float] = None,
     context: RuntimeContext = RuntimeContext.resolve(None, torch.float64),
 ) -> Dict[str, object]:
@@ -166,13 +166,13 @@ def select_particle_angle_flux(
         flux_data: Dictionary produced by the atmosphere I/O loaders, keyed by
             particle/flavour name.
         particle: Particle key to select.
-        alpha_deg: Detector alpha angle used when angle_mode is ``"alpha"``.
-        theta_deg: Atmosphere zenith angle used when angle_mode is
-            ``"theta"``.
+        alpha_deg: Surface/source angle used when angle_mode is ``"alpha"``.
+        theta_deg: Detector zenith angle used when angle_mode is ``"theta"``.
         angle_index: Optional explicit angle-bin index. If provided, angular
             matching is skipped.
         angle_mode: Angle convention used for nearest-bin selection:
-            ``"alpha"`` or ``"theta"``.
+            ``"theta"`` for detector angles or ``"alpha"`` for
+            surface/source angles.
         angle_tolerance_deg: Optional maximum accepted angular mismatch.
         context: Runtime device/dtype for returned tensors.
 

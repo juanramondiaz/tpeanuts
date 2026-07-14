@@ -15,6 +15,15 @@ from peanuts.matter_mixing import th13_M, th12_M
 
 import peanuts.files as f
 
+
+@nb.njit
+def _trapezoid_numba(y, x):
+    total = 0.0
+    for i in range(len(y) - 1):
+        total += 0.5 * (y[i + 1] + y[i]) * (x[i + 1] - x[i])
+    return total
+
+
 class SolarModel:
     """"
     Class containing the info of the solar model
@@ -319,12 +328,12 @@ def solar_flux_mass (th12, th13, DeltamSq21, DeltamSq3l, E, radius_samples, dens
     sampled at radius_samples.
     """
 
-    IntegratedFraction = np.trapz(y=fraction, x=radius_samples)
+    IntegratedFraction = _trapezoid_numba(fraction, radius_samples)
 
     temp = Tei(th12, th13, DeltamSq21, DeltamSq3l, E, density)
     temp = [temp[i]*fraction for i in range(len(temp))]
 
-    Te = [np.trapz(y=temp[i], x = radius_samples) / IntegratedFraction
+    Te = [_trapezoid_numba(temp[i], radius_samples) / IntegratedFraction
           for i in range(3)]
 
     return np.array(Te)

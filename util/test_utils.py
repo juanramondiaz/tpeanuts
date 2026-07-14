@@ -32,6 +32,10 @@ Module functions:
         per-test status lines used by run_test_function.
     max_abs_error(...): Compute the maximum absolute error between two
         scalars or tensors.
+    tensor_summary(...): Compute descriptive statistics for a tensor.
+    check_no_nan_inf(...): Check that a tensor has no NaN or Inf values.
+    check_monotonic_increasing(...): Check that a 1-D tensor is increasing.
+    check_positive(...): Check that a tensor has no negative values.
     assert_true(...): Raise AssertionError if a condition is falsy.
     assert_close(...): Raise AssertionError if two values are not
         numerically close.
@@ -48,14 +52,20 @@ Module functions:
 
 
 
-import traceback
 import inspect
+import traceback
+from typing import Dict, Optional, Union
 
 import torch
 
 from tpeanuts.core.common.pmns import PMNSParams
 from tpeanuts.core.SM.pmns import PMNS_SM
 from tpeanuts.util.context import RuntimeContext
+from tpeanuts.util.torch_util import default_device
+from tpeanuts.util.type import as_tensor
+
+
+TensorLike = Union[float, int, torch.Tensor]
 
 
 # Default absolute tolerance used by assert_close when not overridden.
@@ -189,6 +199,193 @@ def max_abs_error(a, b) -> float:
         return torch.max(torch.abs(a_t - b_t)).item()
 
     return abs(a - b)
+
+
+def tensor_summary(
+    x: TensorLike,
+    *,
+    name: str = "tensor",
+    device: Optional[Union[str, torch.device]] = None,
+    dtype: torch.dtype = torch.float64,
+) -> Dict:
+    """
+    Compute basic descriptive statistics for a tensor-like value.
+
+    Args:
+        x: Tensor-like input of any shape.
+        name: Label to attach to the summary, for identification in reports.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        Dict with keys "name", "shape", "dtype", "device", "min", "max",
+        "mean", "std", "has_nan" and "has_inf" describing x.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
+        x,
+        device=dev,
+        dtype=dtype,
+    )
+
+    return {
+        "name": name,
+        "shape": tuple(x_t.shape),
+        "dtype": str(x_t.dtype),
+        "device": str(x_t.device),
+        "min": float(torch.min(x_t).item()),
+        "max": float(torch.max(x_t).item()),
+        "mean": float(torch.mean(x_t).item()),
+        "std": float(torch.std(x_t).item()),
+        "has_nan": bool(torch.isnan(x_t).any().item()),
+        "has_inf": bool(torch.isinf(x_t).any().item()),
+    }
+
+
+def check_no_nan_inf(
+    x: TensorLike,
+    *,
+    name: str = "tensor",
+    raise_error: bool = False,
+    device: Optional[Union[str, torch.device]] = None,
+    dtype: torch.dtype = torch.float64,
+) -> bool:
+    """
+    Check that a tensor-like value contains no NaN or Inf entries.
+
+    Args:
+        x: Tensor-like input of any shape.
+        name: Label used in the raised error message, if any.
+        raise_error: If True, raise ValueError when the check fails instead
+            of just returning False.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        True if x has no NaN or Inf values, False otherwise.
+
+    Raises:
+        ValueError: If raise_error is True and x contains NaN or Inf.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
+        x,
+        device=dev,
+        dtype=dtype,
+    )
+
+    valid = (
+        not torch.isnan(x_t).any()
+        and not torch.isinf(x_t).any()
+    )
+
+    if (not valid) and raise_error:
+        raise ValueError(f"{name} contains NaN or Inf values.")
+
+    return valid
+
+
+def check_monotonic_increasing(
+    x: TensorLike,
+    *,
+    strict: bool = True,
+    raise_error: bool = False,
+    name: str = "tensor",
+    device: Optional[Union[str, torch.device]] = None,
+    dtype: torch.dtype = torch.float64,
+) -> bool:
+    """
+    Check that a 1-D tensor-like value is monotonically increasing.
+
+    Args:
+        x: Tensor-like input, flattened to 1-D before the check.
+        strict: If True, require strictly increasing values; if False, allow
+            equal consecutive values.
+        raise_error: If True, raise ValueError when the check fails instead
+            of just returning False.
+        name: Label used in the raised error message, if any.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        True if x is monotonically increasing under the requested strictness,
+        False otherwise.
+
+    Raises:
+        ValueError: If raise_error is True and the check fails.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
+        x,
+        device=dev,
+        dtype=dtype,
+    ).reshape(-1)
+
+    dx = torch.diff(x_t)
+
+    if strict:
+        valid = bool(torch.all(dx > 0.0).item())
+    else:
+        valid = bool(torch.all(dx >= 0.0).item())
+
+    if (not valid) and raise_error:
+        raise ValueError(f"{name} is not monotonic increasing.")
+
+    return valid
+
+
+def check_positive(
+    x: TensorLike,
+    *,
+    allow_zero: bool = True,
+    raise_error: bool = False,
+    name: str = "tensor",
+    device: Optional[Union[str, torch.device]] = None,
+    dtype: torch.dtype = torch.float64,
+) -> bool:
+    """
+    Check that a tensor-like value has no negative entries.
+
+    Args:
+        x: Tensor-like input of any shape.
+        allow_zero: If True, zero values are considered valid; if False,
+            require strictly positive values.
+        raise_error: If True, raise ValueError when the check fails instead
+            of just returning False.
+        name: Label used in the raised error message, if any.
+        device: Working torch device. None selects CUDA when available,
+            else CPU.
+        dtype: Floating dtype used for the computation.
+
+    Returns:
+        True if x satisfies the positivity condition, False otherwise.
+
+    Raises:
+        ValueError: If raise_error is True and x contains negative values.
+    """
+    dev = default_device(device)
+
+    x_t = as_tensor(
+        x,
+        device=dev,
+        dtype=dtype,
+    )
+
+    if allow_zero:
+        valid = bool(torch.all(x_t >= 0.0).item())
+    else:
+        valid = bool(torch.all(x_t > 0.0).item())
+
+    if (not valid) and raise_error:
+        raise ValueError(f"{name} contains negative values.")
+
+    return valid
 
 
 def assert_true(condition, message="Condition is not True", name=None):

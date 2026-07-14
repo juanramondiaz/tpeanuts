@@ -194,6 +194,67 @@ register_preset(
     ),
 )
 
+# 1c. Updated SM baseline: NuFIT 6.0 (2024).
+# Reference: Esteban, Gonzalez-Garcia, Maltoni, Martinez-Soler, Pinheiro,
+#   Schwetz, "NuFIT-6.0: Updated global analysis of three-flavor neutrino
+#   oscillations", JHEP 12 (2024) 216, arXiv:2410.05380.
+# Table "IC24 with SK atmospheric data", Normal Ordering (best fit).
+# Values read directly from the official parameter-range table,
+# https://www.nu-fit.org/?q=node/294 (v6.0.tbl-parameters.pdf).
+_SM_NUFIT60_NO: dict = dict(
+    theta12_deg=33.68,
+    theta13_deg=8.56,
+    theta23_deg=43.3,
+    delta13_deg=212.0,
+    DeltamSq21=7.49e-5,
+    DeltamSq3l=+2.513e-3,   # positive -> Delta m^2_31, normal ordering
+    ordering="NO",
+)
+register_preset(
+    OSCILLATION_PRESETS,
+    "_SM_NUFIT60_NO",
+    **_SM_NUFIT60_NO,
+    label="_SM_NUFIT60_NO",
+    description=(
+        "Standard 3-flavor SM best fit. NuFIT 6.0 (2024), normal ordering, "
+        "with SK atmospheric data. Esteban et al., JHEP 12 (2024) 216, "
+        "arXiv:2410.05380. http://www.nu-fit.org."
+    ),
+)
+
+# 1d. Updated SM baseline: NuFIT 6.1 (2025), the most recent release at the
+#     time of writing -- first global fit to include JUNO's initial
+#     theta12/Delta m^2_21 measurement.
+# Reference: same base analysis as NuFIT 6.0 (Esteban et al., JHEP 12 (2024)
+#   216, arXiv:2410.05380), updated per "NuFIT 6.1 (2025), www.nu-fit.org"
+#   (the citation instruction given on the NuFIT results page itself; no
+#   separate arXiv preprint is published for the v6.1 website update).
+# Table "IC24 with SK atmospheric data", Normal Ordering (best fit).
+# Values read directly from the official parameter-range table,
+# https://www.nu-fit.org/?q=node/309 (v6.1.tbl-parameters.pdf).
+_SM_NUFIT61_NO: dict = dict(
+    theta12_deg=33.76,
+    theta13_deg=8.62,
+    theta23_deg=43.29,
+    delta13_deg=212.0,
+    DeltamSq21=7.537e-5,
+    DeltamSq3l=+2.511e-3,   # positive -> Delta m^2_31, normal ordering
+    ordering="NO",
+)
+register_preset(
+    OSCILLATION_PRESETS,
+    "_SM_NUFIT61_NO",
+    **_SM_NUFIT61_NO,
+    label="_SM_NUFIT61_NO",
+    description=(
+        "Standard 3-flavor SM best fit. NuFIT 6.1 (2025), normal ordering, "
+        "with SK atmospheric data -- first NuFIT release including JUNO's "
+        "initial theta12/Delta m^2_21 measurement. Base analysis: Esteban "
+        "et al., JHEP 12 (2024) 216, arXiv:2410.05380; see NuFIT 6.1 (2025), "
+        "http://www.nu-fit.org for the updated tables."
+    ),
+)
+
 # 2. Standard 3-flavor SM, run through the 4-flavour sterile machinery with
 #    all sterile mixing angles zero (has theta14_deg -> builds PMNS_sterile).
 register_preset(

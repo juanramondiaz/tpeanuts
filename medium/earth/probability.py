@@ -221,7 +221,7 @@ def pearth_numerical(
         E_MeV=E_MeV,
         n_e_mol_cm3=n_e,
         dx_evolution=trajectory.dx_evolution,
-        return_history=True,
+        return_history=full_oscillation,
         device=dev,
         dtype=dtype,
         epsilon=epsilon,
@@ -246,7 +246,7 @@ def pearth_numerical(
     if full_oscillation:
         return evolution, x
 
-    return evolution[-1]
+    return evolution
 
 
 @torch.no_grad()

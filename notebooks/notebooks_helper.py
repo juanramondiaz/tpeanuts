@@ -277,9 +277,31 @@ def plot_tripanel(
     xscale: str = "linear",
     labels: Sequence[str] | None = None,
     show_plots: bool = True,
+    quantity: str = "probability",
+    flux_units: str = r"cm$^{-2}$ s$^{-1}$",
 ):
-    """Plot candidate/reference values plus absolute and relative residuals."""
+    """Plot candidate/reference values plus absolute and relative residuals.
+
+    Args:
+        quantity: Either ``"probability"`` or ``"flux"``, selecting the
+            top-left panel's y-axis label. ``"probability"`` labels it
+            "Probability"; ``"flux"`` labels it "Flux [<flux_units>]" so the
+            physical units are always visible next to the curves.
+        flux_units: Unit string shown in the y-axis label when
+            ``quantity="flux"`` (e.g. ``r"cm$^{-2}$ s$^{-1}$"`` for a real
+            physical flux, or ``"a.u."`` for an arbitrary-unit synthetic
+            test spectrum). Ignored when ``quantity="probability"``.
+
+    Raises:
+        ValueError: If ``quantity`` is not ``"probability"`` or ``"flux"``.
+    """
     labels = FLAVOUR_LABELS if labels is None else labels
+    if quantity == "flux":
+        y0_label = f"Flux [{flux_units}]"
+    elif quantity == "probability":
+        y0_label = "Probability"
+    else:
+        raise ValueError(f"quantity must be 'probability' or 'flux', got {quantity!r}")
     cand = to_numpy(candidate)
     ref = to_numpy(reference)
     abs_delta, rel_delta = abs_rel_delta(cand, ref)
@@ -302,7 +324,7 @@ def plot_tripanel(
             x_np, np.maximum(rel_delta[:, i], 1.0e-300), color=color, label=label
         )
     axes[0].set_title(title)
-    axes[0].set_ylabel("Probability / flux")
+    axes[0].set_ylabel(y0_label)
     axes[1].set_title("abs_delta")
     axes[1].set_ylabel("|TPeanuts - legacy|")
     axes[2].set_title("rel_delta")
