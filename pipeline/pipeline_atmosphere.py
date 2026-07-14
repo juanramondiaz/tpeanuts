@@ -19,9 +19,9 @@
 """
 Workflow helpers for atmosphere-neutrino production and detector fluxes.
 
-Physical scenario: unlike the solar pipelines (``pipeline_coherent``,
-``pipeline_incoherent``, ``pipeline_legacypeanuts``), which propagate
-neutrinos produced deep inside the Sun across vacuum to Earth, this module
+Physical scenario: unlike the solar pipelines (``pipeline_incoherent``,
+``pipeline_legacypeanuts``), which propagate neutrinos produced deep inside
+the Sun across vacuum to Earth, this module
 handles neutrinos produced by cosmic-ray air showers in the Earth's
 atmosphere at a height h above the surface, arriving at a detector at a
 given zenith angle theta after crossing only atmosphere and (optionally)

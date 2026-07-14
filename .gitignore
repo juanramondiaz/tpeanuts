@@ -6,9 +6,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# Package init files (local only — not committed)
-__init__.py
-
 # Notebook and editor caches
 .ipynb_checkpoints/
 *.ipynb_checkpoints/
