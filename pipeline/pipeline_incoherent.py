@@ -20,12 +20,12 @@
 Incoherent solar-neutrino propagation pipeline.
 
 This module implements the torch-native incoherent solar-to-detector
-workflow: instead of carrying a coherent flavour-amplitude state vector (as
-``pipeline_coherent`` does), it works directly with the *incoherent* mixture
-of mass-eigenstate weights produced by adiabatic conversion inside the Sun —
-i.e. it tracks how much of the flux is nu1, nu2, nu3 (no relative phase
-information), because solar densities and baselines decohere the mass
-eigenstates well before they reach Earth. It follows the legacy peanuts
+workflow: instead of carrying a coherent flavour-amplitude state vector, it
+works directly with the *incoherent* mixture of mass-eigenstate weights
+produced by adiabatic conversion inside the Sun — i.e. it tracks how much of
+the flux is nu1, nu2, nu3 (no relative phase information), because solar
+densities and baselines decohere the mass eigenstates well before they reach
+Earth. It follows the legacy peanuts
 physical structure (see ``pipeline_legacypeanuts``, the original NumPy/Numba
 reference implementation that this module reproduces in torch) while
 delegating shared setup tasks to ``pipeline.pipeline_common`` and Earth
@@ -137,9 +137,8 @@ def propagate_solar_to_detector_incoherent(
     (``pearth(..., massbasis=True)``) and the resulting flavour
     probabilities are optionally integrated over a one-year nadir exposure.
     This is the torch-native counterpart of the original NumPy/Numba
-    ``pipeline_legacypeanuts`` workflow, and differs from
-    ``pipeline_coherent`` in that it never carries flavour amplitudes/phases
-    after solar production.
+    ``pipeline_legacypeanuts`` workflow: it never carries flavour
+    amplitudes/phases after solar production, only mass-eigenstate weights.
 
     Args:
         E_MeV: Scalar or one-dimensional neutrino energy grid in MeV.

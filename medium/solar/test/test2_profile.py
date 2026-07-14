@@ -24,19 +24,11 @@ import pandas as pd
 import pytest
 import torch
 
-from tpeanuts.coherent.coordinates import (
-    distance_to_solar_radius_fraction,
-    production_to_surface_path_length,
-    solar_path_grid,
-    solar_radius_fraction_to_distance,
-    solar_shell_widths,
-)
 from tpeanuts.medium.solar.profile import (
     SolarParameters,
     SolarProfile,
     build_solar_profile,
 )
-from tpeanuts.util.constant import R_SUN, R_SUN_KM
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.test_utils import assert_close
 
@@ -201,62 +193,3 @@ def test_build_solar_profile_loads_default_when_profile_is_none():
     assert bool(torch.all(profile.density > 0.0))
     assert {"pp", "8B", "7Be", "hep"}.issubset(profile.fractions)
     assert {"pp", "8B", "7Be", "hep"}.issubset(profile.fluxes)
-
-
-def test_solar_radius_fraction_distance_roundtrip_m_and_km():
-    ctx = make_context()
-    rho = torch.tensor([0.0, 0.05, 0.25, 0.70, 1.0], device=DEVICE, dtype=DTYPE)
-
-    radius_m = solar_radius_fraction_to_distance(rho, unit="m", context=ctx)
-    radius_km = solar_radius_fraction_to_distance(rho, unit="km", context=ctx)
-    rho_from_m = distance_to_solar_radius_fraction(radius_m, unit="m", context=ctx)
-    rho_from_km = distance_to_solar_radius_fraction(radius_km, unit="km", context=ctx)
-
-    assert_close(radius_m / 1.0e3, radius_km, name="solar radius m/km conversion", atol=1.0e-8, rtol=1.0e-12)
-    assert_close(rho_from_m, rho, name="rho roundtrip through meters")
-    assert_close(rho_from_km, rho, name="rho roundtrip through kilometers")
-
-
-def test_production_to_surface_path_length_matches_one_minus_rho():
-    ctx = make_context()
-    rho0 = torch.tensor([0.0, 0.10, 0.50, 0.95, 1.0], device=DEVICE, dtype=DTYPE)
-
-    length_m = production_to_surface_path_length(rho0, unit="m", context=ctx)
-    length_km = production_to_surface_path_length(rho0, unit="km", context=ctx)
-    expected_m = (1.0 - rho0) * R_SUN
-
-    assert_close(length_m, expected_m, name="production-to-surface path length")
-    assert_close(length_m / 1.0e3, length_km, name="production path m/km conversion", atol=1.0e-8, rtol=1.0e-12)
-    assert_close(length_km[0], torch.tensor(R_SUN_KM, device=DEVICE, dtype=DTYPE), name="central production length")
-    assert_close(length_km[-1], torch.tensor(0.0, device=DEVICE, dtype=DTYPE), name="surface production length")
-
-
-def test_solar_path_grid_aligned_with_profile_radius_and_widths_sum_to_path():
-    profile = make_profile()
-    ctx = make_context()
-    rho0 = torch.tensor(0.30, device=DEVICE, dtype=DTYPE)
-
-    grid = solar_path_grid(rho0, profile_radius=profile.radius, context=ctx)
-    widths_km = solar_shell_widths(grid, unit="km", context=ctx)
-    total_km = torch.sum(widths_km)
-    expected_km = production_to_surface_path_length(rho0, unit="km", context=ctx)
-
-    assert_close(grid, torch.tensor([0.30, 0.50, 0.75, 1.00], device=DEVICE, dtype=DTYPE), name="profile-aligned solar path grid")
-    assert bool(torch.all(widths_km >= 0.0))
-    assert_close(total_km, expected_km, name="profile-aligned shell widths sum to path", atol=1.0e-8, rtol=1.0e-12)
-
-
-def test_solar_path_grid_even_spacing_and_validation_errors():
-    ctx = make_context()
-    grid = solar_path_grid(0.25, nsteps=3, context=ctx)
-
-    assert_close(grid, torch.tensor([0.25, 0.50, 0.75, 1.00], device=DEVICE, dtype=DTYPE), name="even solar path grid")
-
-    with pytest.raises(ValueError, match="rho0"):
-        solar_path_grid(torch.tensor([0.1, 0.2], device=DEVICE, dtype=DTYPE), context=ctx)
-
-    with pytest.raises(ValueError, match="nsteps"):
-        solar_path_grid(0.1, nsteps=0, context=ctx)
-
-    with pytest.raises(ValueError, match="monotonically increasing"):
-        solar_shell_widths(torch.tensor([0.0, 0.5, 0.4], device=DEVICE, dtype=DTYPE), context=ctx)
