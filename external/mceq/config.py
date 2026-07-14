@@ -66,12 +66,26 @@ Module functions:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union, Dict, Any, TYPE_CHECKING
 import torch
 
-from tpeanuts.medium.atmosphere.io import OutputConfig
 from tpeanuts.util.parallel import ParallelConfig
 from tpeanuts.util.type import as_tensor
+
+if TYPE_CHECKING:
+    from tpeanuts.medium.atmosphere.io import OutputConfig
+
+
+def _default_output_config():
+    from tpeanuts.medium.atmosphere.io import OutputConfig
+
+    return OutputConfig()
+
+
+def _make_output_config(**kwargs):
+    from tpeanuts.medium.atmosphere.io import OutputConfig
+
+    return OutputConfig(**kwargs)
 # ============================================================
 # Optional CRflux import
 # ============================================================
@@ -225,26 +239,26 @@ class GridConfig:
     MCEq objects.
 
     theta_grid_deg:
-        Grid of zenith angles in degrees, 0 <= theta < 90. theta=0 is a
+        Grid of zenith angles in degrees, 0 <= alpha < 90. alpha=0 is a
         vertically downward-going trajectory (shortest atmospheric
-        path); larger theta corresponds to more inclined trajectories
+        path); larger alpha corresponds to more inclined trajectories
         with a longer atmospheric slant depth for a given altitude.
 
     X_grid_gcm2:
         Atmosphere depth grid in g/cm^2, i.e. the slant column density
         of air (integral of mass density along the line of sight) at
-        which the cascade-equation flux Phi(E, X, theta) is evaluated
+        which the cascade-equation flux Phi(E, X, alpha) is evaluated
         by MCEq. Must be strictly increasing.
 
     h_grid_km:
         Altitude-above-sea-level grid in km at which the reconstructed
-        height-differential production profile f(h | E, theta) and flux
-        Phi(E, h, theta) are reported. Must be strictly increasing.
+        height-differential production profile f(h | E, alpha) and flux
+        Phi(E, h, alpha) are reported. Must be strictly increasing.
 
     X_obs_gcm2:
         Observation slant depth in g/cm^2 (e.g. the depth of a detector
         or the ground) at which the energy-differential flux Phi(E,
-        X_obs, theta) is extracted/interpolated from the MCEq solution.
+        X_obs, alpha) is extracted/interpolated from the MCEq solution.
         Must lie within the range covered by X_grid_gcm2.
     """
 
@@ -291,7 +305,7 @@ class GridConfig:
             raise ValueError("h_grid_km must be one-dimensional.")
 
         if torch.any(self.theta_grid_deg < 0.0) or torch.any(self.theta_grid_deg >= 90.0):
-            raise ValueError("All theta values must satisfy 0 <= theta < 90 degrees.")
+            raise ValueError("All theta values must satisfy 0 <= alpha < 90 degrees.")
 
         if torch.any(torch.diff(self.X_grid_gcm2) <= 0.0):
             raise ValueError("X_grid_gcm2 must be strictly increasing.")
@@ -313,11 +327,11 @@ class SmoothingConfig:
 
     This config is purely tpeanuts-native (consumed by
     tpeanuts.external.mceq.smoothing) and does not call MCEq. It
-    controls how the raw MCEq flux Phi(E, X, theta), which can be noisy
+    controls how the raw MCEq flux Phi(E, X, alpha), which can be noisy
     along the depth axis X, is smoothed before the numerical derivative
     dPhi/dX is taken. dPhi/dX is the depth-differential particle
     production source term used downstream to reconstruct the
-    height-dependent production profile f(h | E, theta).
+    height-dependent production profile f(h | E, alpha).
 
     Attributes:
         method: Smoothing method applied along the depth axis before
@@ -377,8 +391,8 @@ class RunConfig:
     (parallel), and the mapping from tpeanuts neutrino-flavour names to
     the corresponding MCEq particle names (flavours, e.g.
     {"numu": "numu", "antinumu": "antinumu", ...}). This object is
-    consumed by tpeanuts.external.mceq.builder to drive the full
-    theta-grid x flavour build of Atmosphere height-flux datasets.
+    consumed by the MCEq generator/orchestration utilities to drive
+    Atmosphere height-flux dataset generation.
 
     Attributes:
         model: MCEqModelConfig selecting the interaction model, primary
@@ -397,7 +411,7 @@ class RunConfig:
     model: MCEqModelConfig = field(default_factory=MCEqModelConfig)
     grid: GridConfig = field(default_factory=GridConfig)
     smoothing: SmoothingConfig = field(default_factory=SmoothingConfig)
-    output: OutputConfig = field(default_factory=OutputConfig)
+    output: "OutputConfig" = field(default_factory=_default_output_config)
     parallel: ParallelConfig = field(default_factory=ParallelConfig)
 
     flavours: Dict[str, str] = field(
@@ -479,7 +493,7 @@ def make_config(
     build each sub-config object explicitly.
 
     Args:
-        theta_grid_deg: Zenith-angle grid in degrees (0 <= theta < 90);
+        theta_grid_deg: Zenith-angle grid in degrees (0 <= alpha < 90);
             defaults to 18 points linearly spaced in [0, 85].
         X_grid_gcm2: Atmospheric slant-depth grid in g/cm^2 at which
             MCEq's cascade-equation flux is solved; defaults to 220
@@ -488,7 +502,7 @@ def make_config(
             height-differential profile/flux is reported; defaults to
             300 points linearly spaced in [0, 80].
         X_obs_gcm2: Observation slant depth in g/cm^2 at which the
-            energy-differential flux Phi(E, X_obs, theta) is extracted.
+            energy-differential flux Phi(E, X_obs, alpha) is extracted.
         interaction_model: Name of the MCEq hadronic interaction model
             (see INTERACTION_MODELS).
         primary_model: Name of the crflux primary cosmic-ray flux model
@@ -546,7 +560,7 @@ def make_config(
             smoothing=smoothing,
             positive_only=positive_only,
         ),
-        output=OutputConfig(
+        output=_make_output_config(
             output_dir=output_dir,
             filename=filename,
             dtype=dtype,

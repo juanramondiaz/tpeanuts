@@ -22,28 +22,28 @@ Production-profile reconstruction from mceq flux gradients.
 This module builds the normalized production-height probability
 density:
 
-    f(h | E, theta)
+    f(h | E, alpha)
 
 from the depth-tabulated flux:
 
-    Phi(E, X, theta)
+    Phi(E, X, alpha)
 
 (obtained by solving MCEq's cascade equation; see
 tpeanuts.external.mceq.solver) using the depth-differential production
 source:
 
-    Q_eff(E, X, theta) = max(dPhi/dX, 0)
+    Q_eff(E, X, alpha) = max(dPhi/dX, 0)
 
 and the change of variables from Atmosphere slant depth X (g/cm^2) to
 altitude h (km):
 
-    Q_eff(E, h, theta)
+    Q_eff(E, h, alpha)
     =
-    Q_eff(E, X(h, theta), theta) |dX/dh|
+    Q_eff(E, X(h, alpha), alpha) |dX/dh|
 
-f(h | E, theta) is then Q_eff(E, h, theta) normalized to integrate to 1
-over h, for each energy E and zenith angle theta; multiplying it by the
-observed energy-differential flux phi_E_obs = Phi(E, X_obs, theta)
+f(h | E, alpha) is then Q_eff(E, h, alpha) normalized to integrate to 1
+over h, for each energy E and zenith angle alpha; multiplying it by the
+observed energy-differential flux phi_E_obs = Phi(E, X_obs, alpha)
 yields the height-differential flux phi_Eh used elsewhere in tpeanuts.
 
 This module is a tpeanuts-native orchestration layer: it does not call
@@ -51,27 +51,27 @@ MCEq directly itself, but its top-level function
 (production_profiles_all_energies_from_flux_gradient) drives the whole
 pipeline by calling init_mceq (MCEq instantiation),
 solve_flux_vs_depth_grid (MCEq cascade-equation solve),
-compute_slant_depth_from_mceq (MCEq Atmosphere depth query), and
+atmosphere_slant_depth_mceq (MCEq Atmosphere depth query), and
 several purely tensor-algebra helpers defined in this module and in
 tpeanuts.external.mceq.{solver,smoothing}.
 
 Module functions:
     interpolate_source_X_to_h:
         Interpolate a depth-tabulated quantity (e.g. dPhi/dX) onto a
-        set of depths X(h, theta) corresponding to an altitude grid.
+        set of depths X(h, alpha) corresponding to an altitude grid.
     convert_depth_source_to_height_source:
         Apply the |dX/dh| Jacobian to convert a depth-differential
         source term into a height-differential source term.
     normalize_height_profiles:
         Normalize a height-differential source term to a probability
-        density f(h | E, theta) integrating to 1 over h.
+        density f(h | E, alpha) integrating to 1 over h.
     build_phi_Eh_from_profile:
         Combine phi_E_obs and f_Eh into the height-differential flux
         phi_Eh.
     production_profiles_all_energies_from_flux_gradient:
-        End-to-end orchestration: solve Phi(E, X, theta) with MCEq,
+        End-to-end orchestration: solve Phi(E, X, alpha) with MCEq,
         smooth and differentiate it, convert to a height-domain source,
-        normalize to f(h | E, theta), and assemble phi_Eh. Returns a
+        normalize to f(h | E, alpha), and assemble phi_Eh. Returns a
         dict bundling every intermediate and final quantity.
 """
 
@@ -93,13 +93,13 @@ from tpeanuts.external.mceq.config import (
 )
 
 from tpeanuts.external.mceq.core import init_mceq
-from tpeanuts.external.mceq.depth import (
-    compute_slant_depth_from_mceq,
+from tpeanuts.medium.atmosphere.depth import (
     compute_dXdh,
+    interpolate_flux_at_Xobs,
 )
+from tpeanuts.external.mceq.depth import atmosphere_slant_depth_mceq
 from tpeanuts.external.mceq.solver import (
     solve_flux_vs_depth_grid,
-    interpolate_flux_at_Xobs,
 )
 from tpeanuts.external.mceq.smoothing import (
     smooth_and_differentiate_flux,
@@ -128,8 +128,8 @@ def interpolate_source_X_to_h(
 
     Pure tensor interpolation (linear in X, via torch.searchsorted); no
     MCEq call. Given a quantity tabulated on the solver's Atmosphere
-    depth grid X_grid_gcm2 (e.g. dPhi/dX(E, X, theta)), evaluates it at
-    the depths X_of_h_gcm2 = X(h, theta) that correspond to a desired
+    depth grid X_grid_gcm2 (e.g. dPhi/dX(E, X, alpha)), evaluates it at
+    the depths X_of_h_gcm2 = X(h, alpha) that correspond to a desired
     altitude grid h, as the first step of converting a depth-domain
     source term into a height-domain one (see
     convert_depth_source_to_height_source). Points in X_of_h_gcm2
@@ -141,7 +141,7 @@ def interpolate_source_X_to_h(
         source_XE: Source tensor of shape (..., n_X, n_E), e.g.
             dPhi/dX in (cm^2 s sr GeV g/cm^2)^-1.
         X_of_h_gcm2: Depths in g/cm^2, of shape (..., n_h), at which to
-            evaluate source_XE; typically X(h, theta) for an altitude
+            evaluate source_XE; typically X(h, alpha) for an altitude
             grid h.
         device: Output torch device. None selects CUDA when available,
             else CPU.
@@ -256,7 +256,7 @@ def convert_depth_source_to_height_source(
     source term via the |dX/dh| Jacobian.
 
     Implements the change of variables
-    Q_eff(E, h, theta) = Q_eff(E, X(h, theta), theta) * |dX/dh|: first
+    Q_eff(E, h, alpha) = Q_eff(E, X(h, alpha), alpha) * |dX/dh|: first
     interpolates source_XE (a function of depth X) onto the depths
     X_of_h_gcm2 corresponding to the altitude grid (via
     interpolate_source_X_to_h), then multiplies by the absolute value
@@ -270,7 +270,7 @@ def convert_depth_source_to_height_source(
             (..., n_X, n_E), e.g. dPhi/dX in
             (cm^2 s sr GeV g/cm^2)^-1.
         X_of_h_gcm2: Depths in g/cm^2 corresponding to the altitude
-            grid, shape (..., n_h); typically X(h, theta).
+            grid, shape (..., n_h); typically X(h, alpha).
         dXdh_gcm2_per_km: Depth-altitude derivative dX/dh in
             g/cm^2/km, shape (..., n_h), matching X_of_h_gcm2;
             typically negative.
@@ -334,7 +334,7 @@ def normalize_height_profiles(
 
     For each energy (and any leading batch dimensions), divides
     source_Eh by its trapezoidal integral over h_grid_km, producing the
-    normalized production-height probability density f(h | E, theta)
+    normalized production-height probability density f(h | E, alpha)
     (units 1/km). Energy channels whose integral is at or below eps
     (e.g. zero production) are returned as all-zero rows rather than
     NaN/Inf from a division by zero.
@@ -466,7 +466,7 @@ def build_phi_Eh_from_profile(
 
 @torch.no_grad()
 def production_profiles_all_energies_from_flux_gradient(
-    theta_deg: TensorLike,
+    alpha_deg: TensorLike,
     particle: str,
     model_config: Optional[MCEqModelConfig] = None,
     grid_config: Optional[GridConfig] = None,
@@ -482,20 +482,20 @@ def production_profiles_all_energies_from_flux_gradient(
     This is the top-level orchestration function of the MCEq pipeline:
     it instantiates an MCEqRun (via init_mceq), drives the external
     cascade-equation solve (via solve_flux_vs_depth_grid) to obtain
-    Phi(E, X, theta) on the configured depth grid, evaluates the
-    observed flux phi_E_obs = Phi(E, X_obs, theta), smooths and
+    Phi(E, X, alpha) on the configured depth grid, evaluates the
+    observed flux phi_E_obs = Phi(E, X_obs, alpha), smooths and
     differentiates the depth-tabulated flux to obtain the production
     source dPhi/dX, maps Atmosphere depth to altitude via
-    compute_slant_depth_from_mceq and compute_dXdh, converts the
+    atmosphere_slant_depth_mceq and compute_dXdh, converts the
     depth-domain source into a height-domain source (Jacobian
     |dX/dh|), normalizes it into the production-height density
-    f(h | E, theta), and finally builds the height-differential flux
+    f(h | E, alpha), and finally builds the height-differential flux
     phi_Eh = phi_E_obs * f_Eh. The numbered inline comments in the body
     mark each of these seven steps.
 
     Args:
-        theta_deg: Zenith angle in degrees (0 <= theta_deg < 90) of the
-            shower/neutrino trajectory; theta_deg=0 is vertical.
+        alpha_deg: Surface/MCEq zenith angle in degrees (0 <= alpha_deg < 90) of the
+            shower/neutrino trajectory; alpha_deg=0 is vertical.
         particle: MCEq particle name (e.g. "numu", "mu+") for which to
             solve and reconstruct the production profile.
         model_config: Optional MCEqModelConfig selecting the
@@ -513,18 +513,18 @@ def production_profiles_all_energies_from_flux_gradient(
 
     Returns:
         Dict with the following tensor entries:
-            theta_deg: Scalar zenith angle in degrees.
+            alpha_deg: Scalar surface/MCEq zenith angle in degrees.
             E_grid_GeV: Energy grid in GeV, shape (n_E,).
             X_grid_gcm2: Atmosphere slant-depth grid in g/cm^2, shape
                 (n_X,).
             h_grid_km: Altitude grid in km, shape (n_h,).
-            flux_XE: Raw solved flux Phi(E, X, theta), shape
+            flux_XE: Raw solved flux Phi(E, X, alpha), shape
                 (n_X, n_E), in (cm^2 s sr GeV)^-1.
             flux_smooth_XE: Depth-smoothed flux, same shape/units as
                 flux_XE.
             dPhi_dX_XE: Depth derivative of the smoothed flux, shape
                 (n_X, n_E), in (cm^2 s sr GeV g/cm^2)^-1.
-            X_of_h_gcm2: Slant depth X(h, theta) on the altitude grid,
+            X_of_h_gcm2: Slant depth X(h, alpha) on the altitude grid,
                 shape (n_h,), in g/cm^2.
             dXdh_gcm2_per_km: Depth-altitude derivative dX/dh on the
                 altitude grid, shape (n_h,), in g/cm^2/km.
@@ -540,7 +540,7 @@ def production_profiles_all_energies_from_flux_gradient(
     Raises:
         ImportError: If the optional MCEq package is not installed.
         ValueError: If model_config, grid_config or smoothing_config
-            fail validation, or if theta_deg is outside [0, 90) degrees.
+            fail validation, or if alpha_deg is outside [0, 90) degrees.
     """
     dev = default_device(device)
 
@@ -570,15 +570,15 @@ def production_profiles_all_energies_from_flux_gradient(
     ).reshape(-1)
 
     mceq = init_mceq(
-        theta_deg=theta_deg,
+        alpha_deg=alpha_deg,
         config=model_config,
     )
 
     # --------------------------------------------------------
-    # 1. Solve Phi(E, X, theta)
+    # 1. Solve Phi(E, X, alpha)
     # --------------------------------------------------------
     X_grid, E_grid, flux_XE = solve_flux_vs_depth_grid(
-        theta_deg=theta_deg,
+        alpha_deg=alpha_deg,
         particle=particle,
         X_grid_gcm2=X_grid,
         config=model_config,
@@ -588,7 +588,7 @@ def production_profiles_all_energies_from_flux_gradient(
     )
 
     # --------------------------------------------------------
-    # 2. Phi(E, X_obs, theta)
+    # 2. Phi(E, X_obs, alpha)
     # --------------------------------------------------------
     phi_E_obs = interpolate_flux_at_Xobs(
         X_grid_gcm2=X_grid,
@@ -611,11 +611,11 @@ def production_profiles_all_energies_from_flux_gradient(
     )
 
     # --------------------------------------------------------
-    # 5. X(h, theta)
+    # 5. X(h, alpha)
     # --------------------------------------------------------
-    X_of_h = compute_slant_depth_from_mceq(
+    X_of_h = atmosphere_slant_depth_mceq(
         h_km=h_grid,
-        theta_deg=theta_deg,
+        alpha_deg=alpha_deg,
         mceq=mceq,
         config=model_config,
         device=dev,
@@ -642,7 +642,7 @@ def production_profiles_all_energies_from_flux_gradient(
     )
 
     # --------------------------------------------------------
-    # 7. Normalize f(h | E, theta)
+    # 7. Normalize f(h | E, alpha)
     # --------------------------------------------------------
     f_Eh = normalize_height_profiles(
         h_grid_km=h_grid,
@@ -659,7 +659,8 @@ def production_profiles_all_energies_from_flux_gradient(
     )
 
     return {
-        "theta_deg": as_tensor(theta_deg, device=dev, dtype=dtype).reshape(()),
+        "alpha_deg": as_tensor(alpha_deg, device=dev, dtype=dtype).reshape(()),
+        "theta_deg": as_tensor(alpha_deg, device=dev, dtype=dtype).reshape(()),
         "E_grid_GeV": E_grid,
         "X_grid_gcm2": X_grid,
         "h_grid_km": h_grid,

@@ -19,6 +19,7 @@ from scipy.interpolate import interp1d
 
 import peanuts.files as f
 from peanuts.utils import intersection
+from tpeanuts.util.math import numpy_trapezoid
 
 
 # Sometimes the function cmath.sqrt takes the "wrong" side of the branch cut, if its argument has vanishing
@@ -205,7 +206,7 @@ def NadirExposure(lam=-1, d1=0, d2=365, ns=1000, normalized=False, from_file=Non
 
     # Normalize the distribution if requested
     if normalized:
-        norm = np.trapz(x=eta_samples,y=exposure)
+        norm = numpy_trapezoid(x=eta_samples, y=exposure)
         exposure = exposure/norm
 
     return np.vstack((eta_samples, exposure)).T

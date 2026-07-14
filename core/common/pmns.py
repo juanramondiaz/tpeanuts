@@ -704,3 +704,22 @@ class PMNS(torch.nn.Module, abc.ABC):
         Ured = self.reduced()
 
         return Ured.conj().transpose(-2, -1)
+
+    @torch.no_grad()
+    def vacuum_flavour_projector(
+        self,
+        antinu: Union[bool, torch.Tensor] = False,
+    ) -> torch.Tensor:
+        """
+        Return the decohered vacuum flavour projector |U_{alpha i}|^2.
+
+        Args:
+            antinu: Boolean scalar or tensor mask. True selects the
+                antineutrino PMNS convention through ``pmns_matrix``.
+
+        Returns:
+            Real tensor shaped (..., n_flavours, n_flavours) with flavour
+            rows and mass-eigenstate columns.
+        """
+        U = self.pmns_matrix(antinu=antinu)
+        return U.abs() ** 2

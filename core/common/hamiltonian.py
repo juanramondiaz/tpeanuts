@@ -251,7 +251,7 @@ def hamiltonian_reduced(
     if context is not None:
         device, dtype = context.device, context.dtype
     else:
-        device, dtype = pmns.device(), pmns.dtype()
+        device, dtype = pmns.device, pmns.dtype
 
     Ured = pmns.reduced(antinu=antinu)
     if Ured.shape[-2:] != (3, 3):

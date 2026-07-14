@@ -28,7 +28,7 @@ profile as the nuSQuIDS reference backend, for an apples-to-apples
 cross-validation of the two oscillation codes.
 
 Module functions:
-    atmosphere_mass_density_profile_nusquids(...)
+    atmosphere_density_nusquids(...)
         Evaluate the nuSQuIDS EarthAtm exponential atmosphere mass-density
         formula on a torch altitude grid.
 """
@@ -43,7 +43,7 @@ from tpeanuts.util.type import TensorLike, as_tensor
 
 
 @torch.no_grad()
-def atmosphere_mass_density_profile_nusquids(
+def atmosphere_density_nusquids(
     h_km: TensorLike,
     config: NuSQuIDSConfig,
     *,

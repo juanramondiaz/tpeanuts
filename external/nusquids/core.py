@@ -42,6 +42,13 @@ Module functions:
         Import and return the installed nuSQuIDS Python module.
     is_available(...)
         Check whether the nuSQuIDS Python bindings can be imported.
+    units(...)
+        Return the nuSQuIDS unit-conversion object.
+    normalise_flavour_label(...), initial_state(...), neutrino_type(...)
+        Public helpers for flavour labels, initial states, and the
+        neutrino/antineutrino enum.
+    set_cp_phase(...), eval_probabilities(...), evolve_with_body(...)
+        Shared solver utilities used by the probability wrappers.
     configure_solver(...)
         Apply oscillation and numerical settings to an existing nuSQuIDS
         solver object.
@@ -53,22 +60,41 @@ Module functions:
     probability_earth(...)
         Return final-flavour probabilities through the nuSQuIDS Earth body
         for a given cos(zenith).
+    transition_matrix_earth_mass_to_flavour(...)
+        Return the nuSQuIDS Earth probability matrix from an incoherent
+        vacuum-mass input basis to the final flavour basis.
+    probability_earth_massbasis(...)
+        Propagate an incoherent vacuum-mass mixture through the nuSQuIDS
+        Earth body and return the final flavour probabilities.
     probability_atmosphere(...)
         Return final-flavour probabilities through nuSQuIDS's EarthAtm
         body (atmosphere production height plus Earth) for a given
         cos(zenith).
+    probability_solar_point(...)
+        Return decohered solar probabilities from a fixed SunASnu production
+        radius.
+    sun_asnu_track_fraction(...)
+        Convert a physical solar radius r/R_sun into the SunASnu track
+        coordinate fraction used by the Python body interface.
+    probability_grid_vacuum(...)
+        Return a table of vacuum probabilities over an energy/baseline grid.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 import importlib
-from typing import Optional, Union
+import math
+from typing import Iterable, Optional, Sequence, Union
 import warnings
 
 import numpy as np
+import torch
 
 from tpeanuts.core.common.neutrino import flavour_index
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.pmns import PMNS_SM
+from tpeanuts.util.context import RuntimeContext
 import tpeanuts.util.default as default
 
 
@@ -117,7 +143,7 @@ class NuSQuIDSConfig:
         nusquids_rho0_gcm3: Zero-altitude reference mass density in g/cm^3
             for the tpeanuts reimplementation of nuSQuIDS's EarthAtm
             exponential atmosphere formula (see
-            external.nusquids.density.atmosphere_mass_density_profile_nusquids).
+            external.nusquids.density.atmosphere_density_nusquids).
         nusquids_scale_height_km: Exponential scale height in km for the
             same atmosphere mass-density formula.
         nusquids_Ye: Electron fraction (dimensionless, electrons per
@@ -191,7 +217,7 @@ def is_available() -> bool:
     return True
 
 
-def _units(nsq):
+def units(nsq):
     """
     Return a unit-conversion object exposing GeV and km in nuSQuIDS's natural units.
 
@@ -223,7 +249,7 @@ def _units(nsq):
     return FallbackUnits()
 
 
-def _normalise_flavour_label(flavour: Union[str, int]) -> Union[str, int]:
+def normalise_flavour_label(flavour: Union[str, int]) -> Union[str, int]:
     """
     Normalize a flavour label to the bare flavour key used by flavour_index.
 
@@ -250,7 +276,7 @@ def _normalise_flavour_label(flavour: Union[str, int]) -> Union[str, int]:
     return key
 
 
-def _initial_state(flavour: Union[str, int], n_flavours: int = 3) -> np.ndarray:
+def initial_state(flavour: Union[str, int], n_flavours: int = 3) -> np.ndarray:
     """
     Build a pure flavour-eigenstate occupation vector for nuSQuIDS.
 
@@ -267,11 +293,11 @@ def _initial_state(flavour: Union[str, int], n_flavours: int = 3) -> np.ndarray:
         Set_initial_state in the flavor basis.
     """
     state = np.zeros(n_flavours, dtype=float)
-    state[flavour_index(_normalise_flavour_label(flavour))] = 1.0
+    state[flavour_index(normalise_flavour_label(flavour))] = 1.0
     return state
 
 
-def _neutrino_type(nsq, *, antinu: bool):
+def neutrino_type(nsq, *, antinu: bool):
     """
     Return the nuSQuIDS NeutrinoType enum value for neutrino or antineutrino.
 
@@ -285,7 +311,7 @@ def _neutrino_type(nsq, *, antinu: bool):
     return nsq.NeutrinoType.antineutrino if antinu else nsq.NeutrinoType.neutrino
 
 
-def _set_cp_phase(nuSQ, config: NuSQuIDSConfig) -> None:
+def set_cp_phase(nuSQ, config: NuSQuIDSConfig) -> None:
     """
     Set the Dirac CP-violating phase on a nuSQuIDS solver object.
 
@@ -365,15 +391,15 @@ def configure_solver(nuSQ, config: Optional[NuSQuIDSConfig] = None):
     nuSQ.Set_MixingAngle(1, 2, float(config.theta23))
     nuSQ.Set_SquareMassDifference(1, float(config.DeltamSq21))
     nuSQ.Set_SquareMassDifference(2, float(config.DeltamSq3l))
-    _set_cp_phase(nuSQ, config)
+    set_cp_phase(nuSQ, config)
 
     if hasattr(nuSQ, "Set_rel_error"):
         nuSQ.Set_rel_error(float(config.rel_error))
     if hasattr(nuSQ, "Set_abs_error"):
         nuSQ.Set_abs_error(float(config.abs_error))
     if config.h_max_km is not None and hasattr(nuSQ, "Set_h_max"):
-        units = _units(require_nusquids())
-        nuSQ.Set_h_max(float(config.h_max_km) * units.km)
+        unit_constants = units(require_nusquids())
+        nuSQ.Set_h_max(float(config.h_max_km) * unit_constants.km)
 
     return nuSQ
 
@@ -398,26 +424,167 @@ def init_solver(
         EvolveState.
     """
     nsq = require_nusquids()
-    nuSQ = nsq.nuSQUIDS(3, _neutrino_type(nsq, antinu=antinu))
+    nuSQ = nsq.nuSQUIDS(3, neutrino_type(nsq, antinu=antinu))
     configure_solver(nuSQ, config=config)
     return nuSQ
 
 
-def _eval_probabilities(nuSQ) -> np.ndarray:
+def eval_probabilities(
+    nuSQ,
+    *,
+    output_energy_GeV: Optional[float] = None,
+    antinu_index: int = 0,
+) -> np.ndarray:
     """
     Read final flavour probabilities off an already-evolved nuSQuIDS solver.
 
     Args:
         nuSQ: A nuSQuIDS solver object after EvolveState() has been called.
+        output_energy_GeV: Optional output energy for bindings whose
+            EvalFlavor overload expects an explicit energy argument.
+        antinu_index: Optional neutrino/antineutrino index for bindings whose
+            EvalFlavor overload expects a third argument.
 
     Returns:
         1D float array of length 3 with P(nu_e), P(nu_mu), P(nu_tau) (or
-        the antineutrino equivalents) from nuSQuIDS's EvalFlavor(i).
+        the antineutrino equivalents) from nuSQuIDS's EvalFlavor.
     """
-    return np.asarray([float(nuSQ.EvalFlavor(i)) for i in range(3)], dtype=float)
+    if output_energy_GeV is None:
+        return np.asarray([float(nuSQ.EvalFlavor(i)) for i in range(3)], dtype=float)
+
+    nsq = require_nusquids()
+    unit_constants = units(nsq)
+    values = []
+    for flavour in range(3):
+        try:
+            values.append(
+                float(
+                    nuSQ.EvalFlavor(
+                        flavour,
+                        float(output_energy_GeV) * unit_constants.GeV,
+                        antinu_index,
+                    )
+                )
+            )
+        except TypeError:
+            values.append(float(nuSQ.EvalFlavor(flavour, float(output_energy_GeV) * unit_constants.GeV)))
+    return np.asarray(values, dtype=float)
 
 
-def _evolve_with_body(
+def _pmns_from_config(config: Optional[NuSQuIDSConfig] = None) -> PMNS_SM:
+    """Build a common PMNS object from a nuSQuIDS oscillation config."""
+    cfg = NuSQuIDSConfig() if config is None else config
+    context = RuntimeContext.resolve(None, torch.float64)
+    params = PMNSParams(
+        theta12=float(cfg.theta12),
+        theta13=float(cfg.theta13),
+        theta23=float(cfg.theta23),
+        delta=float(cfg.delta_cp),
+        context=context,
+    )
+    return PMNS_SM(params)
+
+
+def sun_asnu_radius(nsq=None) -> float:
+    """
+    Return the nuSQuIDS SunASnu radial final coordinate for a radial track.
+
+    Args:
+        nsq: Optional imported nuSQuIDS module. If None, require_nusquids()
+            is used.
+
+    Returns:
+        Solar radius in nuSQuIDS natural-coordinate units.
+    """
+    nsq = require_nusquids() if nsq is None else nsq
+    if not hasattr(nsq, "SunASnu"):
+        raise NuSQuIDSError("The installed nuSQuIDS bindings do not expose SunASnu.")
+    return nsq.SunASnu.Track(0.0).GetFinalX()
+
+
+def sun_asnu_track_fraction(r_solar: float) -> float:
+    """
+    Map a physical solar radius r/R_sun to the SunASnu track coordinate.
+
+    For the radial SunASnu trajectory exposed by the Python bindings, the
+    physical solar interior from centre to surface is sampled over the second
+    half of the track coordinate: centre -> 0.5 and surface -> 1.0. Passing
+    r/R_sun directly as the track fraction samples the wrong part of the
+    trajectory and can make the apparent central density tend to zero.
+
+    Args:
+        r_solar: Physical solar radius in units of R_sun, with 0 at the solar
+            centre and 1 at the solar surface.
+
+    Returns:
+        Normalized SunASnu track coordinate fraction.
+    """
+    return 0.5 + 0.5 * float(r_solar)
+
+
+def make_solar_track(r0: float, *, impact: float = 0.0, nsq=None):
+    """
+    Build a radial SunASnu track for a solar production radius.
+
+    Args:
+        r0: Physical production radius in solar-radius units, r/R_sun.
+        impact: Impact parameter in solar-radius units.
+        nsq: Optional imported nuSQuIDS module.
+
+    Returns:
+        A nuSQuIDS SunASnu.Track object.
+    """
+    nsq = require_nusquids() if nsq is None else nsq
+    radius = sun_asnu_radius(nsq)
+    xini = sun_asnu_track_fraction(r0) * radius
+    return nsq.SunASnu.Track(xini, float(impact) * radius)
+
+
+def eval_mass_weights(nuSQ) -> Optional[np.ndarray]:
+    """
+    Read normalized mass-basis weights from an evolved nuSQuIDS solver.
+
+    Args:
+        nuSQ: A nuSQuIDS solver after EvolveState().
+
+    Returns:
+        Normalized length-3 mass-weight array, or None when the bindings do
+        not expose EvalMass.
+    """
+    eval_mass = getattr(nuSQ, "EvalMass", None)
+    if eval_mass is None:
+        return None
+    weights = np.asarray([float(eval_mass(i)) for i in range(3)], dtype=float)
+    norm = weights.sum()
+    if np.isfinite(norm) and norm > 0.0:
+        weights = weights / norm
+    return weights
+
+
+def eval_flavour_averaged(nuSQ) -> Optional[np.ndarray]:
+    """
+    Read averaged final-flavour probabilities from bindings supporting it.
+
+    This is a fallback for nuSQuIDS builds without EvalMass. It tries the
+    averaged EvalFlavor overload used by some bindings.
+
+    Args:
+        nuSQ: A nuSQuIDS solver after EvolveState().
+
+    Returns:
+        Length-3 probability array, or None if the overload is unavailable.
+    """
+    values = []
+    for flv in range(3):
+        averaged = [False, False, False]
+        try:
+            values.append(float(nuSQ.EvalFlavor(flv, 0.0, averaged)))
+        except TypeError:
+            return None
+    return np.asarray(values, dtype=float)
+
+
+def evolve_with_body(
     *,
     body,
     track,
@@ -445,26 +612,102 @@ def _evolve_with_body(
             the specific trajectory (baseline or cos(zenith)) through it.
         E_GeV: Neutrino energy in GeV.
         initial_flavour: Initial flavour label or index (see
-            _initial_state).
+            initial_state).
         antinu: If True, propagate the antineutrino state.
         config: Oscillation/numerical configuration for the solver.
             Defaults to NuSQuIDSConfig() when None (via init_solver).
 
     Returns:
         1D float array of length 3 with the final flavour probabilities
-        (see _eval_probabilities).
+        (see eval_probabilities).
     """
     nsq = require_nusquids()
-    units = _units(nsq)
+    unit_constants = units(nsq)
     nuSQ = init_solver(antinu=antinu, config=config)
 
     nuSQ.Set_Body(body)
     nuSQ.Set_Track(track)
-    nuSQ.Set_E(float(E_GeV) * units.GeV)
-    nuSQ.Set_initial_state(_initial_state(initial_flavour), nsq.Basis.flavor)
+    nuSQ.Set_E(float(E_GeV) * unit_constants.GeV)
+    nuSQ.Set_initial_state(initial_state(initial_flavour), nsq.Basis.flavor)
     nuSQ.EvolveState()
 
-    return _eval_probabilities(nuSQ)
+    return eval_probabilities(nuSQ)
+
+
+def _build_track_from_cosine(body, cos_zenith: float):
+    """Build an Earth/EarthAtm track from cos(zenith) across binding variants."""
+    cosz = float(cos_zenith)
+    phi = math.acos(max(-1.0, min(1.0, cosz)))
+
+    make_with_cosine = getattr(body, "MakeTrackWithCosine", None)
+    if callable(make_with_cosine):
+        return make_with_cosine(cosz)
+
+    make_track = getattr(body, "MakeTrack", None)
+    if callable(make_track):
+        # Older bindings may expose only MakeTrack(phi), with phi the zenith
+        # angle in radians, while some wrappers may accept cos(phi) directly.
+        for arg in (phi, cosz):
+            try:
+                return make_track(arg)
+            except TypeError:
+                continue
+
+    track_cls = getattr(type(body), "Track", None) or getattr(body, "Track", None)
+    if track_cls is not None:
+        for method_name in ("makeWithCosine", "MakeWithCosine", "MakeTrackWithCosine"):
+            method = getattr(track_cls, method_name, None)
+            if callable(method):
+                try:
+                    return method(cosz)
+                except TypeError:
+                    continue
+
+    raise NuSQuIDSError(
+        "The nuSQuIDS Earth body cannot build a track from cos(zenith): "
+        "tried MakeTrackWithCosine and MakeTrack(phi) binding variants."
+    )
+
+
+def _earth_baseline_km_from_cosine(earth, cos_zenith: float) -> float:
+    """Convert detector cos(zenith) to an Earth-only chord baseline in km."""
+    cosz = float(cos_zenith)
+    radius_km = 6371.0
+    get_radius = getattr(earth, "GetRadius", None)
+    if callable(get_radius):
+        try:
+            radius_km = float(get_radius())
+        except TypeError:
+            radius_km = 6371.0
+    return max(0.0, -2.0 * radius_km * cosz)
+
+
+def _build_earth_track_from_cosine(nsq, earth, cos_zenith: float):
+    """Build an Earth.Track baseline from cos(zenith), without an atmosphere leg."""
+    track_cls = getattr(type(earth), "Track", None) or getattr(earth, "Track", None)
+    if track_cls is None:
+        raise NuSQuIDSError("The nuSQuIDS Earth binding does not expose Earth.Track.")
+
+    unit_constants = units(nsq)
+    baseline_km = _earth_baseline_km_from_cosine(earth, cos_zenith)
+    return track_cls(baseline_km * unit_constants.km)
+
+
+def _earth_body_and_track(nsq, cos_zenith: float):
+    """Build a nuSQuIDS Earth-only body and a compatible detector track."""
+    earth_factory = getattr(nsq, "Earth", None)
+    if earth_factory is not None:
+        earth = earth_factory()
+        try:
+            return earth, _build_earth_track_from_cosine(nsq, earth, cos_zenith)
+        except NuSQuIDSError:
+            pass
+        except TypeError:
+            pass
+
+    earth_atm = nsq.EarthAtm()
+    track = _build_track_from_cosine(earth_atm, cos_zenith)
+    return earth_atm, track
 
 
 def probability_vacuum(
@@ -497,11 +740,11 @@ def probability_vacuum(
         P(nu_tau) (or antineutrino equivalents), summing to 1.
     """
     nsq = require_nusquids()
-    units = _units(nsq)
+    unit_constants = units(nsq)
     body = nsq.Vacuum()
-    track = nsq.Vacuum.Track(float(baseline_km) * units.km)
+    track = nsq.Vacuum.Track(float(baseline_km) * unit_constants.km)
 
-    return _evolve_with_body(
+    return evolve_with_body(
         body=body,
         track=track,
         E_GeV=E_GeV,
@@ -522,13 +765,13 @@ def probability_earth(
     """
     Return final-flavour probabilities through the nuSQuIDS Earth body.
 
-    The track is built from ``cos_zenith``. When the installed bindings do not
-    expose an ``Earth`` body, this falls back to ``EarthAtm``. The neutrino
-    is assumed to be produced at the Earth's surface (no atmosphere
-    production-height segment), so this differs from
-    probability_atmosphere only by omitting the atmospheric part of the
-    trajectory; the Earth density profile, layer structure, and matter
-    effects are otherwise nuSQuIDS's own internal model, not tpeanuts's.
+    The track is built from ``cos_zenith``. When the installed bindings expose
+    an ``Earth`` body, the zenith direction is converted to an Earth-only
+    chord baseline ``L = max(0, -2 R_earth cos_zenith)`` and passed to
+    ``Earth.Track``. Older or reduced bindings that cannot construct
+    ``Earth.Track`` fall back to ``EarthAtm``. The preferred ``Earth`` path
+    assumes the neutrino is already at the Earth surface, so it does not add
+    an atmosphere production-height leg.
 
     Args:
         E_GeV: Neutrino energy in GeV.
@@ -545,19 +788,13 @@ def probability_earth(
         summing to 1.
 
     Raises:
-        NuSQuIDSError: If neither an "Earth" nor an "EarthAtm" body with
-            MakeTrackWithCosine is available in the installed bindings.
+        NuSQuIDSError: If neither an "Earth" nor an "EarthAtm" body can
+            build a compatible track from the provided cos(zenith).
     """
     nsq = require_nusquids()
-    earth_factory = getattr(nsq, "Earth", None)
-    earth = earth_factory() if earth_factory is not None else nsq.EarthAtm()
+    earth, track = _earth_body_and_track(nsq, cos_zenith)
 
-    if hasattr(earth, "MakeTrackWithCosine"):
-        track = earth.MakeTrackWithCosine(float(cos_zenith))
-    else:
-        raise NuSQuIDSError("The nuSQuIDS Earth body cannot build a cosine track.")
-
-    return _evolve_with_body(
+    return evolve_with_body(
         body=earth,
         track=track,
         E_GeV=E_GeV,
@@ -565,6 +802,109 @@ def probability_earth(
         antinu=antinu,
         config=config,
     )
+
+
+def transition_matrix_earth_mass_to_flavour(
+    *,
+    E_GeV: float,
+    cos_zenith: float,
+    antinu: bool = False,
+    config: Optional[NuSQuIDSConfig] = None,
+) -> np.ndarray:
+    """
+    Return the nuSQuIDS Earth probability matrix from mass to flavour.
+
+    This helper is the Earth-side analogue of the decohered solar projection
+    used in probability_solar_point: each pure vacuum mass eigenstate
+    ``|nu_i>`` is propagated independently through the nuSQuIDS Earth body
+    and the final flavour probabilities are assembled into a matrix
+
+    ``T_{alpha i} = P(nu_i -> nu_alpha ; E, cos_zenith)``.
+
+    This is the correct object for solar-neutrino Earth regeneration after
+    Sun-Earth decoherence, where the state arriving at the Earth is an
+    incoherent mass-basis mixture.
+
+    Args:
+        E_GeV: Neutrino energy in GeV.
+        cos_zenith: cos(zenith angle) at the detector. ``cos_zenith=1`` is
+            straight down (minimal Earth crossing) and ``cos_zenith=-1`` is
+            straight up through the Earth's diameter.
+        antinu: If True, propagate antineutrinos.
+        config: Oscillation/numerical configuration. Defaults to
+            ``NuSQuIDSConfig()`` when None.
+
+    Returns:
+        Array shaped ``(3, 3)`` with flavour rows and initial-mass columns.
+
+    Raises:
+        NuSQuIDSError: If the installed bindings do not expose
+            ``nsq.Basis.mass``.
+    """
+    nsq = require_nusquids()
+    unit_constants = units(nsq)
+    basis_mass = getattr(getattr(nsq, "Basis", None), "mass", None)
+    if basis_mass is None:
+        raise NuSQuIDSError(
+            "This nuSQuIDS binding does not expose Basis.mass, so Earth "
+            "propagation from incoherent solar mass weights is unavailable."
+        )
+
+    matrix = np.zeros((3, 3), dtype=float)
+    for mass_idx in range(3):
+        nuSQ = init_solver(antinu=antinu, config=config)
+        earth, track = _earth_body_and_track(nsq, cos_zenith)
+        nuSQ.Set_Body(earth)
+        nuSQ.Set_Track(track)
+        nuSQ.Set_E(float(E_GeV) * unit_constants.GeV)
+        state = np.zeros(3, dtype=float)
+        state[mass_idx] = 1.0
+        nuSQ.Set_initial_state(state, basis_mass)
+        nuSQ.EvolveState()
+        matrix[:, mass_idx] = eval_probabilities(nuSQ)
+
+    return matrix
+
+
+def probability_earth_massbasis(
+    *,
+    E_GeV: float,
+    cos_zenith: float,
+    mass_weights: Sequence[float],
+    antinu: bool = False,
+    config: Optional[NuSQuIDSConfig] = None,
+) -> np.ndarray:
+    """
+    Propagate an incoherent vacuum-mass mixture through the nuSQuIDS Earth.
+
+    Args:
+        E_GeV: Neutrino energy in GeV.
+        cos_zenith: cos(zenith angle) at the detector.
+        mass_weights: Length-3 incoherent mass-eigenstate weights
+            ``w_i >= 0`` at Earth entry, typically produced by solar MSW
+            propagation after Sun-Earth decoherence.
+        antinu: If True, propagate antineutrinos.
+        config: Oscillation/numerical configuration. Defaults to
+            ``NuSQuIDSConfig()`` when None.
+
+    Returns:
+        Length-3 final flavour-probability vector.
+    """
+    weights = np.asarray(mass_weights, dtype=float).reshape(-1)
+    if weights.shape != (3,):
+        raise ValueError("mass_weights must be a length-3 vector.")
+
+    norm = weights.sum()
+    if np.isfinite(norm) and norm > 0.0:
+        weights = weights / norm
+
+    matrix = transition_matrix_earth_mass_to_flavour(
+        E_GeV=E_GeV,
+        cos_zenith=cos_zenith,
+        antinu=antinu,
+        config=config,
+    )
+    return matrix @ weights
 
 
 def probability_atmosphere(
@@ -605,7 +945,7 @@ def probability_atmosphere(
     earth_atm = nsq.EarthAtm()
     track = earth_atm.MakeTrackWithCosine(float(cos_zenith))
 
-    return _evolve_with_body(
+    return evolve_with_body(
         body=earth_atm,
         track=track,
         E_GeV=E_GeV,
@@ -613,3 +953,121 @@ def probability_atmosphere(
         antinu=antinu,
         config=config,
     )
+
+
+def probability_solar_point(
+    *,
+    E_MeV: float,
+    r0: float,
+    initial_flavour: Union[str, int] = "nue",
+    impact: float = 0.0,
+    antinu: bool = False,
+    return_mass_weights: bool = False,
+    config: Optional[NuSQuIDSConfig] = None,
+) -> np.ndarray:
+    """
+    Return decohered SunASnu probabilities from a fixed production radius.
+
+    The state is evolved through nuSQuIDS SunASnu from a production radius
+    r0/R_sun to the solar surface. The physical production radius is mapped
+    to the SunASnu track coordinate with sun_asnu_track_fraction before the
+    track is constructed. When EvalMass is available, the final mass-basis
+    weights are projected to flavour with vacuum |U_{alpha i}|^2, matching
+    the decohered solar-neutrino observable.
+
+    Args:
+        E_MeV: Neutrino energy in MeV.
+        r0: Production radius in solar-radius units.
+        initial_flavour: Initial flavour label or integer index.
+        impact: Impact parameter in solar-radius units.
+        antinu: If True, propagate antineutrinos.
+        return_mass_weights: If True, return the final mass weights instead
+            of flavour probabilities. If EvalMass is unavailable, returns NaNs.
+        config: Oscillation/numerical configuration. Defaults to
+            NuSQuIDSConfig() when None.
+
+    Returns:
+        Length-3 array of final flavour probabilities, or mass weights when
+        return_mass_weights=True.
+    """
+    nsq = require_nusquids()
+    unit_constants = units(nsq)
+    cfg = NuSQuIDSConfig() if config is None else config
+    nuSQ = init_solver(antinu=antinu, config=cfg)
+
+    sun = nsq.SunASnu()
+    nuSQ.Set_Body(sun)
+    nuSQ.Set_Track(make_solar_track(r0, impact=impact, nsq=nsq))
+    nuSQ.Set_E(float(E_MeV) * 1.0e-3 * unit_constants.GeV)
+    nuSQ.Set_initial_state(initial_state(initial_flavour), nsq.Basis.flavor)
+    nuSQ.EvolveState()
+
+    mass_weights = eval_mass_weights(nuSQ)
+    if mass_weights is not None:
+        if return_mass_weights:
+            return mass_weights
+        projector = _pmns_from_config(cfg).vacuum_flavour_projector().detach().cpu().numpy()
+        return projector @ mass_weights
+
+    averaged_flavour = eval_flavour_averaged(nuSQ)
+    if averaged_flavour is not None:
+        if return_mass_weights:
+            return np.full(3, float("nan"))
+        return averaged_flavour
+
+    raise NuSQuIDSError(
+        "This nuSQuIDS binding exposes neither EvalMass nor averaged EvalFlavor; "
+        "coherent EvalFlavor is not a valid solar-decohered reference."
+    )
+
+
+def probability_grid_vacuum(
+    *,
+    E_GeV: Sequence[float],
+    baseline_km: Sequence[float],
+    initial_flavours: Iterable[Union[str, int]] = ("nue", "numu", "nutau"),
+    antinu: bool = False,
+    config: Optional[NuSQuIDSConfig] = None,
+):
+    """
+    Evaluate vacuum probabilities over a rectangular parameter grid.
+
+    Args:
+        E_GeV: Energies in GeV.
+        baseline_km: Vacuum baselines in km.
+        initial_flavours: Initial flavour labels or integer flavour indices.
+        antinu: If True, propagate antineutrinos.
+        config: Oscillation/numerical configuration. Defaults to
+            NuSQuIDSConfig() when None.
+
+    Returns:
+        pandas.DataFrame with one row per grid point and columns
+        ``P_nue``, ``P_numu``, and ``P_nutau``.
+    """
+    import pandas as pd
+
+    rows = []
+    for beta in initial_flavours:
+        for energy in E_GeV:
+            for baseline in baseline_km:
+                probs = probability_vacuum(
+                    E_GeV=float(energy),
+                    baseline_km=float(baseline),
+                    initial_flavour=beta,
+                    antinu=antinu,
+                    config=config,
+                )
+                rows.append(
+                    {
+                        "backend": "nuSQuIDS",
+                        "mode": "vacuum",
+                        "E_GeV": float(energy),
+                        "baseline_km": float(baseline),
+                        "initial_flavour": str(beta),
+                        "antinu": bool(antinu),
+                        "P_nue": probs[0],
+                        "P_numu": probs[1],
+                        "P_nutau": probs[2],
+                    }
+                )
+    return pd.DataFrame.from_records(rows)

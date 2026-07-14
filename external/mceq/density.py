@@ -30,15 +30,11 @@ are moved to CPU for the MCEq call and converted back to the requested device.
 Main functions:
     get_density_model:
         Return the density_model object attached to an initialized MCEq run.
-    get_mass_density_gcm3_from_mceq:
+    atmosphere_density:
         Evaluate the MCEq mass density at one altitude in km.
-    get_mass_overburden_gcm2_from_mceq:
-        Evaluate the MCEq mass overburden at one altitude in km.
-    atmosphere_mass_density_profile_from_mceq:
+    atmosphere_density_mceq:
         Build a torch tensor with the atmosphere mass-density profile.
-    atmosphere_mass_overburden_profile_from_mceq:
-        Build a torch tensor with the atmosphere overburden profile.
-    save_mceq_density_profile:
+    save_atmosphere_density:
         Save a two-column altitude-density table extracted from MCEq.
 """
 
@@ -88,7 +84,7 @@ def get_density_model(mceq):
     return mceq.density_model
 
 
-def get_mass_density_gcm3_from_mceq(
+def atmosphere_density(
     mceq,
     h_km: float,
 ) -> float:
@@ -110,50 +106,16 @@ def get_mass_density_gcm3_from_mceq(
     return float(density_model.get_density(h_cm))
 
 
-def get_mass_overburden_gcm2_from_mceq(
-    mceq,
-    h_km: float,
-) -> float:
-    """
-    Evaluate MCEq atmosphere mass overburden at a single altitude.
-
-    Args:
-        mceq: Initialized MCEq object whose density_model provides
-            get_mass_overburden with altitude in cm.
-        h_km: Altitude above sea level in kilometres.
-
-    Returns:
-        Atmospheric mass overburden in g/cm^2 as a Python float.
-
-    Raises:
-        AttributeError: If the selected MCEq density model does not implement
-            get_mass_overburden.
-    """
-    density_model = get_density_model(mceq)
-
-    if not hasattr(density_model, "get_mass_overburden"):
-        raise AttributeError(
-            "The mceq density model does not provide get_mass_overburden."
-        )
-
-    h_cm = float(h_km) * 1.0e5
-
-    return float(density_model.get_mass_overburden(h_cm))
-
-
 # ============================================================
 # Torch-compatible profiles
 # ============================================================
 
 @torch.no_grad()
-def atmosphere_mass_density_profile_from_mceq(
+def atmosphere_density_mceq(
     h_km: TensorLike,
     mceq=None,
-    theta_deg: TensorLike = 0.0,
+    alpha_deg: TensorLike = 0.0,
     config: Optional[MCEqModelConfig] = None,
-    interaction_model: Optional[str] = None,
-    primary_model: Optional[Union[str, tuple]] = None,
-    density_model: Optional[str] = None,
     *,
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
@@ -166,11 +128,8 @@ def atmosphere_mass_density_profile_from_mceq(
             tensor preserves this shape.
         mceq: Optional initialized MCEq object. When omitted, a new instance is
             created with init_mceq and the supplied configuration arguments.
-        theta_deg: Zenith angle passed to init_mceq when mceq is omitted.
+        alpha_deg: Surface/MCEq zenith angle passed to init_mceq when mceq is omitted.
         config: Optional MCEq model configuration object.
-        interaction_model: Optional interaction-model override for init_mceq.
-        primary_model: Optional primary cosmic-ray model override for init_mceq.
-        density_model: Optional MCEq density-model override for init_mceq.
         device: Output torch device. None selects CUDA when available, else CPU.
         dtype: Floating dtype used for input conversion and output tensor.
 
@@ -184,18 +143,15 @@ def atmosphere_mass_density_profile_from_mceq(
 
     if mceq is None:
         mceq = init_mceq(
-            theta_deg=theta_deg,
+            alpha_deg=alpha_deg,
             config=config,
-            interaction_model=interaction_model,
-            primary_model=primary_model,
-            density_model=density_model,
             info=False,
         )
 
     h_flat_cpu = h_t.detach().cpu().reshape(-1)
 
     rho_vals = [
-        get_mass_density_gcm3_from_mceq(
+        atmosphere_density(
             mceq=mceq,
             h_km=float(h.item()),
         )
@@ -209,89 +165,21 @@ def atmosphere_mass_density_profile_from_mceq(
     ).reshape(original_shape)
 
 
-@torch.no_grad()
-def atmosphere_mass_overburden_profile_from_mceq(
-    h_km: TensorLike,
-    mceq=None,
-    theta_deg: TensorLike = 0.0,
-    config: Optional[MCEqModelConfig] = None,
-    interaction_model: Optional[str] = None,
-    primary_model: Optional[Union[str, tuple]] = None,
-    density_model: Optional[str] = None,
-    *,
-    device: Optional[Union[str, torch.device]] = None,
-    dtype: torch.dtype = torch.float64,
-) -> torch.Tensor:
-    """
-    Build a tensor-valued atmosphere overburden profile from MCEq.
-
-    Args:
-        h_km: Scalar or tensor-like altitude values in kilometres. The returned
-            tensor preserves this shape.
-        mceq: Optional initialized MCEq object. When omitted, a new instance is
-            created with init_mceq and the supplied configuration arguments.
-        theta_deg: Zenith angle passed to init_mceq when mceq is omitted.
-        config: Optional MCEq model configuration object.
-        interaction_model: Optional interaction-model override for init_mceq.
-        primary_model: Optional primary cosmic-ray model override for init_mceq.
-        density_model: Optional MCEq density-model override for init_mceq.
-        device: Output torch device. None selects CUDA when available, else CPU.
-        dtype: Floating dtype used for input conversion and output tensor.
-
-    Returns:
-        Tensor of atmosphere mass overburden values in g/cm^2 with the same
-        shape as h_km.
-    """
-    dev = default_device(device)
-
-    h_t = as_tensor(h_km, device=dev, dtype=dtype)
-    original_shape = h_t.shape
-
-    if mceq is None:
-        mceq = init_mceq(
-            theta_deg=theta_deg,
-            config=config,
-            interaction_model=interaction_model,
-            primary_model=primary_model,
-            density_model=density_model,
-            info=False,
-        )
-
-    h_flat_cpu = h_t.detach().cpu().reshape(-1)
-
-    X_vals = [
-        get_mass_overburden_gcm2_from_mceq(
-            mceq=mceq,
-            h_km=float(h.item()),
-        )
-        for h in h_flat_cpu
-    ]
-
-    return torch.tensor(
-        X_vals,
-        device=dev,
-        dtype=dtype,
-    ).reshape(original_shape)
-
-
 # ============================================================
 # Save density profile
 # ============================================================
 
 @torch.no_grad()
-def save_mceq_density_profile(
+def save_atmosphere_density(
     output_path: str,
     mceq=None,
-    theta_deg: TensorLike = 0.0,
+    alpha_deg: TensorLike = 0.0,
     h_grid_km: Optional[TensorLike] = None,
     h_min_km: TensorLike = 0.0,
     h_max_km: TensorLike = 100.0,
     n_h: int = 1000,
     overwrite: bool = True,
     config: Optional[MCEqModelConfig] = None,
-    interaction_model: Optional[str] = None,
-    primary_model: Optional[Union[str, tuple]] = None,
-    density_model: Optional[str] = None,
     *,
     device: Optional[Union[str, torch.device]] = None,
     dtype: torch.dtype = torch.float64,
@@ -303,16 +191,13 @@ def save_mceq_density_profile(
         output_path: Destination text file path.
         mceq: Optional initialized MCEq object. When omitted, a new instance is
             created with init_mceq and the supplied configuration arguments.
-        theta_deg: Zenith angle passed to init_mceq when mceq is omitted.
+        alpha_deg: Surface/MCEq zenith angle passed to init_mceq when mceq is omitted.
         h_grid_km: Optional explicit altitude grid in kilometres.
         h_min_km: Minimum altitude in kilometres used when h_grid_km is omitted.
         h_max_km: Maximum altitude in kilometres used when h_grid_km is omitted.
         n_h: Number of altitude samples used when h_grid_km is omitted.
         overwrite: Whether an existing output file may be replaced.
         config: Optional MCEq model configuration object.
-        interaction_model: Optional interaction-model override for init_mceq.
-        primary_model: Optional primary cosmic-ray model override for init_mceq.
-        density_model: Optional MCEq density-model override for init_mceq.
         device: Working/output torch device for tensor construction.
         dtype: Floating dtype used for altitude and density tensors.
 
@@ -347,14 +232,11 @@ def save_mceq_density_profile(
     else:
         h_grid_t = as_tensor(h_grid_km, device=dev, dtype=dtype)
 
-    rho_t = atmosphere_mass_density_profile_from_mceq(
+    rho_t = atmosphere_density_mceq(
         h_km=h_grid_t,
         mceq=mceq,
-        theta_deg=theta_deg,
+        alpha_deg=alpha_deg,
         config=config,
-        interaction_model=interaction_model,
-        primary_model=primary_model,
-        density_model=density_model,
         device=dev,
         dtype=dtype,
     )

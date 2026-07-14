@@ -31,7 +31,8 @@ particles/flavours that feed the same final neutrino/antineutrino mode so
 that flux and oscillation-probability spectra can be plotted or compared
 across the full angular range.
 
-The saved files contain one produced particle and one detector alpha/theta.
+The saved files contain one produced particle and one angle pair: detector
+theta and, when available, the associated surface/source alpha.
 Main tensor convention:
 
     detector_flux_Ei: (n_E, 3)
@@ -107,10 +108,8 @@ def build_detector_flux_filename(
     Args:
         particle: Produced-particle key (e.g. "numu", "anti_nue") whose
             flux this file stores.
-        alpha_deg: Detector zenith angle in degrees, if the file was produced
-            on a detector-alpha grid.
-        theta_deg: Atmosphere zenith angle in degrees, if the file was
-            produced on a propagation-theta grid.
+        alpha_deg: Surface/source zenith angle in degrees, if available.
+        theta_deg: Detector zenith angle in degrees, if available.
         base_filename: Base filename (and extension) to derive the torch
             file extension from; defaults to ``default.detector_flux_filename``.
 
@@ -154,8 +153,8 @@ def build_detector_flux_path(
     Args:
         output_dir: Directory the detector-flux file will live in.
         particle: Produced-particle key (e.g. "numu", "anti_nue").
-        alpha_deg: Detector zenith angle in degrees, if applicable.
-        theta_deg: Atmosphere zenith angle in degrees, if applicable.
+        alpha_deg: Surface/source zenith angle in degrees, if applicable.
+        theta_deg: Detector zenith angle in degrees, if applicable.
         base_filename: Base filename used to derive the torch file
             extension; defaults to ``default.detector_flux_filename``.
 
@@ -232,8 +231,8 @@ def _detector_entry_angle(entry: Dict[str, Any]) -> tuple[float, Optional[float]
     """
     Resolve the angle used to stack detector-flux entries.
 
-    Detector files may be produced either on a detector-alpha grid or directly
-    on a propagation-theta grid. Older theta-mode files store alpha_deg=None,
+    Detector files may include a surface-alpha grid in addition to the
+    detector-theta grid. Older theta-only files store alpha_deg=None,
     so aggregation must fall back to theta_deg instead of assuming alpha_deg is
     always present.
     """
@@ -511,8 +510,8 @@ def build_detector_flux_metadata(
             optional ``"metadata_extra"`` dict whose entries override/extend
             the defaults below.
         particle: Produced-particle key the result belongs to.
-        alpha_deg: Detector zenith angle in degrees, or None.
-        theta_deg: Atmosphere zenith angle in degrees, or None.
+        alpha_deg: Surface/source zenith angle in degrees, or None.
+        theta_deg: Detector zenith angle in degrees, or None.
 
     Returns:
         Dictionary with a human-readable description of the physical
@@ -569,9 +568,9 @@ def save_detector_flux_result(
             metadata.
         output_dir: Directory the file is written into (created if needed).
         particle: Produced-particle key. Defaults to ``result["particle"]``.
-        alpha_deg: Detector zenith angle in degrees. Defaults to
+        alpha_deg: Surface/source zenith angle in degrees. Defaults to
             ``result.get("alpha_deg")``.
-        theta_deg: Atmosphere zenith angle in degrees. Defaults to
+        theta_deg: Detector zenith angle in degrees. Defaults to
             ``result.get("theta_deg")``.
         base_filename: Base filename used to derive the output filename and
             torch file extension.

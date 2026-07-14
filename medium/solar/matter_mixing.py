@@ -69,6 +69,7 @@ def Vk(
     E: TensorLike,
     ne: TensorLike,
     *,
+    antinu: bool | torch.Tensor = False,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
     """Compute the dimensionless solar matter-potential ratio.
@@ -80,6 +81,7 @@ def Vk(
         Deltam2: Mass-squared splitting in eV^2.
         E: Neutrino energy in MeV.
         ne: Electron density in mol/cm^3.
+        antinu: If True, flip the matter-potential sign for antineutrinos.
         legacy_precision: If True, use the legacy peanuts combined prefactor
             ``_VK_FACTOR_LEGACY`` (hardcoded to 4 significant digits in
             ``peanuts/matter_mixing.py``) instead of deriving the matter and
@@ -102,12 +104,23 @@ def Vk(
     ne_b = torch.broadcast_to(ne_t, shape)
 
     if legacy_precision:
-        return _VK_FACTOR_LEGACY * ne_b * E_b / dm_b
+        if isinstance(antinu, bool):
+            sign = -1.0 if antinu else 1.0
+        else:
+            antinu_t = antinu.to(device=ne_b.device, dtype=torch.bool)
+            while antinu_t.ndim < ne_b.ndim:
+                antinu_t = antinu_t.unsqueeze(-1)
+            sign = torch.where(
+                antinu_t,
+                torch.full_like(ne_b, -1.0),
+                torch.ones_like(ne_b),
+            )
+        return sign * _VK_FACTOR_LEGACY * ne_b * E_b / dm_b
 
     context = RuntimeContext(device=E_b.device, dtype=E_b.dtype)
     V = matter_potential(
         ne_b[..., None],
-        antinu=False,
+        antinu=antinu,
         evolution_scale_m=constant.R_E,
         context=context,
     )
@@ -181,6 +194,7 @@ def th13_M(
         DeltamSqee(oscillation),
         E_t,
         ne_t,
+        antinu=oscillation.antinu,
         legacy_precision=legacy_precision,
     )
     numerator = torch.cos(2.0 * th13_t) - vk
@@ -230,7 +244,13 @@ def th12_M(
     dm_ee = DeltamSqee(oscillation)
 
     vk_prime = (
-        Vk(dm21, E_t, ne_t, legacy_precision=legacy_precision) * torch.cos(th13m) ** 2
+        Vk(
+            dm21,
+            E_t,
+            ne_t,
+            antinu=oscillation.antinu,
+            legacy_precision=legacy_precision,
+        ) * torch.cos(th13m) ** 2
         + dm_ee / dm21 * torch.sin(th13m - th13_t) ** 2
     )
 

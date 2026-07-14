@@ -148,7 +148,7 @@ def resonance_radius(
     n_E = E_1d.shape[0]
 
     # Vk at all (energy, radius) combinations
-    vk = Vk(dm21, E_1d[:, None], density[None, :])  # (n_E, n_r)
+    vk = Vk(dm21, E_1d[:, None], density[None, :], antinu=oscillation.antinu)  # (n_E, n_r)
 
     # Distance from resonance condition (positive inside resonance, negative outside)
     diff = vk - cos2th12  # (n_E, n_r)

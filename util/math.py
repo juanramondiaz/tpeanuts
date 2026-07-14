@@ -59,6 +59,12 @@ project_to_unitary(...)
     Project a square matrix onto the nearest unitary matrix via SVD.
 interp1d_linear(...)
     Perform one-dimensional linear interpolation with explicit edge values.
+interp_logx(...)
+    Perform one-dimensional interpolation in log10(x), useful for log-spaced
+    positive grids.
+numpy_trapezoid(...)
+    NumPy trapezoidal integration wrapper compatible with both old and new
+    NumPy versions.
 tree_reduce_matmul(...)
     Reduce a stack of square matrices to a single product via a binary tree.
 binom(...)
@@ -122,6 +128,56 @@ def intersection(
         current = torch.stack([minimum, maximum])
 
     return current
+
+
+def interp_logx(
+    x: np.ndarray,
+    xp: np.ndarray,
+    fp: np.ndarray,
+) -> np.ndarray:
+    """
+    Linearly interpolate values in log10(x).
+
+    Args:
+        x: Query points. Values must be positive.
+        xp: Sample x-coordinates. Values must be positive and sorted as
+            expected by ``numpy.interp`` after log10 transformation.
+        fp: Sample values at xp.
+
+    Returns:
+        Interpolated values evaluated at x.
+    """
+    return np.interp(np.log10(x), np.log10(xp), fp)
+
+
+def numpy_trapezoid(
+    y,
+    x=None,
+    dx: float = 1.0,
+    axis: int = -1,
+):
+    """
+    Integrate with NumPy's trapezoidal rule across NumPy versions.
+
+    NumPy 2.x exposes ``numpy.trapezoid`` while older environments commonly
+    use ``numpy.trapz``. This wrapper keeps project code independent of the
+    installed NumPy spelling.
+
+    Args:
+        y: Values to integrate.
+        x: Optional coordinates.
+        dx: Sample spacing used when x is not provided.
+        axis: Axis along which to integrate.
+
+    Returns:
+        Integral computed by ``numpy.trapezoid`` when available, otherwise
+        by ``numpy.trapz``.
+    """
+    trapezoid = getattr(np, "trapezoid", None)
+    if trapezoid is None:
+        trapezoid = getattr(np, "trapz")
+    return trapezoid(y, x=x, dx=dx, axis=axis)
+
 
 def _trapz(
     y: torch.Tensor,

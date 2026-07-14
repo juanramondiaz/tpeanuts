@@ -30,7 +30,7 @@ where:
 
 Everything here is tpeanuts-native tensor arithmetic (convolutions,
 finite differences); no function in this module calls MCEq. It
-post-processes the raw depth-tabulated flux Phi(E, X, theta) already
+post-processes the raw depth-tabulated flux Phi(E, X, alpha) already
 produced by an MCEq cascade-equation solve (see
 tpeanuts.external.mceq.solver.solve_flux_vs_depth_grid) before it is
 differentiated with respect to depth to obtain the depth-differential
@@ -210,7 +210,7 @@ def smooth_flux_gaussian(
     Smooth a depth-tabulated flux along the depth axis with a Gaussian
     kernel convolution.
 
-    Reduces numerical noise in Phi(E, X, theta) along X before its
+    Reduces numerical noise in Phi(E, X, alpha) along X before its
     depth-derivative is taken (see compute_depth_derivative); applied
     independently per energy channel, with edge values replicated
     (padding mode "replicate") to avoid boundary artefacts.
@@ -571,7 +571,7 @@ def smooth_and_differentiate_flux(
     one step.
 
     Convenience wrapper combining smooth_flux_in_depth (to reduce
-    numerical noise in Phi(E, X, theta) along the depth axis) and
+    numerical noise in Phi(E, X, alpha) along the depth axis) and
     compute_depth_derivative (to obtain the depth-differential
     production source dPhi/dX(E, X, theta)) using a single,
     consistently-resolved configuration.

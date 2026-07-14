@@ -56,6 +56,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Union
 
+import numpy as np
 import pandas as pd
 import torch
 
@@ -110,6 +111,8 @@ def as_tensor(values, *, device: Union[str, torch.device], dtype: torch.dtype) -
     Returns:
         Tensor with the requested device and dtype.
     """
+    if isinstance(values, np.ndarray) and not values.flags.writeable:
+        values = values.copy()
     return torch.as_tensor(values, device=default_device(device), dtype=dtype)
 
 
