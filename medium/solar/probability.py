@@ -161,7 +161,7 @@ def Tei(
 
     # --- analytic SM path --------------------------------------------------
     th13m = th13_M(oscillation, E, ne, legacy_precision=legacy_precision)
-    th12m = th12_M(oscillation, E, ne, legacy_precision=legacy_precision)
+    th12m = th12_M(oscillation, E, ne, legacy_precision=legacy_precision, th13m=th13m)
 
     c13m = torch.cos(th13m)
     s13m = torch.sin(th13m)
