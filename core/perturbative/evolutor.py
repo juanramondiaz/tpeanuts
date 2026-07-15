@@ -181,25 +181,36 @@ def evolutor_perturbative_from_H(
         trace_H=trace_H,
         return_spectral=True,
     )
-    U1 = evolutor_first_order(
-        M=spectral["M"],
-        lam=spectral["lam"],
-        trace_H=spectral["trace"],
-        profile_model=profile_model,
-        antinu=antinu,
-        evolution_scale_m=evolution_scale_m,
-        legacy_precision=legacy_precision,
-    )
 
-    perturbation_mask = profile_model.has_perturbation().to(device=U1.device)
-    while perturbation_mask.ndim < U1.ndim - 2:
-        perturbation_mask = perturbation_mask.unsqueeze(-1)
+    perturbation_mask = profile_model.has_perturbation().to(device=U0.device)
 
-    U = U0 + torch.where(
-        perturbation_mask[..., None, None],
-        U1,
-        torch.zeros_like(U1),
-    )
+    # A segment with no perturbation (e.g. a constant-density segment) has a
+    # zero first-order correction everywhere, and would just be masked back
+    # to zero below. Skipping evolutor_first_order in that case avoids the
+    # residual_integral spectral-oscillatory-integral computation entirely
+    # when its result is guaranteed to be discarded.
+    if not bool(torch.any(perturbation_mask)):
+        U = U0
+    else:
+        U1 = evolutor_first_order(
+            M=spectral["M"],
+            lam=spectral["lam"],
+            trace_H=spectral["trace"],
+            profile_model=profile_model,
+            antinu=antinu,
+            evolution_scale_m=evolution_scale_m,
+            legacy_precision=legacy_precision,
+        )
+
+        mask = perturbation_mask
+        while mask.ndim < U1.ndim - 2:
+            mask = mask.unsqueeze(-1)
+
+        U = U0 + torch.where(
+            mask[..., None, None],
+            U1,
+            torch.zeros_like(U1),
+        )
     if zero_mask is not None:
         U = enforce_identity_for_zero_length(U, L, zero_mask)
     return U

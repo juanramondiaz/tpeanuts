@@ -460,8 +460,15 @@ class EvenPowerProfileSegment:
         )
         phase = torch.exp(-1j * la * x2 + 1j * lb * x1)
 
+        # The Taylor branch is only ever read out where `is_small` is True
+        # (see the final torch.where below), so when no eigenvalue pair in
+        # this batch is near-degenerate its value is fully discarded. Skip
+        # computing it in that (common) case to avoid the extra per-term
+        # Taylor-series loop below.
+        needs_taylor = bool(torch.any(is_small))
+
         integral_full = torch.zeros_like(coefficients[..., 0, :, :])
-        integral_taylor = torch.zeros_like(integral_full)
+        integral_taylor = torch.zeros_like(integral_full) if needs_taylor else None
         for index in range(coefficients.shape[-3]):
             power = 2 * index
             coeff = coefficients[..., index, :, :]
@@ -471,14 +478,15 @@ class EvenPowerProfileSegment:
                 x2.unsqueeze(-3),
                 safe_dl,
             ).squeeze(-3)
-            integral_taylor = integral_taylor + coeff * self.taylor_monomial_integral(
-                power,
-                x1.unsqueeze(-3),
-                x2.unsqueeze(-3),
-                dl_poly,
-            ).squeeze(-3)
+            if needs_taylor:
+                integral_taylor = integral_taylor + coeff * self.taylor_monomial_integral(
+                    power,
+                    x1.unsqueeze(-3),
+                    x2.unsqueeze(-3),
+                    dl_poly,
+                ).squeeze(-3)
 
-        out = phase * torch.where(is_small, integral_taylor, integral_full)
+        out = phase * (integral_full if not needs_taylor else torch.where(is_small, integral_taylor, integral_full))
         return torch.where(is_zero, torch.zeros_like(out), out)
 
     def has_perturbation(self) -> torch.Tensor:

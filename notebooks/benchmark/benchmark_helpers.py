@@ -24,6 +24,8 @@ import pandas as pd
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.common.probability import probability_transition
+from tpeanuts.medium.earth.evolutor import earth_evolutor
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
 from tpeanuts.medium.earth.probability import pearth
 from tpeanuts.medium.solar.profile import SolarParameters, SolarProfile
@@ -261,43 +263,63 @@ def plot_speedup_cross_sections(df, title, filename):
     save_and_show(filename, fig, output_dir=OUTPUT_DIR, show_plots=SHOW_PLOTS)
 
 
+_CONTEXT_CACHE: dict = {}
+_OSCILLATION_CACHE: dict = {}
+_EARTH_PROFILE_CACHE: dict = {}
+_SOLAR_PROFILE_CACHE: dict = {}
+
+
 def _context_for(device):
-    return context if device == DEVICE else RuntimeContext.resolve(device, DTYPE)
+    if device == DEVICE:
+        return context
+    if device not in _CONTEXT_CACHE:
+        _CONTEXT_CACHE[device] = RuntimeContext.resolve(device, DTYPE)
+    return _CONTEXT_CACHE[device]
 
 
 def _oscillation_for(device):
+    # Cached per device: rebuilding this (and the profiles below) inside a
+    # timed benchmark call would measure object construction / disk I/O
+    # instead of the actual tensor computation, which previously dominated
+    # the GPU-vs-CPU timing comparison at every grid size.
     if device == DEVICE:
         return oscillation
-    return OscillationParameters.build(
-        theta12=THETA12,
-        theta13=THETA13,
-        theta23=THETA23,
-        delta=DELTA_CP,
-        DeltamSq21=DM21_EV2,
-        DeltamSq3l=DM3L_EV2,
-        antinu=False,
-        context=_context_for(device),
-    )
+    if device not in _OSCILLATION_CACHE:
+        _OSCILLATION_CACHE[device] = OscillationParameters.build(
+            theta12=THETA12,
+            theta13=THETA13,
+            theta23=THETA23,
+            delta=DELTA_CP,
+            DeltamSq21=DM21_EV2,
+            DeltamSq3l=DM3L_EV2,
+            antinu=False,
+            context=_context_for(device),
+        )
+    return _OSCILLATION_CACHE[device]
 
 
 def _earth_profile_for(device):
     if device == DEVICE:
         return earth_profile_t
-    return EarthProfile(
-        params=EarthParameters(
-            profile_perturbative_kwargs={"density_file": EARTH_DENSITY_TPEANUTS, "tabulated_density": False},
-        ),
-        context=_context_for(device),
-    )
+    if device not in _EARTH_PROFILE_CACHE:
+        _EARTH_PROFILE_CACHE[device] = EarthProfile(
+            params=EarthParameters(
+                profile_perturbative_kwargs={"density_file": EARTH_DENSITY_TPEANUTS, "tabulated_density": False},
+            ),
+            context=_context_for(device),
+        )
+    return _EARTH_PROFILE_CACHE[device]
 
 
 def _solar_profile_for(device):
     if device == DEVICE:
         return solar_profile
-    return SolarProfile.default(
-        params=SolarParameters(model_path=SOLAR_MODEL_CSV_FILE, fluxes_path=SOLAR_FLUX_CSV_FILE),
-        context=_context_for(device),
-    )
+    if device not in _SOLAR_PROFILE_CACHE:
+        _SOLAR_PROFILE_CACHE[device] = SolarProfile.default(
+            params=SolarParameters(model_path=SOLAR_MODEL_CSV_FILE, fluxes_path=SOLAR_FLUX_CSV_FILE),
+            context=_context_for(device),
+        )
+    return _SOLAR_PROFILE_CACHE[device]
 
 
 def torch_pearth_probability(state, E_MeV, eta, depth_m, *, massbasis=True, device=None):
@@ -533,18 +555,31 @@ def nusquids_solar_detector_probabilities(mass_np, E_1d, eta_1d):
     )
 
 
-def _tpeanuts_earth_flux(E_1d, eta_1d, flux):
-    cols = [
-        torch_pearth_probability(
-            torch.eye(3, dtype=DTYPE, device=DEVICE)[i],
-            E_1d[:, None],
-            eta_1d[None, :],
-            EARTH_DEPTH_M,
-            massbasis=True,
-        )
-        for i in range(3)
-    ]
-    return torch.einsum("enba,ea->enb", torch.stack(cols, dim=-1), flux)
+def _tpeanuts_earth_flux(E_1d, eta_1d, flux, *, device=None):
+    """Flavour-basis Earth flux via a single shared evolutor.
+
+    The Earth evolution operator does not depend on the initial state, so
+    building it once and reading off the full transition-probability matrix
+    is equivalent to (but three times cheaper than) calling
+    ``torch_pearth_probability`` once per basis vector of ``torch.eye(3)``,
+    since each of those calls would otherwise rebuild the same evolutor.
+    """
+    dev = device if device is not None else DEVICE
+    osc_dev = _oscillation_for(dev)
+    profile_dev = _earth_profile_for(dev)
+    E_t = torch.as_tensor(E_1d, device=dev, dtype=DTYPE)
+    eta_t = torch.as_tensor(eta_1d, device=dev, dtype=DTYPE)
+
+    U_earth = earth_evolutor(
+        profile_earth=profile_dev,
+        oscillation=osc_dev,
+        E=E_t,
+        eta=eta_t,
+        depth_m=EARTH_DEPTH_M,
+    )
+    U = osc_dev.pmns.pmns_matrix(antinu=osc_dev.antinu).to(device=U_earth.device, dtype=U_earth.dtype)
+    probabilities = probability_transition(U_earth @ U)
+    return torch.einsum("enba,ea->enb", probabilities, flux)
 
 
 def _legacy_earth_flux(E_np, eta_np, flux_np):

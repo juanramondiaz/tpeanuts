@@ -39,6 +39,8 @@ Module functions:
 
 from __future__ import annotations
 
+from typing import Optional
+
 import torch
 
 import tpeanuts.util.constant as constant
@@ -210,6 +212,7 @@ def th12_M(
     ne: TensorLike,
     *,
     legacy_precision: bool = False,
+    th13m: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
     """Compute the matter-modified theta12 mixing angle.
 
@@ -230,6 +233,11 @@ def th12_M(
         legacy_precision: If True, evaluate every internal ``Vk``/``th13_M``
             call with the legacy peanuts combined prefactor for
             bit-comparable validation.
+        th13m: Optional precomputed ``th13_M(oscillation, E, ne,
+            legacy_precision=legacy_precision)`` result. Callers that already
+            evaluated ``th13_M`` for the same ``(E, ne)`` grid can pass it
+            here to avoid recomputing it. When omitted, it is computed
+            internally as before.
 
     Returns:
         Matter-modified theta12 angle in radians.
@@ -239,7 +247,8 @@ def th12_M(
     E_t    = as_tensor_like(E, th12_t)
     ne_t   = as_tensor_like(ne, E_t)
 
-    th13m = th13_M(oscillation, E_t, ne_t, legacy_precision=legacy_precision)
+    if th13m is None:
+        th13m = th13_M(oscillation, E_t, ne_t, legacy_precision=legacy_precision)
     dm21  = oscillation.DeltamSq21
     dm_ee = DeltamSqee(oscillation)
 
