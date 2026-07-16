@@ -72,16 +72,17 @@ def compose_segment_evolutors(
     O(N) sequential kernel launches of a plain loop.
 
     Args:
-        U_segments: Segment operators shaped (..., N, 3, 3).
+        U_segments: Segment operators shaped (..., N, d, d) for any flavour
+            count d (3 for the SM, 4 for 3+1 sterile extensions, ...).
         segment_dim: Axis enumerating segments in propagation order.
         multiply: ``"left"`` accumulates ``U_seg @ U_total`` (each new segment
             is applied on the left); ``"right"`` accumulates the reverse order.
 
     Returns:
-        Total evolution operator shaped (..., 3, 3).
+        Total evolution operator shaped (..., d, d).
     """
-    if U_segments.shape[-2:] != (3, 3):
-        raise ValueError("U_segments must have final shape (..., 3, 3).")
+    if U_segments.shape[-1] != U_segments.shape[-2]:
+        raise ValueError("U_segments must have final shape (..., d, d) with a square matrix.")
 
     if multiply not in ("left", "right"):
         raise ValueError("multiply must be either 'left' or 'right'.")

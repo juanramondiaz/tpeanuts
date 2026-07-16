@@ -230,6 +230,47 @@ def _active_epsilon_matrix(
     )
 
 
+def _outer_block(
+    pmns: object,
+    antinu: Union[bool, torch.Tensor],
+    *,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> torch.Tensor:
+    """Build the ``outer`` PMNS block ``O`` that commutes with ``diag(V, 0, ..., 0)``.
+
+    ``O = R23 . Delta`` for the 3-flavour SM, ``O = R23 . Delta . R24 . R34``
+    for the 3+1 sterile extension -- exactly the block used internally by
+    ``pmns.operator_flavour_basis`` (``O @ op_reduced @ O^dagger``). Since
+    ``O`` is unitary, the inverse conjugation ``O^dagger @ (.) @ O`` maps a
+    flavour-basis operator into the reduced basis; this is what
+    ``hamiltonian_reduced_bsm`` needs to rotate an NSI matter term (defined
+    in the flavour basis, see ``tpeanuts.core.BSM.NSIConfig``) into the
+    reduced basis it assembles.
+
+    Args:
+        pmns: PMNS-compatible object exposing ``R23``/``Delta`` (and, for
+            4-flavour sterile objects, ``R24``/``R34``), ``select_antinu``,
+            and ``n_flavours``.
+        antinu: Bool or boolean tensor selecting the antineutrino convention.
+        device: Target torch device.
+        dtype: Target complex dtype.
+
+    Returns:
+        Complex unitary tensor shaped (..., n_flavours, n_flavours).
+    """
+    r23 = pmns.select_antinu(pmns.R23(), antinu).to(device=device, dtype=dtype)
+    delta = pmns.select_antinu(pmns.Delta(), antinu).to(device=device, dtype=dtype)
+    O = r23 @ delta
+
+    if int(pmns.n_flavours) == 4:
+        r24 = pmns.select_antinu(pmns.R24(), antinu).to(device=device, dtype=dtype)
+        r34 = pmns.select_antinu(pmns.R34(), antinu).to(device=device, dtype=dtype)
+        O = O @ r24 @ r34
+
+    return O
+
+
 def kinetic_hamiltonian_from_mass_vector(
     mass_squared_vector: TensorLike,
     E_MeV: TensorLike,
@@ -405,9 +446,14 @@ def hamiltonian_reduced_bsm(
       sterile splitting ``DeltamSq41`` appended (see
       ``_mass_vector_from_pmns_config``);
     - ``H_mat`` is the plain SM matter term ``diag(V,0,...,0)`` when
-      ``epsilon`` is None, or the NSI-extended term
-      ``V * (diag(1,0,...,0) + epsilon)`` (via ``hamiltonian_matter_nsi``)
-      otherwise; the sterile state never receives a matter potential.
+      ``epsilon`` is None, or, when an NSI ``epsilon`` is given, the
+      flavour-basis NSI matter term ``V * (diag(1,0,...,0) + epsilon)``
+      (via ``hamiltonian_matter_nsi``) rotated into the reduced basis via
+      ``O^dagger @ (.) @ O`` (see ``_outer_block``), so that
+      ``hamiltonian_flavour_bsm(...) == oscillation.pmns.H_flavour_basis(
+      hamiltonian_reduced_bsm(...))`` holds for arbitrary (not just
+      diagonal-uniform) ``epsilon``; the sterile state never receives a
+      matter potential.
 
     Args:
         oscillation: ``OscillationParameters`` bundling the PMNS object
@@ -496,12 +542,14 @@ def hamiltonian_reduced_bsm(
             epsilon.to(device=Hkin.device, dtype=Hkin.dtype),
             antinu=antinu,
         )
-        Hmat = hamiltonian_matter_nsi(
+        Hmat_flavour = hamiltonian_matter_nsi(
             V,
             eps,
             n_flavours=n_flavours,
             context=RuntimeContext(device=Hkin.device, dtype=Hkin.real.dtype),
         )
+        O = _outer_block(pmns, antinu, device=Hkin.device, dtype=Hkin.dtype)
+        Hmat = O.conj().transpose(-2, -1) @ Hmat_flavour @ O
 
     return Hkin + Hmat
 
