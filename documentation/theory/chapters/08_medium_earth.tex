@@ -1,0 +1,466 @@
+\chapter{\texttt{medium.earth} --- Earth-crossing matter propagation}
+\label{ch:earth}
+
+Earth-crossing neutrinos (atmospheric, astrophysical, or terrestrial-source)
+see a matter density that varies by four orders of magnitude between the
+crust and the inner core, along a chord whose length and depth of
+penetration depend entirely on the detector's nadir angle. This chapter
+combines the perturbative machinery of \cref{ch:core-perturbative} (dense,
+shell-crossing trajectories) with the exact numerical evolutor of
+\cref{ch:core-numerical} (used as the reference and as an alternative
+pipeline), plus a dedicated geometric layer converting detector angles into
+trajectory coordinates, and a time-exposure layer averaging over a year of
+Earth rotation and orbital motion.
+
+\section{\texttt{profile.py} --- the Earth density model}
+\label{sec:earth-profile}
+
+\modulehead{medium/earth/profile.py}{\pyclass{EarthProfile}: shell radii and
+a delegated perturbative density model, transformed into trajectory
+coordinates on demand.}
+
+\begin{implbox}
+\textbf{Sources for the density profile.} Every option ultimately traces
+back to the Preliminary Reference Earth Model, PREM
+\parencite{DziewonskiAnderson1981} -- a seismologically constrained,
+spherically symmetric radial density model, tabulated in $\sim$500 layers
+from the inner core to the surface. \texttt{tpeanuts} offers three ways to
+consume it, selected by \code{EarthParameters.profile\_perturbative\_name}
+(\cref{ch:core-perturbative}, \texttt{model\_selection.py}):
+\begin{itemize}
+  \item \code{"even\_power"} (\textbf{the default}): the legacy
+    \texttt{peanuts} even-power polynomial fit per shell,
+    $n_e(r)=\alpha+\beta r^2+\gamma r^4+\dots$, read from
+    \code{data/density/earth\_density.csv}. This is what every perturbative
+    Earth evolutor formula in this chapter uses unless overridden.
+  \item \code{"prem"}: the PREM500 table's own native piecewise-linear-in-$r^2$
+    parametrisation per shell, consumed directly (converting tabulated mass
+    density to electron density via layer-appropriate $\langle Z/A\rangle$
+    ratios) rather than through a polynomial fit
+    (\cref{ch:core-perturbative}).
+  \item \textbf{Tabulated} (\code{earth\_tabulated\_density=True}): bypasses
+    the perturbative polynomial representation entirely and interpolates the
+    raw tabulated density directly -- at the cost of losing the closed-form
+    residual integral that the perturbative pipeline needs, so this mode is
+    only usable together with the numerical evolutor
+    (\cref{ch:core-numerical}), not the analytical one below.
+\end{itemize}
+\end{implbox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{EarthParameters}: bundles the profile-model selection
+    above, \code{profile\_scale\_m}/\code{evolution\_scale\_m} (normally both
+    $R_\oplus$, kept independent for testing), detector \code{depth\_m}, the
+    \code{method} choice (\code{"analytical"}/\code{"numerical"},
+    \cref{sec:earth-probability}), and the numerical-mode step count
+    \code{nsteps} and sampling rule \code{ode\_method}
+    (\cref{ch:core-numerical}).
+  \item \pyfunc{EarthProfile.shells\_x(eta)}: for a surface-equivalent
+    nadir angle, returns each shell's chord-coordinate crossing point via
+    $x_j=\sqrt{r_j^2-\sin^2\eta}$ (clamped at 0), and which shells are
+    physically crossed ($r_j>\sin\eta$).
+  \item \pyfunc{EarthProfile.trajectory\_profile(eta)}: re-expresses the
+    selected radial model in the trajectory coordinate $x$ via the chord
+    identity $r^2=x^2+\sin^2\eta$ (\cref{sec:earth-geometry}).
+  \item \pyfunc{EarthProfile.density\_x\_eta(x, eta)}: pointwise electron
+    density at a trajectory coordinate, used directly by the numerical
+    pipeline (\cref{sec:earth-probability}).
+\end{itemize}
+\end{implbox}
+
+\begin{implbox}
+\textbf{Optional neutron density, for the 3+1 sterile neutral-current
+term.} Both the \code{"even\_power"} and \code{"prem"} layered profile
+models optionally expose a neutron-density companion table alongside their
+default electron-density one, built with \code{include\_neutron=True}:
+\begin{itemize}
+  \item \textbf{\code{"prem"}}: the PREM500 loader already computes a
+    layer-appropriate $\langle Z/A\rangle$ to convert tabulated mass density
+    to $n_e$ (implbox above); the complementary neutron fraction
+    $1-\langle Z/A\rangle$ gives $n_n$ from the very same tabulated mass
+    density, at no extra physical assumption --
+    \pyfunc{load\_prem500\_neutron\_profile} fits it with the same
+    piecewise-linear-in-$r^2$ shells (identical \code{rj} boundaries) as the
+    electron-density loader.
+  \item \textbf{\code{"even\_power"}}: has no composition information of its
+    own (it is a bare polynomial fit to tabulated $n_e(r)$, next section),
+    so its neutron companion is instead read from a separate, independently
+    fitted table, \code{data/density/earth\_density\_nn.csv}, matching the
+    default electron table's shell boundaries exactly.
+\end{itemize}
+\pyfunc{EarthProfile.density\_n\_x\_eta(x, eta)} / \pyfunc{call\_neutron(r,
+eta)} evaluate this companion table pointwise, mirroring
+\pyfunc{density\_x\_eta}/\pyfunc{call} above; they raise a clear
+\code{ValueError} if the selected profile was not built with
+\code{include\_neutron=True} (e.g.\ the default \code{"even\_power"}
+construction). See \cref{ch:core-common} (\texttt{potential.py} section) for
+the physics $n_n$ enables, and the \texttt{evolutor.py}/\texttt{probability.py}
+sections below for how it is threaded through the analytical and numerical
+Earth pipelines via \code{include\_matter\_nc}.
+\end{implbox}
+
+\section{\texttt{geometry.py} --- nadir angle and trajectory coordinates}
+\label{sec:earth-geometry}
+
+\modulehead{medium/earth/geometry.py}{Pure geometric conversions: detector
+depth and nadir/zenith angle to dimensionless trajectory coordinates.
+Computes no Hamiltonians, evolutors, or probabilities.}
+
+\begin{notebox}[title={Nadir Angle and Its Relation to the Zenith Angle}]
+Two angle conventions coexist in this chapter, both measured at the
+detector. The \textbf{zenith angle} $\theta$ is measured from the local
+upward vertical: $\theta=0$ is a neutrino arriving from directly overhead
+(shortest possible path, no Earth crossing), $\theta=180^\circ$ is a
+neutrino arriving from directly below (having crossed the full Earth
+diameter). The \textbf{nadir angle} $\eta$ used internally throughout this
+chapter is measured from the opposite direction (straight down, toward the
+Earth's centre), so the two are exact complements:
+\begin{equation}
+  \keyresult{\eta = \pi - \theta}.
+\end{equation}
+$\eta=0$ is therefore the longest possible path (straight through the
+centre) and $\eta=\pi/2$ is the horizon (grazing incidence, zero Earth
+material for a surface detector). \pyfunc{earth\_evolutor\_from\_zenith}
+(\cref{sec:earth-evolutor}) applies exactly this conversion for callers
+who prefer to work with $\theta$ in degrees.
+\end{notebox}
+
+\begin{theorybox}
+For a detector displaced below the surface by depth $d$, define the
+dimensionless \textbf{detector radius}
+\begin{equation}
+  r_d = 1 - \frac{d}{R_\oplus}\ \ (\le 1),
+\end{equation}
+and the \textbf{surface-equivalent nadir angle} $\eta'$ -- the nadir angle
+at which a ray from the Earth's centre through the detector would exit the
+(undisplaced) surface, obtained from the sine rule applied to the chord
+geometry:
+\begin{equation}
+  \keyresult{\eta' = \arcsin\bigl(r_d\sin\eta\bigr)}.
+\end{equation}
+$\eta'$ is what \pyfunc{EarthProfile.shells\_x}/\pyfunc{trajectory\_profile}
+(\cref{sec:earth-profile}) actually consume, so that a buried detector sees
+exactly the shells a surface detector at the corresponding $\eta'$ would.
+The detector's own position along the trajectory chord is
+\begin{equation}
+  x_d = r_d\cos\eta,
+\end{equation}
+and, for shallow trajectories that never reach a tabulated shell boundary
+(Case B, \cref{sec:earth-evolutor}), the total matter path length from the
+surface to the detector is
+\begin{equation}
+  \keyresult{\Delta x_B = r_d\cos\eta + \sqrt{1-r_d^2\sin^2\eta}}.
+\end{equation}
+\pyfunc{classify\_eta\_regions} partitions any $\eta\in[0,\pi]$ into three
+disjoint outcomes: \textbf{above horizon} ($\eta\in[\pi/2,\pi]$ for a
+surface detector only -- no Earth material at all, only relevant when
+$d=0$), \textbf{Case A} ($\eta\in[0,\pi/2)$, shell-crossing), and
+\textbf{Case B} ($\eta\in[\pi/2,\pi]$ for $d>0$, shallow detector-near
+paths) -- see \cref{sec:earth-evolutor}.
+\end{theorybox}
+
+\section{\texttt{evolutor.py} --- Case A and Case B evolutors}
+\label{sec:earth-evolutor}
+
+\modulehead{medium/earth/evolutor.py}{\pyfunc{earth\_evolutor}: the full
+flavour-basis Earth evolution operator, dispatching every trajectory to one
+of two geometrically distinct constructions.}
+
+\begin{notebox}[title={Case A versus Case B}]
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{Case A} ($0\le\eta<\pi/2$) & \textbf{Case B} ($\eta\ge\pi/2$, $d>0$) \\
+\midrule
+Path & \parbox[t]{4.6cm}{Deep, crosses one or more tabulated Earth shells} & \parbox[t]{4.6cm}{Shallow, surface to a buried detector, no shell crossed} \\[16pt]
+Density & \parbox[t]{4.6cm}{Piecewise, one perturbative segment per crossed shell} & \parbox[t]{4.6cm}{Single constant value, sampled at the mid-depth radius} \\[16pt]
+Segments & \parbox[t]{4.6cm}{Many (near half + mirrored far half)} & \parbox[t]{4.6cm}{One} \\[10pt]
+Evolutor & \parbox[t]{4.6cm}{Composed product of many perturbative segment evolutors (\cref{ch:core-perturbative})} & \parbox[t]{4.6cm}{A single perturbative segment evolutor} \\[16pt]
+\bottomrule
+\end{tabular}
+\end{center}
+\end{notebox}
+
+\begin{theorybox}
+\subsection*{Case A: shell-crossing trajectories}
+The chord identity $r^2=x^2+\sin^2\eta$ makes the physical density profile
+\emph{even} in $x$: $n_e(x)=n_e(-x)$, since both $\pm x$ map to the same
+$r$. This lets the chord be built from two mirror-symmetric halves without
+recomputing the shell geometry twice:
+\begin{enumerate}
+  \item \textbf{Near half} (point of closest approach, $x=0$, to the
+    detector, $x=x_d$): the crossed shells between $0$ and $x_d$ are
+    ordered outermost-first; each is turned into a perturbative segment
+    evolutor (\cref{ch:core-perturbative}) via the selected density model
+    (\cref{sec:earth-profile}), and non-crossed shells are masked to the
+    identity. These compose (\cref{ch:core-common}) into the detector-side
+    half-evolutor $U_{\rm half,det}$.
+  \item \textbf{Far half} (mirrored, $x\in[-x_d^{\max},0]$): recomputed
+    \emph{directly} from the mirrored segment endpoints
+    ($x_1,x_2)\to(-x_2,-x_1)$, \textbf{not} derived from the near half by
+    transpose or reordering. Although the density profile is even, the
+    first-order perturbative correction's oscillatory residual integral
+    (\cref{ch:core-perturbative}) depends on the segment endpoints through a
+    complex phase that is \emph{not} itself even, so the mirrored segment's
+    evolutor genuinely differs and must be built through the same
+    segment-evolutor pipeline independently. A transpose-based shortcut
+    would only be valid when the reduced Hamiltonian is real (i.e.\
+    $\delta_{14}=0$ for the 3+1 sterile extension, \cref{ch:core-bsm}); this
+    direct recomputation is correct unconditionally, at the cost of one
+    extra pass.
+\end{enumerate}
+The two halves combine into the reduced-basis Earth evolutor,
+\begin{equation}
+  \keyresult{U_{\rm red}^{\rm Earth} = U_{\rm half,det}\;U_{\rm half,far}},
+\end{equation}
+which is then dressed into the flavour basis via
+\pyfunc{pmns.flavour\_basis} (\cref{ch:core-common,ch:core-sm,ch:core-bsm}),
+correct for the Standard Model, NSI, the 3+1 sterile extension, or any
+combination.
+
+\subsection*{Case B: shallow detector-near trajectories}
+For $\eta\ge\pi/2$ with a buried detector, the path from the surface to the
+detector never reaches a tabulated shell boundary. The density is
+approximated by its value at the mid-depth radius $r_{\rm mid}=1-d/(2R_\oplus)$,
+treated as a single constant-density perturbative segment of length
+$\Delta x_B$ (\cref{sec:earth-geometry}):
+\begin{equation}
+  \keyresult{U_{\rm red}^{\rm Earth} = \text{\pyfunc{evolutor\_perturbative\_segment}}\bigl(n_e(r_{\rm mid}),\ \Delta x_B\bigr)},
+\end{equation}
+again dressed to the flavour basis exactly as in Case A. Since the profile
+is exactly constant on this single segment, the perturbative first-order
+correction (\cref{ch:core-perturbative}) is identically zero and $U_0$
+alone is exact for this segment.
+
+Entries with $\eta\in[\pi/2,\pi]$ \emph{and} $d=0$ (above the horizon for a
+surface detector) never enter either construction: they are left as the
+identity operator directly by \pyfunc{earth\_evolutor}, since no Earth
+material is crossed at all.
+\end{theorybox}
+
+\begin{implbox}
+\pyfunc{earth\_evolutor(profile\_earth, oscillation, E, eta, depth\_m, ...)}:
+classifies every $(E,\eta)$ entry (\pyfunc{classify\_eta\_regions}), routes
+Case A entries through \pyfunc{\_earth\_evolutor\_case\_a\_batched} and
+Case B entries through \pyfunc{\_earth\_evolutor\_case\_b\_batched}, and
+optionally re-projects each result onto the nearest unitary matrix
+(\code{reunitarize}, via \pyfunc{util.math.project\_to\_unitary}) to absorb
+the small numerical drift the perturbative expansion can introduce.
+\pyfunc{earth\_evolutor\_from\_zenith} is the zenith-angle convenience
+wrapper (\cref{sec:earth-geometry}). Both support the 3-flavour Standard
+Model and the 3+1 sterile extension transparently, sizing the identity
+operator and every intermediate tensor by \code{oscillation.pmns.n\_flavours}.
+Both also accept \code{include\_matter\_nc=False}, forwarded down to every
+\pyfunc{evolutor\_perturbative\_segment} call in both Case A and Case B
+(\cref{ch:core-perturbative}): when \code{True}, the Case B constant segment
+additionally samples \pyfunc{EarthProfile.call\_neutron} at the mid-depth
+radius (mirroring the electron-density sample above it), enabling the 3+1
+sterile neutral-current term end-to-end. \code{False} (the default)
+reproduces the pre-existing CC-only behaviour exactly, and requires no
+neutron-density support from the selected profile model.
+\end{implbox}
+
+\section{\texttt{probability.py} --- analytical versus numerical}
+\label{sec:earth-probability}
+
+{\sloppy\modulehead{medium/earth/probability.py}{\pyfunc{earth\_\allowbreak{}probability\_\allowbreak{}state}:
+dispatches between the perturbative-analytical and the exact-numerical
+Earth probability pipeline. \pyfunc{earth\_\allowbreak{}probability\_\allowbreak{}transition} and
+\pyfunc{earth\_\allowbreak{}probability\_\allowbreak{}integrated} build on it (full transition matrix
+and spectrum-weighted energy average, respectively).}}
+
+\begin{notebox}[title={Analytical versus Numerical}]
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{\code{method="analytical"}} & \textbf{\code{method="numerical"}} \\
+\midrule
+Evolutor &
+  \parbox[t]{4.4cm}{\pyfunc{earth\_evolutor} (\cref{sec:earth-evolutor}): a handful of perturbative segments per shell, closed-form residual integrals} &
+  \parbox[t]{4.4cm}{\pyfunc{evolutor\_numerical} (\cref{ch:core-numerical}): \code{nsteps} matrix exponentials sampled along a fine \pyclass{Trajectory}} \\[36pt]
+Accuracy driver &
+  \parbox[t]{4.4cm}{First-order truncation per segment (\cref{ch:core-perturbative}); exact only if the density is well fit by the chosen model} &
+  \parbox[t]{4.4cm}{Exact per segment; accuracy set purely by \code{nsteps} (\cref{ch:core-numerical})} \\[36pt]
+Density model &
+  \parbox[t]{4.4cm}{Perturbative even-power/PREM shell coefficients (\cref{sec:earth-profile})} &
+  \parbox[t]{4.4cm}{Any \pyfunc{EarthProfile.density\_x\_eta}, including the tabulated (interpolated) option} \\[26pt]
+Batching &
+  \parbox[t]{4.4cm}{Fully vectorised over $(E,\eta)$} &
+  \parbox[t]{4.4cm}{Currently scalar $\eta$ per call} \\[10pt]
+Extras &
+  \parbox[t]{4.4cm}{\code{reunitarize} drift correction} &
+  \parbox[t]{4.4cm}{\code{full\_oscillation} returns the whole path, not just the endpoint} \\[20pt]
+\bottomrule
+\end{tabular}
+\end{center}
+The numerical pipeline is the reference: it makes no perturbative
+assumption, so it is what the analytical pipeline is validated against
+(matching the general relationship between \cref{ch:core-numerical,ch:core-perturbative}).
+\end{notebox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{earth\_probability\_transition(profile\_earth, oscillation, E\_MeV, eta, depth\_m, ...)}:
+    builds $U_{\rm Earth}$ via \pyfunc{earth\_evolutor} and returns the full
+    $|U_{\rm Earth}[\beta,\alpha]|^2$ matrix via
+    \pyfunc{core.common.probability.probability\_transition}
+    (\cref{ch:core-common}); uses the analytical evolutor only, since the
+    numerical segment pipeline below only ever evolves an explicit initial
+    state and has no matrix-level counterpart.
+  \item \pyfunc{earth\_probability\_state\_analytical(nustate, profile\_earth, oscillation, E\_MeV, eta, depth\_m, massbasis, ...)}:
+    builds $U_{\rm Earth}$ via \pyfunc{earth\_evolutor} and applies the
+    coherent or incoherent probability formula of \cref{ch:core-common}
+    depending on \code{massbasis}.
+  \item \pyfunc{earth\_probability\_state\_numerical(nustate, profile\_earth, oscillation, E\_MeV, eta, depth\_m, ...)}:
+    builds a scalar \pyclass{Trajectory} (\pyfunc{build\_earth\_trajectory},
+    \cref{ch:core-numerical}) -- Case A samples
+    \pyfunc{EarthProfile.density\_x\_eta} along the chord, Case B repeats
+    the constant mid-depth density -- then calls \pyfunc{evolutor\_numerical}
+    and the same probability dispatch; \code{full\_oscillation=True}
+    additionally returns the probability at every sampled point, not only
+    the final one.
+  \item \pyfunc{earth\_probability\_state(...)}: the public dispatcher
+    selecting one of the two pipelines by the string \code{method}.
+  \item \pyfunc{earth\_probability\_integrated(nustate, profile\_earth, oscillation, E\_MeV, eta, depth\_m, spectrum, ...)}:
+    builds \pyfunc{earth\_probability\_state} on an energy grid at a fixed
+    nadir angle and averages it with
+    \pyfunc{core.common.probability.probability\_integrated}
+    (\cref{ch:core-common}), weighted by an explicit production
+    \code{spectrum}. This time-averages over energy, not over nadir angle,
+    and is therefore distinct from \pyfunc{earth\_probability\_exposure}
+    below (\cref{sec:earth-exposure}).
+\end{itemize}
+\end{implbox}
+
+\begin{implbox}
+Every function above (and \pyfunc{earth\_probability\_transition}) accepts
+\code{include\_matter\_nc=False}, forwarded to \pyfunc{earth\_evolutor} for
+the analytical pipeline or sampled directly from
+\pyfunc{profile\_earth.call\_neutron} alongside the electron-density sample
+for the numerical one (both Case A and the Case B constant-density
+fallback). Requesting it with a profile model that lacks neutron-density
+coefficients (\cref{sec:earth-profile}) raises a clear \code{ValueError}
+rather than silently falling back to CC-only; requesting it for a
+3-flavour \code{oscillation.pmns} is silently ignored (\cref{ch:core-common}).
+\end{implbox}
+
+\section{\texttt{flux.py} --- Earth flux}
+
+{\sloppy\modulehead{medium/earth/flux.py}{\pyfunc{earth\_\allowbreak{}flux\_\allowbreak{}state},
+\pyfunc{earth\_\allowbreak{}flux\_\allowbreak{}integrated}, and \pyfunc{earth\_\allowbreak{}flux\_\allowbreak{}exposure}: apply
+\texttt{core.common.flux} normalisations, energy integration, and
+exposure integration (respectively) on top of
+\pyfunc{earth\_\allowbreak{}probability\_\allowbreak{}state} and \pyfunc{earth\_\allowbreak{}probability\_\allowbreak{}exposure}
+(\cref{sec:earth-exposure}).}}
+
+\begin{implbox}
+\pyfunc{earth\_flux\_state(nustate, profile\_earth, oscillation, E\_MeV, eta, depth\_m, flux, spectrum, method, ...)}
+calls \pyfunc{earth\_probability\_state} then
+\pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}), propagating
+the \code{(probabilities\_along\_path, x)} pair through unchanged when
+\code{method="numerical"} and \code{full\_oscillation=True}.
+\pyfunc{earth\_flux\_integrated(nustate, profile\_earth, oscillation, E\_MeV,
+eta, depth\_m, flux, spectrum, ...)} builds \pyfunc{earth\_flux\_state} on an
+energy grid at a fixed nadir angle and integrates it with
+\pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
+physical rate. \pyfunc{earth\_flux\_exposure(nustate, profile\_earth,
+oscillation, E\_MeV, depth\_m, flux, spectrum, exposure, ...)} instead starts
+from \pyfunc{earth\_probability\_exposure} (\cref{sec:earth-exposure}): the
+angular exposure average happens at the probability level, before the flux
+normalisation is applied. All three accept \code{include\_matter\_nc=False},
+forwarded unchanged to the underlying probability function.
+\end{implbox}
+
+\section[Nadir-angle exposure]{Nadir-angle exposure: \texttt{exposure\_math.py}, \texttt{exposure\_table.py}, \texttt{exposure\_integration.py}, \texttt{exposure\_io.py}}
+\label{sec:earth-exposure}
+
+\modulehead{medium/earth/exposure\_*.py}{Together, these four modules build
+a time-averaged nadir-angle exposure weight $W(\eta)$ for a detector at
+fixed geographic latitude, and integrate Earth probabilities against it.}
+
+\begin{theorybox}
+\subsection*{The physical exposure problem}
+A detector at fixed geographic latitude $\lambda$ observes a given nadir
+angle $\eta$ only during specific windows of each day, because the visible
+nadir angle towards a fixed astrophysical/atmospheric source direction
+sweeps as the Earth rotates and as the Sun's apparent declination
+$\delta_\odot(t)$ (approximated as varying sinusoidally with the orbital
+inclination $\iota\approx23.44^\circ$ over the year) changes with the
+season. The exposure weight
+\begin{equation}
+  \keyresult{W(\eta) = \int_{d_1}^{d_2}\!\!\bigl[\text{fraction of day } d \text{ spent at nadir angle }\eta\bigr]\,\mathrm{d}d}
+\end{equation}
+integrates that daily observability window over a requested day-of-year
+range $[d_1,d_2]\subseteq[0,365]$ (the full year by default), giving a
+weight function used to time-average Earth-crossing probabilities:
+\begin{equation}
+  \keyresult{P_{\rm exp}(E) = \int_0^\pi W(\eta)\,P_{\rm Earth}(E,\eta)\,\mathrm{d}\eta}.
+\end{equation}
+
+\subsection*{From an elementary rate to $W(\eta)$: the elliptic-integral machinery}
+The instantaneous rate at which nadir angle $\eta$ is observed has no
+elementary closed-form antiderivative in the day-phase variable; the
+project evaluates it via \textbf{incomplete elliptic integrals of the
+first kind}, $F(\varphi,m)$ (\pyfunc{util.math.ellipf\_incomplete}), through
+three nested closed-form functions, entirely in complex arithmetic to
+remain well-defined across the geometry's branch cuts (the physical result
+is always the real part of a difference):
+\begin{itemize}
+  \item \pyfunc{IndefiniteIntegralDay(T, eta, lam)}: the antiderivative,
+    in the day-phase variable $T\in[-1,1]$, of the instantaneous
+    nadir-observation rate, expressed through $F(\varphi,m)$ with an
+    elliptic amplitude $\varphi$ and parameter $m$ built from
+    $\sin\iota$, $\sin(\eta\mp\lambda)$, and $T$ (the exact closed form is
+    a several-term rational combination of square roots of these
+    quantities, verified numerically against direct integration in the
+    test suite rather than reproduced symbol-by-symbol here).
+  \item \pyfunc{IntegralAngle(eta, lam, a1, a2)}: evaluates
+    \pyfunc{IndefiniteIntegralDay} at the two endpoints of the
+    sub-interval of $T$ consistent with \emph{both} the day/night geometry
+    at nadir angle $\eta$ \emph{and} a single year-angle window
+    $[a_1,a_2]$ (found via \pyfunc{util.math.intersection} of the relevant
+    validity intervals), returning zero when no valid sub-interval exists.
+  \item \pyfunc{IntegralDay(eta, lam, d1, d2)}: converts the requested
+    day-of-year window to year-angle radians ($a=2\pi d/365$), splits it at
+    the half-year boundaries (the day/night geometry is evaluated
+    separately on each half via a sign reflection), and sums the
+    \pyfunc{IntegralAngle} contributions -- this \emph{is} $W(\eta)$ for one
+    nadir angle.
+\end{itemize}
+\pyfunc{make\_eta\_grid(ns, daynight=...)} builds the uniform grid on which
+$W(\eta)$ is tabulated, optionally restricted to the day half (larger
+$\eta$, closer to $\pi$) or night half (smaller $\eta$, closer to $0$,
+where core-crossing trajectories concentrate) of the full $[0,\pi]$ range.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{ExposureParameters}: selects the exposure backend
+    (\code{exposure\_source}: \code{"math"} direct integration,
+    \code{"cache"} a precomputed torch file, \code{"csv"} a tabulated file
+    in any of the Nadir/Zenith/CosZenith conventions, or \code{"legacy"}
+    delegating to legacy \texttt{peanuts} for validation), the detector
+    latitude, the day-of-year window, the day/night filter, and grid size.
+  \item \pyfunc{build\_nadir\_exposure(exposure, context, normalized)}
+    (\texttt{exposure\_table.py}): dispatches to the selected backend and
+    returns a \pyclass{NadirExposureTable} (an $(\eta, W)$ pair),
+    optionally normalised to unit trapezoidal integral so it reads as a
+    probability density over nadir angle.
+  \item \pyfunc{integrate\_exposure(probabilities\_eta, eta, exposure)}:
+    the $P_{\rm exp}(E)$ formula above, evaluated by the trapezoidal rule
+    (\code{torch.trapezoid}).
+  \item \pyfunc{earth\_probability\_exposure(...)} (\texttt{exposure\_integration.py}):
+    the end-to-end entry point -- builds the exposure table, evaluates
+    \pyfunc{earth\_probability\_state} (\cref{sec:earth-probability}) over
+    the full $\eta$ grid (optionally chunked via \code{chunk\_eta} to bound
+    memory), and integrates against $W(\eta)$. Accepts
+    \code{include\_matter\_nc=False}, forwarded to every
+    \pyfunc{earth\_probability\_state} call.
+  \item \texttt{exposure\_io.py}: CSV and torch-cache read/write helpers
+    for the \code{"csv"}/\code{"cache"} backends above -- pure I/O, no
+    additional physics.
+\end{itemize}
+\end{implbox}

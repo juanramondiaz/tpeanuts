@@ -1,0 +1,390 @@
+\chapter{\texttt{medium.atmosphere} --- atmospheric neutrino propagation}
+\label{ch:atmosphere}
+
+Atmospheric neutrinos are produced by cosmic-ray air showers at a range of
+altitudes above the Earth's surface and propagate down through the
+atmosphere -- a comparatively low-density medium, but one whose geometry
+(production height, zenith angle, detector depth) is considerably richer
+than the single-scale exponential often assumed. This chapter follows the
+same profile/geometry/evolutor/probability/flux structure established in
+\cref{ch:vacuum}, adapted to that geometry, plus a
+production-altitude density layer (\texttt{density.py}) and an atmospheric
+slant-depth layer (\texttt{depth.py}) with no direct analogue in the
+previous media chapters.
+
+\section{\texttt{profile.py} and \texttt{density.py} --- the atmosphere density model}
+\label{sec:atmosphere-profile}
+
+\modulehead{medium/atmosphere/density.py, profile.py}{Pluggable
+production-to-surface electron-density backends, and
+\pyclass{AtmosphereProfile}, the trajectory container consumed by the
+numerical evolutor (\cref{ch:core-numerical}).}
+
+\begin{implbox}
+Unlike the Earth chapter's single PREM-derived source
+(\cref{sec:earth-profile}), \pyfunc{atmosphere\_density} offers a genuine
+choice of density backends, selected by \code{atmosphere\_density\_source}:
+\begin{itemize}
+  \item \code{"exponential"} (\textbf{the default}): the barometric formula
+    $\rho(h)=\rho_0 e^{-h/H}$, with $\rho_0=1.225\times10^{-3}\ \mathrm{g/cm^3}$
+    (U.S. Standard Atmosphere sea-level density) and scale height
+    $H=8.4\ \mathrm{km}$ -- a single-parameter approximation, adequate when
+    only the coarse exponential fall-off matters.
+  \item \code{"nusquids"}/\code{"earthatm"}: the external nuSQuIDS
+    \code{EarthAtm} density formula (\texttt{external.nusquids}), for
+    bit-comparable cross-checks against that reference implementation.
+  \item \code{"file"}: linear interpolation of a user-supplied two-column
+    altitude/density table.
+  \item \code{"mceq"}: densities consistent with an initialised MCEq
+    atmosphere object \parencite{Fedynitch2015MCEq}, for internal
+    consistency with an MCEq-generated production flux.
+  \item \code{"msis"}/\code{"pymsis"}: the NRLMSIS 2.0 empirical
+    atmosphere model \parencite{Emmert2021NRLMSIS2}, the most physically
+    detailed option (season-, location-, and space-weather-dependent), via
+    the optional \texttt{pymsis} backend.
+\end{itemize}
+Every backend returns mass density $\rho(h)$ in g/cm$^3$; electron density
+is obtained via $n_e=Y_e\,\rho\times\text{(mol/g conversion)}$, with the
+electron fraction $Y_e$ read from the backend's own configuration (PyMSIS)
+or from the shared default $Y_e=0.5$ (air, elsewhere) -- exactly the same
+mass-to-electron-density conversion pattern as
+\cref{ch:core-common}/\cref{sec:earth-profile}. \pyfunc{atmosphere\_density}
+also accepts \code{density\_type="neutron\_density"}, returning
+$n_n=(1-Y_e)\,\rho\times\text{(mol/g conversion)}$ from the very same
+$Y_e$/$\rho$ already computed for $n_e$ -- no new backend logic, since air's
+composition is fully captured by the single scalar $Y_e$ already in use.
+This enables the 3+1 sterile neutral-current term (\cref{ch:core-common})
+for every density backend uniformly.
+\end{implbox}
+
+\begin{implbox}
+\pyclass{AtmosphereParameters} bundles the density-backend selection above
+with the numerical trajectory settings (\code{nsteps}, sampling
+\code{method}) and the analytical-mode fit settings
+(\code{perturbative\_segments}, \code{perturbative\_degree}, next section);
+\code{matter=False} forces zero density everywhere (a pure-vacuum check).
+\pyclass{AtmosphereProfile} builds the production-to-surface
+\pyclass{Trajectory} (\cref{ch:core-numerical}) from
+(\code{h\_km},\code{theta\_deg},\code{depth\_km}) via the geometry of the
+next section, and samples the selected density backend once per segment.
+\code{AtmosphereParameters.include\_matter\_nc=False} additionally makes
+\pyclass{AtmosphereProfile} sample \code{density\_type="neutron\_density"}
+alongside $n_e$, exposed as \code{n\_n\_molcm3} (\code{None} when not
+requested); since \pyfunc{atmosphere\_density} supports every backend
+uniformly (implbox above), unlike \cref{ch:earth} there is no profile model
+for which this can fail to be available.
+\end{implbox}
+
+\section{\texttt{geometry.py} and \texttt{depth.py} --- angles, altitude, and atmospheric depth}
+\label{sec:atmosphere-geometry}
+
+\modulehead{medium/atmosphere/geometry.py, depth.py}{Zenith/nadir angle
+conversions, surface/detector angle mapping, path-length geometry, and the
+altitude $\leftrightarrow$ atmospheric-depth relation.}
+
+\begin{notebox}[title={Two Angles and Two ``Depths''}]
+This chapter uses \textbf{three} angle labels and \textbf{two} unrelated
+quantities both called ``depth'' -- keeping them apart is essential:
+\begin{itemize}
+  \item $\theta$ (\textbf{detector zenith angle}, the MCEq convention):
+    measured at the detector from the local upward vertical;
+    $\theta=0^\circ$ is straight down (shortest path), $\theta=90^\circ$ is
+    horizontal.
+  \item $\eta$ (\textbf{nadir angle}, \cref{ch:earth}'s convention):
+    $\eta=\pi-\theta$, identical relation and identical meaning to the one
+    used throughout the Earth chapter.
+  \item $\alpha$ (\textbf{surface zenith angle}): the zenith angle the same
+    ray would have if measured by an observer \emph{at the Earth's
+    surface} directly above/along the trajectory, rather than at the
+    (possibly buried) detector -- related to $\theta$ by impact-parameter
+    conservation (below), not simple equality.
+  \item \code{depth\_km} or \code{depth\_m} (\textbf{detector depth}): how far
+    below the Earth's surface the detector sits -- a \emph{geometric}
+    length, identical in meaning to Earth's $d$ (\cref{ch:earth}).
+  \item $X$ (\textbf{atmospheric depth}, \texttt{depth.py}): a
+    \emph{column density} in g/cm$^2$ (mass per unit area integrated along
+    the path), \textbf{not} a length -- the physical quantity most
+    directly tied to how many interaction lengths of atmosphere a
+    cosmic-ray shower (and hence its neutrino production point) has
+    traversed. It is unrelated to detector depth beyond sharing the English
+    word.
+\end{itemize}
+\end{notebox}
+
+\begin{theorybox}
+\subsection*{Angle conversions}
+The nadir/zenith relation is exactly the one used throughout
+\cref{ch:earth}:
+\begin{equation}
+  \keyresult{\eta = \pi - \theta}.
+\end{equation}
+The detector zenith angle $\theta$ and the surface zenith angle $\alpha$ of
+the \emph{same} straight-line ray are related by conservation of the
+impact parameter (the perpendicular distance from Earth's centre to the
+ray is the same whether measured from the detector's radius $r_d=R_\oplus-d$
+or the surface radius $R_\oplus$):
+\begin{equation}
+  \keyresult{r_d\sin\theta = R_\oplus\sin\alpha}
+  \qquad\Longleftrightarrow\qquad
+  \theta=\arcsin\!\Bigl(\frac{R_\oplus}{r_d}\sin\alpha\Bigr),\
+  \alpha=\arcsin\!\Bigl(\frac{r_d}{R_\oplus}\sin\theta\Bigr).
+\end{equation}
+Because $R_\oplus/r_d>1$ for a buried detector, not every surface angle
+maps to a valid detector ray: $\alpha$ must stay below
+$\alpha_{\max}=\arcsin(r_d/R_\oplus)$ for the first arcsine to remain
+defined (\pyfunc{alpha\_max\_for\_detector\_depth}). For a surface detector
+($d=0$), $r_d=R_\oplus$ and $\alpha\equiv\theta$ trivially.
+
+\subsection*{Path lengths}
+For a neutrino produced at altitude $h$ and detected at zenith angle
+$\theta$ with detector depth $d$ (so $r_d=R_\oplus-d$), the straight-line
+law of cosines applied to the triangle (Earth centre, detector, production
+point) gives the total detector-to-production distance,
+\begin{equation}
+  \keyresult{L_{\rm total} = -r_d\cos\theta+\sqrt{(R_\oplus+h)^2-r_d^2\sin^2\theta}},
+\end{equation}
+and, setting $h=0$, the purely \textbf{underground} part of the same ray
+(detector to surface),
+\begin{equation}
+  L_{\rm underground} = -r_d\cos\theta+\sqrt{R_\oplus^2-r_d^2\sin^2\theta}.
+\end{equation}
+The \textbf{atmospheric} path length actually carrying matter effects is
+the difference, $L_{\rm atm}=L_{\rm total}-L_{\rm underground}$
+(\pyfunc{atmosphere\_path\_length}); \pyfunc{atmosphere\_path\_grid} samples
+altitude along it via the same law-of-cosines relation evaluated at
+distance $s$ from the detector,
+\begin{equation}
+  \keyresult{r(s)=\sqrt{r_d^2+s^2+2r_ds\cos\theta}},\qquad h(s)=r(s)-R_\oplus.
+\end{equation}
+
+\subsection*{Vertical and slant atmospheric depth}
+Independently of the path-length geometry above, the atmospheric depth $X$
+(the column density integral, used e.g.\ to tabulate cosmic-ray shower
+development or MCEq/Honda fluxes rather than oscillation propagation
+directly) is
+\begin{equation}
+  \keyresult{X_{\rm vertical}(h) = \int_h^\infty \rho(h')\,\mathrm{d}h'},
+  \qquad
+  X_{\rm slant}(h,\alpha) = \frac{X_{\rm vertical}(h)}{\cos\alpha},
+\end{equation}
+the second equation being the plane-parallel approximation (valid for
+$\alpha$ not too close to the horizon, where the Earth's curvature would
+need to be accounted for); $\alpha$ here is the \emph{surface} zenith
+angle defined above, since the plane-parallel picture is anchored to a
+flat patch of atmosphere.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{theta\_to\_eta} / \pyfunc{eta\_to\_theta}: $\eta=\pi-\theta$
+    and its inverse.
+  \item \pyfunc{alpha\_surface\_to\_theta\_detector} /
+    \pyfunc{theta\_detector\_to\_alpha\_surface} /
+    \pyfunc{alpha\_max\_for\_detector\_depth}: the impact-parameter mapping
+    above and its domain limit.
+  \item \pyfunc{total\_path\_length} / \pyfunc{underground\_path\_length} /
+    \pyfunc{atmosphere\_path\_length}: the three path-length formulas
+    above.
+  \item \pyfunc{altitude\_along\_detector\_path} /
+    \pyfunc{atmosphere\_path\_grid}: the $r(s)$ sampling formula above,
+    and the resulting distance/altitude grid used to build an
+    \pyclass{AtmosphereProfile} trajectory.
+  \item \pyfunc{atmosphere\_vertical\_depth(h\_km, rho\_gcm3)} /
+    \pyfunc{atmosphere\_slant\_depth(X\_vertical, alpha\_deg)}
+    (\texttt{depth.py}): the $X_{\rm vertical}$/$X_{\rm slant}$ formulas
+    above, the first via trapezoidal integration from the top of the
+    supplied grid downward.
+  \item \pyfunc{compute\_dXdh} / \pyfunc{interpolate\_flux\_at\_Xobs}
+    (\texttt{depth.py}): the depth-profile derivative and a
+    depth-tabulated-flux interpolator, both backend-neutral utilities for
+    working with $\Phi(E,X,\alpha)$ tables from any external source.
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{evolutor.py} --- atmosphere evolution operators}
+\label{sec:atmosphere-evolutor}
+
+\modulehead{medium/atmosphere/evolutor.py}{\pyfunc{atmosphere\_evolutor}:
+dispatches between a numerical (default) and an analytical perturbative
+atmosphere evolutor.}
+
+\begin{implbox}
+The same numerical/analytical distinction of \cref{ch:earth}
+applies here, with the \textbf{default reversed} (\code{method="numerical"}
+by default, versus Earth's \code{"analytical"} default): the atmosphere's
+low density and short path make the numerical matrix-exponential pipeline
+(\cref{ch:core-numerical}) cheap enough to use by default.
+\begin{itemize}
+  \item \pyfunc{atmosphere\_evolutor\_numerical(...)}: builds an
+    \pyclass{AtmosphereProfile} trajectory (\cref{sec:atmosphere-profile})
+    and calls \pyfunc{evolutor\_numerical} (\cref{ch:core-numerical})
+    directly on its sampled density; entries with $L_{\rm atm}\le0$
+    (grazing/no-path geometries) are masked to the identity.
+  \item \pyfunc{atmosphere\_evolutor\_analytical(...)}: \emph{fits} a local
+    polynomial density model on the fly -- splits the atmospheric path
+    into \code{perturbative\_segments} equal sub-intervals, samples the
+    density backend at \code{perturbative\_degree}$+1$ Chebyshev-like nodes
+    per sub-interval (\code{q}$\in[-1,1]$, centred/rescaled), and builds an
+    \pyclass{AtmospherePolynomialProfile}
+    (\cref{ch:core-perturbative}, \texttt{atmosphere} model) from those
+    samples, then evolves it with
+    \pyfunc{evolutor\_perturbative\_segment} (\cref{ch:core-perturbative})
+    exactly as the Earth analytical pipeline does. Unlike Earth's
+    tabulated shell coefficients, the polynomial here is fitted
+    \emph{per call}, from whichever density backend is selected
+    (\cref{sec:atmosphere-profile}) -- the price of supporting arbitrary
+    density sources with the same closed-form perturbative machinery.
+  \item \pyfunc{atmosphere\_evolutor(...)}: the public dispatcher, mirroring
+    \pyfunc{earth\_probability\_state} (\cref{sec:earth-probability}) in
+    spirit.
+\end{itemize}
+\end{implbox}
+
+\begin{implbox}
+Both evolutors accept \code{atmosphere.include\_matter\_nc=False}
+(\cref{sec:atmosphere-profile}), enabling the 3+1 sterile neutral-current
+term (\cref{ch:core-common}). The numerical evolutor forwards
+\pyclass{AtmosphereProfile}'s sampled \code{n\_n\_molcm3} straight through
+to \pyfunc{evolutor\_numerical} as \code{n\_n\_mol\_cm3}. The analytical
+evolutor fits a \emph{second}, independent
+\pyclass{AtmospherePolynomialProfile} to a neutron-density sample at the
+same nodes as the electron-density fit, and passes its coefficients as
+\code{coefficients\_n} into the same segment model
+(\cref{ch:core-perturbative}), then calls
+\pyfunc{evolutor\_perturbative\_segment} with
+\code{include\_matter\_nc=True}. Both default to \code{False}, reproducing
+the pre-existing CC-only behaviour exactly.
+\end{implbox}
+
+\section{\texttt{probability.py} --- atmosphere-surface probabilities}
+\label{sec:atmosphere-probability}
+
+{\sloppy\modulehead{medium/atmosphere/probability.py}{\pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}transition}
+and \pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}state}: final flavour probabilities at
+the Earth surface from an atmosphere evolution operator.
+\pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}integrated},
+\pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}integrated\_\allowbreak{}angular}, and
+\pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}integrated\_\allowbreak{}height} build on
+\pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}state} to average over energy, the full
+zenith range, and production height, respectively.}}
+
+\begin{implbox}
+Structurally identical to \cref{ch:vacuum,ch:earth}:
+\pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}transition(oscillation, E\_MeV, h\_km, theta\_deg, depth\_km, method, ...)}
+returns the full transition-probability matrix $P=|S_{\rm atm}|^2$
+(\cref{ch:core-common}); \pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}state(nustate, ..., massbasis, ...)}
+dispatches between the coherent formula
+($\psi_{\rm surface}=S_{\rm atm}\psi_{\rm initial}$,
+$P_\alpha=|\psi_{\rm surface,\alpha}|^2$) and the incoherent formula
+($P_\alpha=\sum_i|(S_{\rm atm}U_{\rm PMNS})_{\alpha i}|^2w_i$) of
+\cref{ch:core-common}, exactly as \pyfunc{vacuum\_probability\_state} and
+\pyfunc{earth\_probability\_state} do,
+using whichever evolutor \pyfunc{atmosphere\_evolutor}
+(\cref{sec:atmosphere-evolutor}) returns. Because every function in this
+section takes the whole \pyclass{AtmosphereParameters} bundle as its
+\code{atmosphere} argument rather than exploding it into individual
+keywords, \code{include\_matter\_nc} (previous section) is already
+available at every level here with no further plumbing.
+\end{implbox}
+
+\begin{notebox}
+\textbf{A real, previously uncaught 3-flavour-only bug.}
+\pyfunc{atmosphere\_probability\_state} used to crash outright for a
+4-flavour (3+1 sterile) initial state, even though
+\pyfunc{atmosphere\_evolutor} underneath it already built the correct
+$4\times4$ operator: a shared broadcasting helper
+(\code{util.type.broadcast\_last3}, used identically in
+\cref{ch:vacuum}) hardcoded its input's final dimension to exactly 3. The
+fix generalises the helper to accept 3 \emph{or} 4 (renamed
+\code{broadcast\_flavour\_vector} to match, since it is no longer
+3-specific) and is shared by \texttt{medium.vacuum.probability},
+\texttt{medium.vacuum.evolutor}, and this module. No test exercised a
+sterile initial state through this function before the fix.
+\end{notebox}
+
+\begin{implbox}
+Atmospheric probabilities depend on three axes at once ($E$, production
+height $h$, zenith angle $\theta$), so this medium is the only one with
+three dedicated \code{*\_integrated} reductions, each delegating to the
+corresponding \cref{ch:core-common} primitive:
+\begin{itemize}
+  \item \pyfunc{atmosphere\_probability\_integrated(nustate, ..., spectrum, integrate\_angular, integrate\_height, ...)}:
+    \textbf{always} averages over energy (spectrum-weighted, via
+    \pyfunc{core.common.probability.probability\_integrated}), then
+    optionally chains a height average and/or an angular average by hand,
+    each a further, independent reduction rather than one fused operation.
+  \item \pyfunc{atmosphere\_probability\_integrated\_angular(nustate, ...)}:
+    averages over the full zenith range via
+    \pyfunc{core.common.probability.probability\_integrated\_angular}
+    (geometric $\sin\theta$ weight).
+  \item \pyfunc{atmosphere\_probability\_integrated\_height(nustate, ..., production\_flux, ...)}:
+    averages over production height, weighted by the height-resolved
+    production flux, again via
+    \pyfunc{core.common.probability.probability\_integrated} -- height is
+    not a universal \cref{ch:core-common} concept, so this wrapper lives
+    here, even though it reuses that module's generic weighted-average
+    primitive.
+\end{itemize}
+Every reduction's \code{*\_dim} parameter defaults to $-2$ (``the axis
+immediately before flavour''), matching \cref{ch:core-common}'s own
+convention; for the composite function's fixed energy-then-height-then-angle
+chaining order to line up with that default at every step, the input grid
+should be laid out as $(\ldots,\theta,h,E,\text{flavour})$.
+\end{implbox}
+
+\section{\texttt{flux.py} --- atmosphere flux}
+\label{sec:atmosphere-flux}
+
+{\sloppy\modulehead{medium/atmosphere/flux.py}{\pyfunc{atmosphere\_\allowbreak{}flux\_\allowbreak{}state}
+(surface flux from \pyfunc{atmosphere\_\allowbreak{}probability\_\allowbreak{}state}) and three
+\code{*\_integrated} variants mirroring the probability-layer reductions
+above.}}
+
+\begin{implbox}
+Like \texttt{probability.py} above, every function here takes the whole
+\code{atmosphere} (\pyclass{AtmosphereParameters}) bundle, so
+\code{include\_matter\_nc} is available with no further plumbing.
+\begin{itemize}
+  \item \pyfunc{atmosphere\_flux\_state(nustate, oscillation, E\_MeV, h\_km, theta\_deg, flux, spectrum, depth\_km, ...)}:
+    the standard pattern -- \pyfunc{atmosphere\_probability\_state} then
+    \pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}).
+  \item \pyfunc{atmosphere\_flux\_integrated(..., integrate\_angular, integrate\_height, ...)}:
+    always integrates over energy via
+    \pyfunc{core.common.flux.flux\_integrated} (an unnormalised rate,
+    unlike the probability-layer average), then optionally chains a plain
+    trapezoidal height integral and/or an angular integral
+    (\pyfunc{core.common.flux.flux\_integrated\_angular}) -- no separate
+    height weight is needed here, since \code{flux} already carries
+    whatever height dependence it has.
+  \item \pyfunc{atmosphere\_flux\_integrated\_angular(...)}: integrates over
+    the full zenith range via
+    \pyfunc{core.common.flux.flux\_integrated\_angular}.
+  \item \pyfunc{atmosphere\_flux\_integrated\_height(..., production\_flux, ...)}:
+    integrates over production height using the tabulated production-flux
+    data. Atmosphere-specific and, unlike the three functions above, calls
+    no \texttt{core.common} function directly: it combines
+    \pyfunc{atmosphere\_probability\_integrated\_height} (the
+    production-flux-weighted average probability over height, $\langle
+    P\rangle_h$) with the plain trapezoidal integral of
+    \code{production\_flux} itself over height,
+    $\Phi_h=\int\text{production\_flux}(h)\,\mathrm{d}h$; the product
+    $\langle P\rangle_h\,\Phi_h$ equals $\int P(h)\,\text{production\_flux}(h)\,\mathrm{d}h$
+    exactly, by the definition of the weighted average.
+\end{itemize}
+\end{implbox}
+
+\begin{notebox}[title={Detector Composition Lives in the Pipeline Layer}]
+Unlike \cref{ch:earth}, \texttt{medium.atmosphere} only ever propagates
+production $\to$ surface: it has no notion of a detector, and no
+\texttt{validation.py}. Weighting a surface or detector probability by
+production-flux data, integrating a detector flux over production height,
+and summing the incoherent contributions from several produced flavours are
+all pipeline-level concerns, composed in
+\texttt{pipeline.atmosphere\_earth} (\pyfunc{detector\_flux\_from\_production},
+\pyfunc{integrate\_detector\_flux\_over\_height},
+\pyfunc{sum\_detected\_flavours}) on top of
+\pyfunc{pipeline.atmosphere\_earth.propagate\_surface\_to\_detector}, which
+applies the Earth evolutor of \cref{ch:earth} to this medium's coherent
+surface state via ordinary matrix-vector composition, not the matrix-matrix
+composition used internally by \cref{sec:earth-evolutor}.
+\end{notebox}

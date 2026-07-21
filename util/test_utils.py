@@ -59,7 +59,7 @@ from typing import Dict, Optional, Union
 import torch
 
 from tpeanuts.core.common.pmns import PMNSParams
-from tpeanuts.core.SM.pmns import PMNS_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.torch_util import default_device
 from tpeanuts.util.type import as_tensor

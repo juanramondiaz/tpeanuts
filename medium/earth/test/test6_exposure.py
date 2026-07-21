@@ -52,9 +52,10 @@ from tpeanuts.medium.earth.exposure_table import (
     nadir_exposure_from_math,
     prepare_nadir_exposure,
 )
-from tpeanuts.medium.earth.exposure_integration import _prepare_energy_grid, pearth_integrated
+from tpeanuts.medium.earth.exposure_integration import _prepare_energy_grid, earth_probability_exposure
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.test_utils import assert_close, build_pmns
 
@@ -68,8 +69,10 @@ DEPTH_SURFACE_M = 0.0
 def _oscillation() -> OscillationParameters:
     return OscillationParameters(
         pmns=build_pmns(),
-        DeltamSq21=torch.tensor(7.42e-5, device=DEVICE, dtype=DTYPE),
-        DeltamSq3l=torch.tensor(2.517e-3, device=DEVICE, dtype=DTYPE),
+        mass_spectrum=MassSpectrum_SM(
+            DeltamSq21=torch.tensor(7.42e-5, device=DEVICE, dtype=DTYPE),
+            DeltamSq3l=torch.tensor(2.517e-3, device=DEVICE, dtype=DTYPE),
+        ),
         antinu=False,
     )
 
@@ -381,14 +384,14 @@ def test_prepare_energy_grid_scalar_and_vector():
     assert squeeze_vector is False
 
 
-def test_pearth_integrated_scalar_energy_sums_to_one():
+def test_earth_probability_exposure_scalar_energy_sums_to_one():
     profile = _two_shell_profile()
     oscillation = _oscillation()
     weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
     ctx = RuntimeContext.resolve(DEVICE, DTYPE)
     exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
 
-    P_int = pearth_integrated(
+    P_int = earth_probability_exposure(
         weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
         method="analytical", massbasis=True, exposure=exposure, context=ctx, normalized_exposure=True,
     )
@@ -398,7 +401,7 @@ def test_pearth_integrated_scalar_energy_sums_to_one():
                  name="normalized-exposure-averaged probabilities sum to one")
 
 
-def test_pearth_integrated_vector_energy_preserves_dimension():
+def test_earth_probability_exposure_vector_energy_preserves_dimension():
     profile = _two_shell_profile()
     oscillation = _oscillation()
     weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
@@ -406,7 +409,7 @@ def test_pearth_integrated_vector_energy_preserves_dimension():
     ctx = RuntimeContext.resolve(DEVICE, DTYPE)
     exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
 
-    P_int = pearth_integrated(
+    P_int = earth_probability_exposure(
         weights, profile, oscillation, E, DEPTH_SURFACE_M,
         method="analytical", massbasis=True, exposure=exposure, context=ctx,
     )
@@ -415,18 +418,18 @@ def test_pearth_integrated_vector_energy_preserves_dimension():
     assert torch.all(torch.isfinite(P_int))
 
 
-def test_pearth_integrated_chunk_eta_matches_full_batch():
+def test_earth_probability_exposure_chunk_eta_matches_full_batch():
     profile = _two_shell_profile()
     oscillation = _oscillation()
     weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
     ctx = RuntimeContext.resolve(DEVICE, DTYPE)
     exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
 
-    P_full = pearth_integrated(
+    P_full = earth_probability_exposure(
         weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
         method="analytical", massbasis=True, exposure=exposure, context=ctx, chunk_eta=None,
     )
-    P_chunked = pearth_integrated(
+    P_chunked = earth_probability_exposure(
         weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
         method="analytical", massbasis=True, exposure=exposure, context=ctx, chunk_eta=3,
     )
@@ -434,7 +437,7 @@ def test_pearth_integrated_chunk_eta_matches_full_batch():
     assert_close(P_chunked, P_full, atol=1.0e-10, rtol=1.0e-10, name="chunked eta integration matches full-batch result")
 
 
-def test_pearth_integrated_rejects_invalid_method():
+def test_earth_probability_exposure_rejects_invalid_method():
     profile = _two_shell_profile()
     oscillation = _oscillation()
     weights = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
@@ -442,7 +445,7 @@ def test_pearth_integrated_rejects_invalid_method():
     exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
 
     with pytest.raises(ValueError, match="method must be either"):
-        pearth_integrated(
+        earth_probability_exposure(
             weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
             method="bogus", massbasis=True, exposure=exposure, context=ctx,
         )

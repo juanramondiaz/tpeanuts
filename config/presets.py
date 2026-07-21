@@ -33,7 +33,7 @@ phases.  For N = 4 this gives exactly **three** Dirac phases:
 
 R_34 is always a **real** rotation: the fourth phase can be absorbed into the
 charged-lepton or neutrino fields.  Sterile presets therefore carry no
-``delta34_deg`` entry; ``OscillationParameters.from_preset`` always builds
+``delta34_deg`` entry; ``oscillation_parameters_from_preset`` always builds
 ``PMNS_sterile`` with delta34 = 0.
 
 Module contents
@@ -49,12 +49,12 @@ list_presets(registry)
 OSCILLATION_PRESETS
     Registry of 3-flavour SM and 3+1 sterile oscillation parameter sets
     (degrees/eV^2). A preset is a sterile preset iff it carries a
-    ``theta14_deg`` key; ``OscillationParameters.from_preset`` dispatches on
+    ``theta14_deg`` key; ``oscillation_parameters_from_preset`` dispatches on
     that to build either a plain ``PMNS_SM`` or a ``PMNS_sterile``.
 
 NSI_PRESETS
     Registry of Non-Standard Interaction coupling sets, consumed by
-    ``tpeanuts.core.BSM.NSIConfig.NSIConfig.from_preset``.
+    ``tpeanuts.core.BSM.bsm_nsi.NSIConfig.from_preset``.
 """
 
 from __future__ import annotations
@@ -255,26 +255,10 @@ register_preset(
     ),
 )
 
-# 2. Standard 3-flavor SM, run through the 4-flavour sterile machinery with
-#    all sterile mixing angles zero (has theta14_deg -> builds PMNS_sterile).
-register_preset(
-    OSCILLATION_PRESETS,
-    "standard_3nu",
-    **_SM_NUFIT52_NO,
-    theta14_deg=0.0,
-    theta24_deg=0.0,
-    theta34_deg=0.0,
-    delta14_deg=0.0,
-    delta24_deg=0.0,
-    DeltamSq41=1.0,   # arbitrary; no physical effect when all sterile angles = 0
-    label="standard_3nu",
-    description=(
-        "Standard 3-flavor SM best fit. NuFIT 5.2 (2022), normal ordering, "
-        "with SK atmospheric data. No sterile mixing."
-    ),
-)
-
-# 3. 3+1 framework with null sterile mixing (SM limit inside 4-flavor code).
+# 2. 3+1 framework with null sterile mixing (SM limit inside 4-flavor code).
+#    Has theta14_deg -> builds PMNS_sterile; with all sterile angles at zero
+#    this is numerically identical to the plain 3-flavour SM (see the SM-limit
+#    tests in core/BSM/test/test3_bsm_sterile.py).
 register_preset(
     OSCILLATION_PRESETS,
     "sterile_3p1_null_mixing",
@@ -288,8 +272,9 @@ register_preset(
     label="sterile_3p1_null_mixing",
     description=(
         "3+1 scenario with all active-sterile mixing angles set to zero. "
-        "Physically equivalent to standard_3nu but run through PMNS_sterile. "
-        "Use as null-hypothesis reference in sterile analyses."
+        "Numerically identical to the plain 3-flavour SM, run through the "
+        "4-flavour PMNS_sterile machinery. Use as null-hypothesis reference "
+        "in sterile analyses."
     ),
 )
 
@@ -344,6 +329,51 @@ register_preset(
     ),
 )
 
+# 6. Exact two-flavour disappearance limit -- a mathematical construction, not
+#    a data-driven benchmark. All three SM active mixing angles are set to
+#    exactly zero (theta12=theta13=theta23=0), which removes every source of
+#    "leakage" between the standard 2-flavour formula
+#        P(nu_a -> nu_a) = 1 - sin^2(2 theta_a4) sin^2(1.267 Dm41^2 L/E)
+#    and the full 4-flavour numerical result:
+#      - |U_e4|^2 = cos^2(theta12) cos^2(theta13) sin^2(theta14) in tpeanuts'
+#        U_red_4 = R13.R12.R14 rotation ordering (R14 applied first); with
+#        theta12=theta13=0 this collapses to exactly sin^2(theta14), so the
+#        nu_e channel matches the textbook formula to floating-point
+#        precision, for *any* theta24 (theta24 lives only in the outer block
+#        O_4 = R23.Delta.R24.R34, which leaves the electron index untouched).
+#      - |U_mu4|^2 = sin^2(theta24) exactly only when theta23=0 *and*
+#        theta14=0 (R14 and R24 both act on the sterile index and do not
+#        commute in general, so a small residual survives in the nu_mu
+#        channel whenever theta14 and theta24 are simultaneously non-zero;
+#        see notebooks/validation/physics/BSM/sterile2_kinematics.ipynb,
+#        Section 3, for the quantified size of that residual).
+# theta14/theta24 are illustrative (not fit to data) - chosen larger than
+# current experimental bounds purely to make the exact-vs-naive-formula
+# comparison numerically clear in plots.
+register_preset(
+    OSCILLATION_PRESETS,
+    "sterile_3p1_two_flavour_limit",
+    **{**_SM_NUFIT52_NO, "theta12_deg": 0.0, "theta13_deg": 0.0, "theta23_deg": 0.0},
+    theta14_deg=15.0,
+    theta24_deg=12.0,
+    theta34_deg=0.0,
+    delta14_deg=0.0,
+    delta24_deg=0.0,
+    DeltamSq41=1.0,
+    label="sterile_3p1_two_flavour_limit",
+    description=(
+        "Mathematical construction (not a data-driven benchmark): all SM "
+        "active mixing angles (theta12, theta13, theta23) set to zero, so "
+        "that the nu_e disappearance channel exactly reproduces the "
+        "textbook 2-flavour formula P_ee = 1 - sin^2(2 theta14) sin^2(1.267 "
+        "Dm41^2 L/E) for any theta24. Used to validate the 2-flavour "
+        "disappearance approximation against the full numerical evolutor "
+        "in isolation from the active-sector suppression effects quantified "
+        "for realistic presets (e.g. sterile_3p1_bestfit_giunti2017) in "
+        "sterile2_kinematics.ipynb."
+    ),
+)
+
 
 # ---------------------------------------------------------------------------
 # NSI presets
@@ -354,8 +384,8 @@ register_preset(
 #   |eps_ee|  < 0.50    |eps_emu|  < 0.033
 #   |eps_mumu| < 0.078   |eps_etau|  < 0.27
 #   |eps_tautau| < 0.33    |eps_mutau|  < 0.040
-# See ``tpeanuts.core.BSM.NSIConfig`` for the full physics background and the
-# ``NSIConfig.epsilon_tensor()`` builder consuming these presets.
+# See ``tpeanuts.core.BSM.bsm_nsi`` for the full physics background and the
+# ``NSIConfig.epsilon_tensor_base()`` builder consuming these presets.
 
 NSI_PRESETS: dict[str, dict] = {}
 
@@ -366,7 +396,7 @@ register_preset(
     label="sm_no_nsi",
     description=(
         "Standard Model: all NSI parameters set to zero. "
-        "Passing this epsilon to hamiltonian_reduced_bsm is equivalent to "
+        "Passing this epsilon to hamiltonian_reduced is equivalent to "
         "the default epsilon=None (SM MSW matter potential)."
     ),
 )

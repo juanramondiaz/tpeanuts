@@ -32,7 +32,7 @@ Module functions:
     cast_tensor_tree(...): Recursively detach, move, and cast tensor leaves.
     broadcast_tensor(...): Convert and broadcast generic tensor-like values.
     flat_tensor(...): Flatten a tensor and optionally select indexed entries.
-    identity_evolutor_like(...): Build scalar or batched 3x3 identities.
+    identity_evolutor_like(...): Build scalar or batched NxN identities.
     enforce_identity_for_zero_length(...): Replace zero-length evolutors with
         the identity.
 """
@@ -55,22 +55,25 @@ def identity_evolutor_like(
     *,
     device: torch.device,
     dtype: torch.dtype,
+    n: int = 3,
 ) -> torch.Tensor:
-    """Build a 3x3 identity evolutor matching a path-length batch.
+    """Build an nxn identity evolutor matching a path-length batch.
 
     Args:
         L: Dimensionless scalar or batched segment length.
         device: Device used for the identity tensor.
         dtype: Real or complex dtype used for the identity tensor.
+        n: Evolutor dimension (3 for the SM, 4 for the 3+1 sterile
+            extension).
 
     Returns:
-        Identity evolutor shaped L.shape + (3, 3).
+        Identity evolutor shaped L.shape + (n, n).
     """
-    identity = torch.eye(3, device=device, dtype=dtype)
+    identity = torch.eye(n, device=device, dtype=dtype)
     if L.ndim == 0:
         return identity
 
-    return identity.expand(*L.shape, 3, 3)
+    return identity.expand(*L.shape, n, n)
 
 
 def enforce_identity_for_zero_length(
@@ -81,7 +84,7 @@ def enforce_identity_for_zero_length(
     """Replace evolution operators on zero-length segments with the identity.
 
     Args:
-        U: Evolution operators shaped (..., 3, 3).
+        U: Evolution operators shaped (..., N, N), N in {3, 4}.
         L: Segment lengths. Retained alongside the mask for API clarity.
         zero_mask: Boolean tensor selecting zero-length segments.
 
@@ -93,6 +96,7 @@ def enforce_identity_for_zero_length(
         zero_mask,
         device=U.device,
         dtype=U.dtype,
+        n=U.shape[-1],
     )
     return torch.where(zero_mask[..., None, None], identity, U)
 

@@ -93,9 +93,9 @@ import torch
 
 from tpeanuts.core.common.neutrino import flavour_index
 from tpeanuts.core.common.pmns import PMNSParams
-from tpeanuts.core.SM.pmns import PMNS_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.util.context import RuntimeContext
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 
 
 class NuSQuIDSError(RuntimeError):
@@ -123,6 +123,24 @@ class NuSQuIDSConfig:
         DeltamSq3l: Atmospheric mass-squared splitting Delta m^2_3l in eV^2
             (l=1 for normal ordering, l=2 for inverted, per nuSQuIDS
             convention).
+        numneu: Number of neutrino flavours passed to ``nsq.nuSQUIDS``. 3
+            for the plain Standard Model (default, unchanged behaviour); 4
+            for the 3+1 sterile extension, in which case ``theta14``/
+            ``theta24``/``theta34``/``delta14``/``delta24``/``DeltamSq41``
+            below are also applied. Every helper in this module that reads
+            ``config.numneu`` sizes its initial/final states accordingly;
+            the sterile state carries no matter potential in nuSQuIDS's own
+            ``Earth``/``EarthAtm`` bodies, matching the ``diag(V, 0, 0, 0)``
+            sterile matter Hamiltonian built by tpeanuts's own
+            ``hamiltonian_reduced``/``hamiltonian_flavour``.
+        theta14, theta24, theta34: Active-sterile mixing angles in radians
+            (ignored unless ``numneu >= 4``).
+        delta14, delta24: Active-sterile CP phases in radians (ignored
+            unless ``numneu >= 4``); there is no ``delta34`` (R_34 is a
+            real rotation for Dirac 3+1 neutrinos, matching tpeanuts's own
+            ``PMNS_sterile`` convention).
+        DeltamSq41: Sterile mass-squared splitting Delta m^2_41 in eV^2
+            (ignored unless ``numneu >= 4``).
         rel_error: Relative error tolerance for nuSQuIDS's internal ODE
             integrator (Set_rel_error), if supported by the installed
             bindings.
@@ -157,6 +175,13 @@ class NuSQuIDSConfig:
     delta_cp: float = 1.20
     DeltamSq21: float = 7.42e-5
     DeltamSq3l: float = 2.517e-3
+    numneu: int = 3
+    theta14: float = 0.0
+    theta24: float = 0.0
+    theta34: float = 0.0
+    delta14: float = 0.0
+    delta24: float = 0.0
+    DeltamSq41: float = 1.0
     rel_error: float = 1.0e-11
     abs_error: float = 1.0e-13
     h_max_km: Optional[float] = 100.0
@@ -282,18 +307,25 @@ def initial_state(flavour: Union[str, int], n_flavours: int = 3) -> np.ndarray:
 
     Args:
         flavour: Initial neutrino flavour, as a string label (e.g. "numu")
-            or integer flavour index (0=e, 1=mu, 2=tau in the standard
-            tpeanuts/nuSQuIDS ordering).
-        n_flavours: Number of flavours in the solver (3 for the standard
-            three-flavour scenario used throughout this module).
+            or integer flavour index (0=e, 1=mu, 2=tau, 3=sterile in the
+            standard tpeanuts/nuSQuIDS ordering). Integer indices are used
+            directly (bypassing ``flavour_index``'s active-flavour-only
+            validation), so the sterile index (3, for ``n_flavours=4``) is
+            reachable; string labels still only resolve the three active
+            flavours.
+        n_flavours: Number of flavours in the solver: 3 for the standard
+            three-flavour scenario, 4 for the 3+1 sterile extension.
 
     Returns:
         1D float array of length n_flavours, with a 1.0 at the initial
         flavour's index and 0.0 elsewhere, ready to pass to nuSQuIDS's
         Set_initial_state in the flavor basis.
     """
+    idx = flavour if isinstance(flavour, int) else flavour_index(normalise_flavour_label(flavour))
+    if not (0 <= idx < n_flavours):
+        raise ValueError(f"Flavour index {idx} is out of range for n_flavours={n_flavours}.")
     state = np.zeros(n_flavours, dtype=float)
-    state[flavour_index(normalise_flavour_label(flavour))] = 1.0
+    state[idx] = 1.0
     return state
 
 
@@ -393,6 +425,17 @@ def configure_solver(nuSQ, config: Optional[NuSQuIDSConfig] = None):
     nuSQ.Set_SquareMassDifference(2, float(config.DeltamSq3l))
     set_cp_phase(nuSQ, config)
 
+    if config.numneu >= 4:
+        # 3+1 sterile extension: active-sterile mixing angles (indices 0-3,
+        # 1-3, 2-3), their CP phases (R_34 stays real, matching tpeanuts's
+        # PMNS_sterile), and the sterile mass-squared splitting.
+        nuSQ.Set_MixingAngle(0, 3, float(config.theta14))
+        nuSQ.Set_MixingAngle(1, 3, float(config.theta24))
+        nuSQ.Set_MixingAngle(2, 3, float(config.theta34))
+        nuSQ.Set_CPPhase(0, 3, float(config.delta14))
+        nuSQ.Set_CPPhase(1, 3, float(config.delta24))
+        nuSQ.Set_SquareMassDifference(3, float(config.DeltamSq41))
+
     if hasattr(nuSQ, "Set_rel_error"):
         nuSQ.Set_rel_error(float(config.rel_error))
     if hasattr(nuSQ, "Set_abs_error"):
@@ -419,19 +462,22 @@ def init_solver(
             configure_solver. Defaults to ``NuSQuIDSConfig()`` if None.
 
     Returns:
-        A configured ``nsq.nuSQUIDS(3, ...)`` solver object, ready to have
-        its body, track, energy, and initial state set before calling
+        A configured ``nsq.nuSQUIDS(config.numneu, ...)`` solver object
+        (3 flavours by default, 4 for the 3+1 sterile extension), ready to
+        have its body, track, energy, and initial state set before calling
         EvolveState.
     """
     nsq = require_nusquids()
-    nuSQ = nsq.nuSQUIDS(3, neutrino_type(nsq, antinu=antinu))
-    configure_solver(nuSQ, config=config)
+    cfg = NuSQuIDSConfig() if config is None else config
+    nuSQ = nsq.nuSQUIDS(cfg.numneu, neutrino_type(nsq, antinu=antinu))
+    configure_solver(nuSQ, config=cfg)
     return nuSQ
 
 
 def eval_probabilities(
     nuSQ,
     *,
+    numneu: int = 3,
     output_energy_GeV: Optional[float] = None,
     antinu_index: int = 0,
 ) -> np.ndarray:
@@ -440,22 +486,26 @@ def eval_probabilities(
 
     Args:
         nuSQ: A nuSQuIDS solver object after EvolveState() has been called.
+        numneu: Number of flavours the solver was built with (3 for the
+            standard case, 4 for the 3+1 sterile extension); sizes the
+            returned array and the EvalFlavor index range.
         output_energy_GeV: Optional output energy for bindings whose
             EvalFlavor overload expects an explicit energy argument.
         antinu_index: Optional neutrino/antineutrino index for bindings whose
             EvalFlavor overload expects a third argument.
 
     Returns:
-        1D float array of length 3 with P(nu_e), P(nu_mu), P(nu_tau) (or
-        the antineutrino equivalents) from nuSQuIDS's EvalFlavor.
+        1D float array of length numneu with P(nu_e), P(nu_mu), P(nu_tau)
+        (and P(nu_sterile) when numneu=4), or the antineutrino equivalents,
+        from nuSQuIDS's EvalFlavor.
     """
     if output_energy_GeV is None:
-        return np.asarray([float(nuSQ.EvalFlavor(i)) for i in range(3)], dtype=float)
+        return np.asarray([float(nuSQ.EvalFlavor(i)) for i in range(numneu)], dtype=float)
 
     nsq = require_nusquids()
     unit_constants = units(nsq)
     values = []
-    for flavour in range(3):
+    for flavour in range(numneu):
         try:
             values.append(
                 float(
@@ -618,20 +668,22 @@ def evolve_with_body(
             Defaults to NuSQuIDSConfig() when None (via init_solver).
 
     Returns:
-        1D float array of length 3 with the final flavour probabilities
-        (see eval_probabilities).
+        1D float array of length config.numneu (3, or 4 for the 3+1
+        sterile extension) with the final flavour probabilities (see
+        eval_probabilities).
     """
     nsq = require_nusquids()
     unit_constants = units(nsq)
-    nuSQ = init_solver(antinu=antinu, config=config)
+    cfg = NuSQuIDSConfig() if config is None else config
+    nuSQ = init_solver(antinu=antinu, config=cfg)
 
     nuSQ.Set_Body(body)
     nuSQ.Set_Track(track)
     nuSQ.Set_E(float(E_GeV) * unit_constants.GeV)
-    nuSQ.Set_initial_state(initial_state(initial_flavour), nsq.Basis.flavor)
+    nuSQ.Set_initial_state(initial_state(initial_flavour, n_flavours=cfg.numneu), nsq.Basis.flavor)
     nuSQ.EvolveState()
 
-    return eval_probabilities(nuSQ)
+    return eval_probabilities(nuSQ, numneu=cfg.numneu)
 
 
 def _build_track_from_cosine(body, cos_zenith: float):
@@ -835,7 +887,9 @@ def transition_matrix_earth_mass_to_flavour(
             ``NuSQuIDSConfig()`` when None.
 
     Returns:
-        Array shaped ``(3, 3)`` with flavour rows and initial-mass columns.
+        Array shaped ``(numneu, numneu)`` with flavour rows and
+        initial-mass columns (``numneu`` from ``config.numneu``, 3 by
+        default or 4 for the 3+1 sterile extension).
 
     Raises:
         NuSQuIDSError: If the installed bindings do not expose
@@ -843,6 +897,7 @@ def transition_matrix_earth_mass_to_flavour(
     """
     nsq = require_nusquids()
     unit_constants = units(nsq)
+    cfg = NuSQuIDSConfig() if config is None else config
     basis_mass = getattr(getattr(nsq, "Basis", None), "mass", None)
     if basis_mass is None:
         raise NuSQuIDSError(
@@ -850,18 +905,18 @@ def transition_matrix_earth_mass_to_flavour(
             "propagation from incoherent solar mass weights is unavailable."
         )
 
-    matrix = np.zeros((3, 3), dtype=float)
-    for mass_idx in range(3):
-        nuSQ = init_solver(antinu=antinu, config=config)
+    matrix = np.zeros((cfg.numneu, cfg.numneu), dtype=float)
+    for mass_idx in range(cfg.numneu):
+        nuSQ = init_solver(antinu=antinu, config=cfg)
         earth, track = _earth_body_and_track(nsq, cos_zenith)
         nuSQ.Set_Body(earth)
         nuSQ.Set_Track(track)
         nuSQ.Set_E(float(E_GeV) * unit_constants.GeV)
-        state = np.zeros(3, dtype=float)
+        state = np.zeros(cfg.numneu, dtype=float)
         state[mass_idx] = 1.0
         nuSQ.Set_initial_state(state, basis_mass)
         nuSQ.EvolveState()
-        matrix[:, mass_idx] = eval_probabilities(nuSQ)
+        matrix[:, mass_idx] = eval_probabilities(nuSQ, numneu=cfg.numneu)
 
     return matrix
 
@@ -880,19 +935,21 @@ def probability_earth_massbasis(
     Args:
         E_GeV: Neutrino energy in GeV.
         cos_zenith: cos(zenith angle) at the detector.
-        mass_weights: Length-3 incoherent mass-eigenstate weights
-            ``w_i >= 0`` at Earth entry, typically produced by solar MSW
-            propagation after Sun-Earth decoherence.
+        mass_weights: Incoherent mass-eigenstate weights ``w_i >= 0`` at
+            Earth entry (length ``config.numneu``: 3, or 4 with a
+            zero-padded sterile entry for the 3+1 extension), typically
+            produced by solar MSW propagation after Sun-Earth decoherence.
         antinu: If True, propagate antineutrinos.
         config: Oscillation/numerical configuration. Defaults to
             ``NuSQuIDSConfig()`` when None.
 
     Returns:
-        Length-3 final flavour-probability vector.
+        Final flavour-probability vector, length ``config.numneu``.
     """
+    cfg = NuSQuIDSConfig() if config is None else config
     weights = np.asarray(mass_weights, dtype=float).reshape(-1)
-    if weights.shape != (3,):
-        raise ValueError("mass_weights must be a length-3 vector.")
+    if weights.shape != (cfg.numneu,):
+        raise ValueError(f"mass_weights must be a length-{cfg.numneu} vector.")
 
     norm = weights.sum()
     if np.isfinite(norm) and norm > 0.0:
@@ -932,14 +989,16 @@ def probability_atmosphere(
         cos_zenith: cos(zenith angle) at the detector. cos_zenith=1 is
             vertically downward (minimal/no Earth crossing); cos_zenith=-1
             is vertically upward through the full Earth diameter.
-        initial_flavour: Initial flavour label or integer flavour index.
+        initial_flavour: Initial flavour label or integer flavour index
+            (0=e, 1=mu, 2=tau, 3=sterile for ``config.numneu=4``).
         antinu: If True, propagate the antineutrino state.
         config: Oscillation/numerical configuration. Defaults to
-            NuSQuIDSConfig() when None.
+            NuSQuIDSConfig() when None. Set ``numneu=4`` (plus the sterile
+            angle/splitting fields) for the 3+1 extension.
 
     Returns:
-        1D float array of length 3 with the final flavour probabilities,
-        summing to 1.
+        1D float array of length config.numneu with the final flavour
+        probabilities, summing to 1.
     """
     nsq = require_nusquids()
     earth_atm = nsq.EarthAtm()

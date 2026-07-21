@@ -46,14 +46,17 @@ from typing import Union
 
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.type import TensorLike, as_tensor
 from tpeanuts.util.torch_util import default_device
 from tpeanuts.core.perturbative.models.interface import (
     PerturbativeOuterSegment,
     PerturbativeSegmentBatch,
 )
-from tpeanuts.core.perturbative.models.prem.io import load_prem500_profile
+from tpeanuts.core.perturbative.models.prem.io import (
+    load_prem500_profile,
+    load_prem500_neutron_profile,
+)
 from tpeanuts.core.perturbative.models.prem.profile_segment import PremProfileSegment
 
 
@@ -79,6 +82,15 @@ class PremTabulatedProfile:
         coefficients: Optional pre-built coefficient tensor of shape
             ``(..., n_shells, 2)`` with columns ``[A, B]`` for
             n_e(r²) = A + B·r² in each shell.  Must be paired with ``rj``.
+        include_neutron: If True and ``coefficients`` is not pre-built, also
+            load neutron-density coefficients from the same PREM500 CSV
+            (``coefficients_n``), enabling the 3+1 sterile extension's
+            neutral-current matter term (see ``evaluate_neutron`` and
+            ``core.common.hamiltonian.hamiltonian_matter_reduced``). Ignored
+            when ``coefficients`` is supplied directly; pass
+            ``coefficients_n`` explicitly in that case instead.
+        coefficients_n: Optional pre-built neutron-density coefficient
+            tensor, same shape and shell convention as ``coefficients``.
         device: Torch device for all tensors.
         dtype: Real dtype for all tensors.
     """
@@ -86,6 +98,8 @@ class PremTabulatedProfile:
     prem_file: str | None = None
     rj: torch.Tensor | None = None
     coefficients: torch.Tensor | None = None
+    include_neutron: bool = False
+    coefficients_n: torch.Tensor | None = None
     device: Union[str, torch.device, None] = None
     dtype: torch.dtype = default.dtype
 
@@ -101,6 +115,12 @@ class PremTabulatedProfile:
                 device=self.device,
                 dtype=self.dtype,
             )
+            if self.include_neutron and self.coefficients_n is None:
+                _, self.coefficients_n = load_prem500_neutron_profile(
+                    self.prem_file,
+                    device=self.device,
+                    dtype=self.dtype,
+                )
 
         self.coefficients = torch.as_tensor(
             self.coefficients, device=self.device, dtype=self.dtype
@@ -124,6 +144,17 @@ class PremTabulatedProfile:
                 "PREM profile coefficients must have exactly 2 entries per shell "
                 "(A constant term and B quadratic term)."
             )
+
+        if self.coefficients_n is not None:
+            self.coefficients_n = torch.as_tensor(
+                self.coefficients_n,
+                device=self.coefficients.device,
+                dtype=self.coefficients.dtype,
+            )
+            if self.coefficients_n.shape != self.coefficients.shape:
+                raise ValueError(
+                    "coefficients_n must have the same shape as coefficients."
+                )
 
         self.device = self.coefficients.device
         self.dtype = self.coefficients.dtype
@@ -157,6 +188,11 @@ class PremTabulatedProfile:
                 else None
             ),
             coefficients=self.coefficients.to(device=out_device, dtype=out_dtype),
+            coefficients_n=(
+                self.coefficients_n.to(device=out_device, dtype=out_dtype)
+                if self.coefficients_n is not None
+                else None
+            ),
             device=out_device,
             dtype=out_dtype,
         )
@@ -193,9 +229,19 @@ class PremTabulatedProfile:
         B = coefficients[..., 1]  # (..., n_shells)
         A_shifted = A + B * offset[..., None]
 
+        coefficients_n = None
+        if self.coefficients_n is not None:
+            coefficients_n = torch.broadcast_to(
+                self.coefficients_n, (*leading_shape, n_shells, 2)
+            )
+            A_n = coefficients_n[..., 0]
+            B_n = coefficients_n[..., 1]
+            coefficients_n = torch.stack([A_n + B_n * offset[..., None], B_n], dim=-1)
+
         return PremTabulatedProfile(
             rj=self.rj,
             coefficients=torch.stack([A_shifted, B], dim=-1),
+            coefficients_n=coefficients_n,
             device=self.device,
             dtype=self.dtype,
         )
@@ -230,6 +276,55 @@ class PremTabulatedProfile:
             coefficients = self.gather_layers(layer_index)
         return coefficients[..., 0] + coefficients[..., 1] * x * x
 
+    def evaluate_neutron(
+        self,
+        x: TensorLike,
+        *,
+        layer_index: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Evaluate n_n(x) = A_n + B_n · x² (see ``evaluate``).
+
+        Requires neutron-density coefficients, built via
+        ``PremTabulatedProfile(..., include_neutron=True)`` or supplied
+        directly as ``coefficients_n``.
+
+        Args:
+            x: Coordinate value in trajectory or radial units.
+            layer_index: Optional integer tensor selecting one shell per batch
+                element.  When omitted all shells are evaluated.
+
+        Returns:
+            Neutron density values with the appropriate broadcast shape.
+
+        Raises:
+            ValueError: If neutron-density coefficients were not loaded.
+        """
+        if self.coefficients_n is None:
+            raise ValueError(
+                "This PremTabulatedProfile has no neutron-density "
+                "coefficients. Build it with include_neutron=True (or pass "
+                "coefficients_n explicitly) to enable the 3+1 sterile "
+                "extension's neutral-current matter term."
+            )
+        x = as_tensor(x, device=self.device, dtype=self.dtype)
+        coefficients = self.coefficients_n
+        if layer_index is not None:
+            coefficients = self._gather_layers(self.coefficients_n, layer_index)
+        return coefficients[..., 0] + coefficients[..., 1] * x * x
+
+    def _gather_layers(
+        self, coefficients: torch.Tensor, layer_index: torch.Tensor
+    ) -> torch.Tensor:
+        """Gather per-batch shell coefficient vectors from ``coefficients``."""
+        layer_index = layer_index.to(device=self.device, dtype=torch.long)
+        n_shells = coefficients.shape[-2]
+        layer_index = layer_index.clamp(0, n_shells - 1)
+        if coefficients.ndim == 2:
+            # Unbatched coefficients: direct index into the shell dimension.
+            return coefficients[layer_index]
+        idx = layer_index[..., None, None].expand(*layer_index.shape, 1, 2)
+        return torch.gather(coefficients, dim=-2, index=idx).squeeze(-2)
+
     def gather_layers(self, layer_index: torch.Tensor) -> torch.Tensor:
         """Gather per-batch shell coefficient vectors.
 
@@ -240,14 +335,7 @@ class PremTabulatedProfile:
         Returns:
             Coefficient tensor shaped ``(..., 2)``.
         """
-        layer_index = layer_index.to(device=self.device, dtype=torch.long)
-        n_shells = self.coefficients.shape[-2]
-        layer_index = layer_index.clamp(0, n_shells - 1)
-        if self.coefficients.ndim == 2:
-            # Unbatched coefficients: direct index into the shell dimension.
-            return self.coefficients[layer_index]
-        idx = layer_index[..., None, None].expand(*layer_index.shape, 1, 2)
-        return torch.gather(self.coefficients, dim=-2, index=idx).squeeze(-2)
+        return self._gather_layers(self.coefficients, layer_index)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Leading-batch handling (scalar trajectory)
@@ -269,6 +357,11 @@ class PremTabulatedProfile:
             return PremTabulatedProfile(
                 rj=self.rj,
                 coefficients=self.coefficients.squeeze(0),
+                coefficients_n=(
+                    self.coefficients_n.squeeze(0)
+                    if self.coefficients_n is not None
+                    else None
+                ),
                 device=self.device,
                 dtype=self.dtype,
             )
@@ -293,11 +386,18 @@ class PremTabulatedProfile:
             crossed: Boolean mask for physically crossed shells, same shape.
 
         Returns:
-            ``PerturbativeSegmentBatch`` whose ``model_data`` is the
-            reversed-order ``(A, B)`` coefficient tensor.
+            ``PerturbativeSegmentBatch`` whose ``model_data`` is a
+            ``(coefficients, coefficients_n)`` tuple of reversed-order
+            ``(A, B)`` coefficient tensors (``coefficients_n`` is None
+            unless this profile was built with ``include_neutron=True``).
         """
         xs = torch.flip(xj_all, dims=(-1,))
         coefficients = torch.flip(self.coefficients, dims=(-2,))
+        coefficients_n = (
+            torch.flip(self.coefficients_n, dims=(-2,))
+            if self.coefficients_n is not None
+            else None
+        )
         crossed_flipped = torch.flip(crossed, dims=(-1,))
 
         x_lo = torch.zeros_like(xs)
@@ -308,7 +408,7 @@ class PremTabulatedProfile:
             x1=x_lo,
             x2=xs,
             crossed=crossed_flipped,
-            model_data=coefficients,
+            model_data=(coefficients, coefficients_n),
         )
 
     def outermost_segment(
@@ -328,8 +428,11 @@ class PremTabulatedProfile:
             crossed: Boolean mask for crossed shells, same shape.
 
         Returns:
-            ``PerturbativeOuterSegment`` whose ``model_data`` holds the (A, B)
-            coefficients of the outermost crossed layer.
+            ``PerturbativeOuterSegment`` whose ``model_data`` is a
+            ``(coefficients, coefficients_n)`` tuple holding the (A, B)
+            coefficients of the outermost crossed layer (``coefficients_n``
+            is None unless this profile was built with
+            ``include_neutron=True``).
         """
         batch_size, n_shells = xj_all.shape
         crossed = crossed.to(device=xj_all.device)
@@ -362,8 +465,15 @@ class PremTabulatedProfile:
             x_start,
         )
 
+        last_pos_long = last_pos.to(torch.long)
+        coefficients_n = (
+            self._gather_layers(self.coefficients_n, last_pos_long)
+            if self.coefficients_n is not None
+            else None
+        )
+
         return PerturbativeOuterSegment(
-            model_data=self.gather_layers(last_pos.to(torch.long)),
+            model_data=(self.gather_layers(last_pos_long), coefficients_n),
             x_start=x_start,
             has_any=has_any,
             has_two=has_two,
@@ -391,8 +501,9 @@ class PremTabulatedProfile:
         so it is consistent with the x₁/x₂ coordinates in ``segments``.
 
         Args:
-            segments: ``PerturbativeSegmentBatch`` with ``(A, B)`` in
-                ``model_data``.
+            segments: ``PerturbativeSegmentBatch`` whose ``model_data`` is a
+                ``(coefficients, coefficients_n)`` tuple of ``(A, B)``
+                coefficients (``coefficients_n`` may be None).
             coordinate_ratio: Optional rescaling factor
                 ``profile_scale_m / R_E`` applied to the B coefficient.
                 In the default configuration both scales equal R_E so the
@@ -404,22 +515,29 @@ class PremTabulatedProfile:
         Returns:
             Initialized ``PremProfileSegment``.
         """
-        coefficients = segments.model_data
+        coefficients, coefficients_n = segments.model_data
+
+        def _rescale(coeffs: torch.Tensor) -> torch.Tensor:
+            ratio = as_tensor(coordinate_ratio, device=coeffs.device, dtype=coeffs.dtype)
+            A = coeffs[..., 0]
+            B = coeffs[..., 1] * ratio ** 2
+            return torch.stack([A, B], dim=-1)
+
         if coordinate_ratio is not None:
-            ratio = as_tensor(
-                coordinate_ratio,
-                device=coefficients.device,
-                dtype=coefficients.dtype,
-            )
-            A = coefficients[..., 0]
-            B = coefficients[..., 1] * ratio ** 2
-            coefficients = torch.stack([A, B], dim=-1)
+            coefficients = _rescale(coefficients)
+            if coefficients_n is not None:
+                coefficients_n = _rescale(coefficients_n)
+
+        neutron_kwargs = {}
+        if coefficients_n is not None:
+            neutron_kwargs = dict(a_n=coefficients_n[..., 0], b_n=coefficients_n[..., 1])
 
         return PremProfileSegment(
             x1=segments.x1,
             x2=segments.x2,
             a=coefficients[..., 0],
             b=coefficients[..., 1],
+            **neutron_kwargs,
             **kwargs,
         )
 
@@ -429,6 +547,7 @@ class PremTabulatedProfile:
         x1: TensorLike,
         x2: TensorLike,
         density: TensorLike,
+        density_n: TensorLike | None = None,
         **kwargs,
     ) -> PremProfileSegment:
         """Build a constant-density segment (b = 0, no first-order correction).
@@ -440,16 +559,23 @@ class PremTabulatedProfile:
             x1: Segment start coordinate.
             x2: Segment end coordinate.
             density: Constant electron density in mol cm⁻³.
+            density_n: Optional constant neutron density, enabling the 3+1
+                sterile extension's neutral-current matter term.
             **kwargs: Forwarded to ``PremProfileSegment``.
 
         Returns:
             ``PremProfileSegment`` with B = 0.
         """
         density_t = torch.as_tensor(density)
+        neutron_kwargs = {}
+        if density_n is not None:
+            density_n_t = torch.as_tensor(density_n)
+            neutron_kwargs = dict(a_n=density_n_t, b_n=torch.zeros_like(density_n_t))
         return PremProfileSegment(
             x1=x1,
             x2=x2,
             a=density_t,
             b=torch.zeros_like(density_t),
+            **neutron_kwargs,
             **kwargs,
         )

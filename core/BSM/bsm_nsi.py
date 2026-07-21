@@ -17,7 +17,8 @@
 # =============================================================================
 
 """
-Non-Standard Interaction (NSI) parameter configuration for neutrino propagation.
+Non-Standard Interaction (NSI) parameter configuration, for neutrino
+propagation.
 
 Physics background
 ------------------
@@ -58,40 +59,55 @@ Usage
 -----
 ::
 
-    from tpeanuts.core.BSM.NSIConfig import NSIConfig
+    from tpeanuts.core.BSM.bsm_nsi import NSIConfig
+    from tpeanuts.config.propagation import PropagationConfig
 
-    cfg  = NSIConfig.from_preset("nsi_lma_dark_esteban2018")
-    print(cfg)
+    # Usual path: attach the NSI preset directly to OscillationParameters
+    # (this builds the NSIConfig internally, including its precomputed
+    # epsilon tensor) so every downstream builder --
+    # core.common.hamiltonian.hamiltonian_reduced/hamiltonian_flavour,
+    # core.numerical.evolutor.evolutor_numerical,
+    # core.perturbative.evolutor.evolutor_perturbative_segment -- reads
+    # oscillation.nsi.epsilon automatically; none of them take a separate
+    # epsilon argument.
+    oscillation = PropagationConfig.oscillation_parameters_from_preset(
+        "_SM_NUFIT52_NO", NSI_extension="nsi_lma_dark_esteban2018",
+    )
+    print(oscillation.nsi)
+    eps = oscillation.nsi.epsilon          # torch.Tensor, shape (3, 3), complex
 
-    eps  = cfg.epsilon_tensor()            # torch.Tensor, shape (3, 3), complex
-    H    = hamiltonian_reduced_bsm(..., epsilon=eps)
-
-    # SM limit — equivalent to passing epsilon=None
+    # SM limit — equivalent to oscillation.nsi = None
     cfg0 = NSIConfig.from_preset("sm_no_nsi")
     assert cfg0.is_sm_limit
 
 The preset registry itself (data and bounds/citations per preset) lives in
-``tpeanuts.core.common.presets.NSI_PRESETS`` — see that module for the
+``tpeanuts.config.presets.NSI_PRESETS`` — see that module for the
 available preset names and their physics justification.
 
 Module contents
 ---------------
 NSIConfig
     Frozen dataclass storing all NSI parameters.  Provides
-    ``epsilon_tensor`` to build the complex 3×3 ε matrix, and the
-    ``from_preset`` classmethod for named parameter sets. To list available
-    preset names, call
-    ``tpeanuts.core.common.presets.list_presets(NSI_PRESETS)`` directly.
+    ``epsilon_tensor_base`` to build the complex 3×3 ε matrix on demand, and
+    the ``from_preset`` classmethod for named parameter sets, which
+    additionally precomputes it into the ``epsilon`` field. ``epsilon_tensor``
+    embeds ``self.epsilon`` for a Hamiltonian of arbitrary flavour count
+    (used by ``tpeanuts.core.common.hamiltonian.hamiltonian_matter_reduced``
+    for the 3+1 sterile extension). To list available preset names, call
+    ``tpeanuts.config.presets.list_presets(NSI_PRESETS)`` directly.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import dataclasses
+from dataclasses import dataclass, field
 from typing import Optional
 
 import torch
 
-from tpeanuts.core.common.presets import NSI_PRESETS, get_preset
+from tpeanuts.config.presets import NSI_PRESETS, get_preset
+from tpeanuts.util.context import RuntimeContext
+from tpeanuts.util.type import cdtype_from_real
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +124,8 @@ class NSIConfig:
     * Three **complex off-diagonal** entries decomposed into real and imaginary
       parts: ``eps_emu_re / _im``, ``eps_etau_re / _im``, ``eps_mutau_re / _im``.
 
-    The SM limit is all fields at 0.  Use ``epsilon_tensor()`` to obtain the
-    corresponding complex 3×3 torch tensor.
+    The SM limit is all fields at 0.  Use ``epsilon_tensor_base()`` to obtain
+    the corresponding complex 3×3 torch tensor.
 
     Only the traceless part of ε is observable; ``eps_mumu = 0`` can be set
     without loss of generality for the diagonal sector.
@@ -132,6 +148,13 @@ class NSIConfig:
         Short identifier string (e.g. the preset name).
     description : str
         Human-readable description and literature reference.
+    epsilon : Optional[torch.Tensor]
+        Precomputed complex 3x3 epsilon tensor. ``None`` for a directly
+        constructed ``NSIConfig`` (call ``epsilon_tensor_base()`` explicitly
+        in that case); populated automatically by ``from_preset`` via
+        ``self.epsilon_tensor_base()``. Excluded from equality comparisons
+        since tensor ``==`` does not reduce to a bool. This is the field
+        ``OscillationParameters.nsi.epsilon`` exposes.
     """
 
     # Diagonal entries (real)
@@ -155,41 +178,57 @@ class NSIConfig:
     label:       str = ""
     description: str = ""
 
+    # Precomputed tensor (populated by from_preset; None otherwise)
+    epsilon: Optional[torch.Tensor] = field(default=None, compare=False)
+
     # ------------------------------------------------------------------
     # Preset interface
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_preset(cls, name: str) -> "NSIConfig":
-        """Build an ``NSIConfig`` from a named preset.
+    def from_preset(
+        cls,
+        name: str,
+        *,
+        device: Optional[torch.device] = None,
+        real_dtype: torch.dtype = torch.float64,
+    ) -> "NSIConfig":
+        """Build an ``NSIConfig`` from a named preset, with ``epsilon`` precomputed.
 
         Args:
             name: Preset identifier.  Call
-                ``tpeanuts.core.common.presets.list_presets(NSI_PRESETS)``
+                ``tpeanuts.config.presets.list_presets(NSI_PRESETS)``
                 for all names.
+            device: Target torch device for the precomputed ``epsilon``
+                tensor.  Defaults to CPU (see ``epsilon_tensor``).
+            real_dtype: Real base dtype for ``epsilon``; the complex dtype is
+                inferred (float32 -> complex64, float64 -> complex128).
 
         Returns:
-            Fully initialized ``NSIConfig`` instance.
+            Fully initialized ``NSIConfig`` instance with ``epsilon`` already
+            built by calling ``self.epsilon_tensor_base(device, real_dtype)``.
 
         Raises:
-            ValueError: If ``name`` is not in ``tpeanuts.core.common.presets.NSI_PRESETS``.
+            ValueError: If ``name`` is not in ``tpeanuts.config.presets.NSI_PRESETS``.
         """
-        return cls(**get_preset(NSI_PRESETS, name, kind="NSI preset"))
+        cfg = cls(**get_preset(NSI_PRESETS, name, kind="NSI preset"))
+        epsilon = cfg.epsilon_tensor_base(device=device, real_dtype=real_dtype)
+        return dataclasses.replace(cfg, epsilon=epsilon)
 
     # ------------------------------------------------------------------
     # Tensor builder
     # ------------------------------------------------------------------
 
-    def epsilon_tensor(
+    def epsilon_tensor_base(
         self,
         device: Optional[torch.device] = None,
         real_dtype: torch.dtype = torch.float64,
     ) -> torch.Tensor:
-        """Build the 3×3 Hermitian ε matrix as a complex torch tensor.
+        """Build the base 3x3 Hermitian ε matrix as a complex torch tensor.
 
-        The tensor is constructed once per call (no caching).  Pass the
-        result as the ``epsilon`` argument of ``hamiltonian_reduced_bsm`` or
-        ``hamiltonian_flavour_bsm``.
+        The tensor is constructed once per call (no caching). This is the
+        "base" (3x3, not antineutrino-selected) matrix; ``epsilon_tensor``
+        embeds ``self.epsilon`` for a Hamiltonian of arbitrary flavour count.
 
         Args:
             device: Target torch device.  Defaults to CPU.
@@ -214,6 +253,67 @@ class NSIConfig:
         ]
 
         return torch.tensor(data, dtype=cdtype, device=device)
+
+    def epsilon_tensor(
+        self,
+        *,
+        n_flavours: int,
+        context: Optional[RuntimeContext] = None,
+    ) -> torch.Tensor:
+        """Embed ``self.epsilon`` for a Hamiltonian with *n_flavours* flavours.
+
+        If ``self.epsilon`` is already shaped ``(..., n_flavours, n_flavours)``
+        it is returned as-is (after a device/dtype cast). If *n_flavours* > 3
+        and ``self.epsilon`` is shaped ``(..., 3, 3)``, it is embedded in the
+        top-left corner of an ``(n_flavours, n_flavours)`` zero matrix -- the
+        sterile-sector rows and columns carry no NSI coupling. This is the
+        base (not antineutrino-selected) matrix; callers needing the
+        antineutrino convention must select it themselves on the result
+        (e.g. via ``PMNS.select_antinu``).
+
+        Args:
+            n_flavours: Total number of flavours of the target Hamiltonian.
+            context: Optional runtime device/dtype. When omitted, both are
+                inferred from ``self.epsilon``.
+
+        Returns:
+            Complex tensor shaped ``(..., n_flavours, n_flavours)``.
+
+        Raises:
+            ValueError: If ``self.epsilon`` is ``None``, or if it has an
+                incompatible shape.
+        """
+        eps = self.epsilon
+        if eps is None:
+            raise ValueError(
+                "No epsilon matrix available: use an NSIConfig with epsilon "
+                "already populated (e.g. from_preset)."
+            )
+        if context is not None:
+            device, dtype = context.device, context.dtype
+        else:
+            device = eps.device
+            dtype = eps.real.dtype if eps.is_complex() else eps.dtype
+        cdtype = cdtype_from_real(dtype)
+        eps = eps.to(device=device, dtype=cdtype)
+
+        if eps.shape[-2:] == (n_flavours, n_flavours):
+            return eps
+
+        if n_flavours > 3 and eps.shape[-2:] == (3, 3):
+            out = torch.zeros(
+                (*eps.shape[:-2], n_flavours, n_flavours),
+                device=device,
+                dtype=cdtype,
+            )
+            out[..., :3, :3] = eps
+            return out
+
+        raise ValueError(
+            "epsilon must have final dimensions "
+            f"({n_flavours}, {n_flavours}) or active block (3, 3); "
+            f"got {tuple(eps.shape[-2:])}."
+        )
 
     # ------------------------------------------------------------------
     # Convenience queries

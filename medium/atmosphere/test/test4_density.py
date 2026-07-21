@@ -50,6 +50,30 @@ def test_density_exponential_mass_and_electron_conversion():
     torch.testing.assert_close(ne, Ye * rho * GCM3_TO_NUCLEON_MOLCM3, rtol=1.0e-14, atol=1.0e-18)
 
 
+def test_density_neutron_conversion_uses_complementary_fraction():
+    context = make_context()
+    h = torch.tensor([0.0, 10.0], device=DEVICE, dtype=DTYPE)
+    Ye = torch.tensor(0.494, device=DEVICE, dtype=DTYPE)
+
+    rho = atmosphere_density(h, source="exponential", density_type="mass_density", Ye=Ye, rho0_gcm3=1.2e-3, scale_height_km=7.5, context=context)
+    ne = atmosphere_density(h, source="exponential", density_type="electron_density", Ye=Ye, rho0_gcm3=1.2e-3, scale_height_km=7.5, context=context)
+    nn = atmosphere_density(h, source="exponential", density_type="neutron_density", Ye=Ye, rho0_gcm3=1.2e-3, scale_height_km=7.5, context=context)
+
+    torch.testing.assert_close(nn, (1.0 - Ye) * rho * GCM3_TO_NUCLEON_MOLCM3, rtol=1.0e-14, atol=1.0e-18)
+    torch.testing.assert_close(ne + nn, rho * GCM3_TO_NUCLEON_MOLCM3, rtol=1.0e-14, atol=1.0e-18)
+
+
+def test_density_neutron_conversion_uses_nusquids_electron_fraction():
+    context = make_context()
+    h = torch.tensor([0.0, 7.594], device=DEVICE, dtype=DTYPE)
+    config = NuSQuIDSConfig(nusquids_rho0_gcm3=1.2e-3, nusquids_scale_height_km=7.594, nusquids_Ye=0.494)
+
+    rho = atmosphere_density(h, source="nusquids", density_type="mass_density", nusquids_config=config, context=context)
+    nn = atmosphere_density(h, source="nusquids", density_type="neutron_density", nusquids_config=config, context=context)
+
+    torch.testing.assert_close(nn, (1.0 - 0.494) * rho * GCM3_TO_NUCLEON_MOLCM3, rtol=1.0e-14, atol=1.0e-18)
+
+
 def test_file_density_interpolation_and_endpoint_clamping(tmp_path):
     context = make_context()
     density_file = tmp_path / "density_profile.txt"

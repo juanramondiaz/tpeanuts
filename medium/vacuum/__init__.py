@@ -34,8 +34,8 @@ Submodules:
         final flavour probabilities, for both coherent (flavour-basis) and
         incoherent (mass-basis) initial states.
     medium.vacuum.flux
-        Combines ``probability.pvacuum`` with flux normalization and
-        optional spectral weighting.
+        Combines ``probability.vacuum_probability_state`` with flux
+        normalization, optional spectral weighting, and energy integration.
     medium.vacuum.validation
         Helpers comparing this package's output against the legacy
         NumPy-based peanuts vacuum implementation.
@@ -48,21 +48,24 @@ from tpeanuts.medium.vacuum.evolutor import (
     vacuum_evolutor,
 )
 from tpeanuts.medium.vacuum.probability import (
-    pvacuum,
-    vacuum_probability,
+    vacuum_probability_integrated,
+    vacuum_probability_state,
+    vacuum_probability_transition,
 )
-from tpeanuts.medium.vacuum.flux import vacuum_flux
+from tpeanuts.medium.vacuum.flux import vacuum_flux_integrated, vacuum_flux_state
 from tpeanuts.medium.vacuum.validation import (
-    compare_pvacuum_with_legacy,
+    compare_vacuum_probability_state_with_legacy,
     compare_vacuum_evolved_state_with_legacy,
 )
 
 __all__ = [
-    "pvacuum",
-    "vacuum_flux",
+    "vacuum_probability_state",
+    "vacuum_probability_integrated",
+    "vacuum_flux_state",
+    "vacuum_flux_integrated",
     "vacuum_evolved_state",
     "vacuum_evolutor",
-    "vacuum_probability",
-    "compare_pvacuum_with_legacy",
+    "vacuum_probability_transition",
+    "compare_vacuum_probability_state_with_legacy",
     "compare_vacuum_evolved_state_with_legacy",
 ]

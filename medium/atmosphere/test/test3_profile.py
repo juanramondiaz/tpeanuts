@@ -119,6 +119,38 @@ def test_atmosphere_profile_broadcasts_angle_and_height_inputs():
     assert profile.n_e_molcm3.shape == (2, 10)
 
 
+def test_atmosphere_profile_neutron_density_defaults_to_none():
+    context = make_context()
+    params = make_params(nsteps=10)
+
+    profile = AtmosphereProfile(20.0, 30.0, 2.0, params=params, context=context)
+
+    assert profile.include_matter_nc is False
+    assert profile.n_n_molcm3 is None
+
+
+def test_atmosphere_profile_neutron_density_matches_complementary_fraction():
+    context = make_context()
+    params = make_params(nsteps=16, include_matter_nc=True, atmosphere_density_kwargs={"rho0_gcm3": 1.2e-3, "scale_height_km": 7.5, "Ye": 0.494})
+
+    profile = AtmosphereProfile(20.0, 30.0, 2.0, params=params, context=context)
+
+    assert profile.n_n_molcm3 is not None
+    assert profile.n_n_molcm3.shape == profile.n_e_molcm3.shape
+    total = profile.n_e_molcm3 / 0.494
+    torch.testing.assert_close(profile.n_n_molcm3, total * (1.0 - 0.494), rtol=1.0e-12, atol=1.0e-16)
+
+
+def test_atmosphere_profile_neutron_density_zero_when_matter_false():
+    context = make_context()
+    params = make_params(matter=False, include_matter_nc=True)
+
+    profile = AtmosphereProfile(20.0, 30.0, 2.0, params=params, context=context)
+
+    assert profile.n_n_molcm3 is not None
+    torch.testing.assert_close(profile.n_n_molcm3, torch.zeros_like(profile.n_n_molcm3), rtol=0.0, atol=0.0)
+
+
 def test_atmosphere_profile_rejects_invalid_nsteps_and_scale():
     context = make_context()
 

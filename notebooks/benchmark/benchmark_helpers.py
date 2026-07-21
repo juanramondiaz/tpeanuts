@@ -14,26 +14,242 @@ from __future__ import annotations
 
 import gc
 import math
+import os
+import threading
 import time
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import psutil
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.core.common.probability import probability_transition
-from tpeanuts.medium.earth.evolutor import earth_evolutor
+from tpeanuts.config.propagation import PropagationConfig
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
-from tpeanuts.medium.earth.probability import pearth
+from tpeanuts.medium.earth.probability import earth_probability_state
 from tpeanuts.medium.solar.profile import SolarParameters, SolarProfile
 from tpeanuts.notebooks.notebooks_helper import FLAVOUR_NAMES, save_and_show, to_numpy
 from tpeanuts.util.context import RuntimeContext
 
 
 BENCHMARK_BACKEND = "legacy"
+
+
+def synchronize_device(device: torch.device | str) -> None:
+    """Synchronize pending work when *device* is a CUDA device."""
+    device = torch.device(device)
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def release_benchmark_memory(
+    device: torch.device | str,
+    *,
+    empty_cuda_cache: bool = True,
+) -> None:
+    """Collect Python garbage and optionally release unused CUDA cache blocks."""
+    gc.collect()
+    device = torch.device(device)
+    if empty_cuda_cache and device.type == "cuda":
+        torch.cuda.empty_cache()
+
+
+def process_ram_gb(process: psutil.Process | None = None) -> float:
+    """Return resident memory used by the current process in GiB."""
+    process = psutil.Process(os.getpid()) if process is None else process
+    return process.memory_info().rss / 1024**3
+
+
+def check_ram_budget(
+    max_ram_gb: float,
+    *,
+    process: psutil.Process | None = None,
+) -> None:
+    """Raise ``MemoryError`` when process RSS exceeds *max_ram_gb*."""
+    used_gb = process_ram_gb(process)
+    if used_gb > max_ram_gb:
+        raise MemoryError(
+            f"Process RAM {used_gb:.2f} GiB exceeds "
+            f"max_ram_gb={max_ram_gb:.2f} GiB"
+        )
+
+
+def iter_grid_chunks(
+    energy: torch.Tensor,
+    angles: torch.Tensor,
+    *,
+    energy_chunk_size: int,
+    angle_chunk_size: int,
+    max_ram_gb: float | None = None,
+    process: psutil.Process | None = None,
+) -> Iterator[tuple[torch.Tensor, torch.Tensor]]:
+    """Yield Cartesian energy-angle chunks while enforcing an RSS budget."""
+    if energy_chunk_size <= 0 or angle_chunk_size <= 0:
+        raise ValueError("Chunk sizes must be positive integers.")
+    for energy_start in range(0, energy.numel(), energy_chunk_size):
+        for angle_start in range(0, angles.numel(), angle_chunk_size):
+            if max_ram_gb is not None:
+                check_ram_budget(max_ram_gb, process=process)
+            yield (
+                energy[energy_start : energy_start + energy_chunk_size],
+                angles[angle_start : angle_start + angle_chunk_size],
+            )
+
+
+def reduce_tensor_chunks(
+    chunks: Iterable[torch.Tensor],
+    *,
+    device: torch.device | str,
+    dtype: torch.dtype,
+    max_ram_gb: float | None = None,
+    process: psutil.Process | None = None,
+) -> torch.Tensor:
+    """Materialize tensor chunks and return a scalar checksum without retaining them."""
+    checksum = torch.zeros((), device=device, dtype=dtype)
+    for value in chunks:
+        checksum = checksum + value.real.sum()
+        del value
+        if max_ram_gb is not None:
+            check_ram_budget(max_ram_gb, process=process)
+    return checksum
+
+
+def _sample_resources(
+    stop: threading.Event,
+    peaks: dict[str, float],
+    *,
+    process: psutil.Process,
+    device: torch.device,
+    interval_s: float,
+    cpu_normalization_cores: int,
+) -> None:
+    process.cpu_percent(None)
+    while not stop.wait(interval_s):
+        peaks["ram_gb"] = max(peaks["ram_gb"], process_ram_gb(process))
+        normalized_cpu = process.cpu_percent(None) / cpu_normalization_cores
+        peaks["cpu_percent"] = max(
+            peaks["cpu_percent"], min(100.0, normalized_cpu)
+        )
+        if device.type == "cuda":
+            try:
+                peaks["gpu_percent"] = max(
+                    peaks["gpu_percent"], float(torch.cuda.utilization(device))
+                )
+            except (ModuleNotFoundError, RuntimeError):
+                pass
+
+
+def measure_resources(
+    func: Callable[[], torch.Tensor],
+    *,
+    device: torch.device | str,
+    max_ram_gb: float,
+    sample_interval_s: float = 0.02,
+    empty_cuda_cache: bool = True,
+    cpu_normalization_cores: int | None = None,
+    process: psutil.Process | None = None,
+) -> tuple[float, dict[str, float]]:
+    """Time a tensor callable and return elapsed seconds and peak resources.
+
+    CPU use is normalized by ``cpu_normalization_cores`` and therefore lies
+    between 0 and 100 percent. By default the denominator is the machine's
+    logical CPU count; pass a benchmark thread budget to measure utilization
+    relative to that explicitly configured capacity.
+    """
+    device = torch.device(device)
+    process = psutil.Process(os.getpid()) if process is None else process
+    cpu_normalization_cores = (
+        psutil.cpu_count(logical=True)
+        if cpu_normalization_cores is None
+        else int(cpu_normalization_cores)
+    )
+    if cpu_normalization_cores <= 0:
+        raise ValueError("cpu_normalization_cores must be a positive integer.")
+    release_benchmark_memory(device, empty_cuda_cache=empty_cuda_cache)
+    check_ram_budget(max_ram_gb, process=process)
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
+    peaks = {
+        "ram_gb": process_ram_gb(process),
+        "cpu_percent": 0.0,
+        "gpu_percent": 0.0,
+    }
+    stop = threading.Event()
+    sampler = threading.Thread(
+        target=_sample_resources,
+        kwargs={
+            "stop": stop,
+            "peaks": peaks,
+            "process": process,
+            "device": device,
+            "interval_s": sample_interval_s,
+            "cpu_normalization_cores": cpu_normalization_cores,
+        },
+        daemon=True,
+    )
+    sampler.start()
+    synchronize_device(device)
+    start = time.perf_counter()
+    try:
+        result = func()
+        synchronize_device(device)
+        elapsed = time.perf_counter() - start
+    finally:
+        stop.set()
+        sampler.join()
+    peaks["ram_gb"] = max(peaks["ram_gb"], process_ram_gb(process))
+    peaks["vram_allocated_gb"] = (
+        torch.cuda.max_memory_allocated(device) / 1024**3 if device.type == "cuda" else 0.0
+    )
+    peaks["vram_reserved_gb"] = (
+        torch.cuda.max_memory_reserved(device) / 1024**3 if device.type == "cuda" else 0.0
+    )
+    if not torch.isfinite(result).all():
+        raise ValueError("Benchmark callable returned a non-finite tensor.")
+    return elapsed, peaks
+
+
+def timed_resources(
+    func: Callable[[], torch.Tensor],
+    *,
+    device: torch.device | str,
+    repeats: int,
+    warmups: int,
+    max_ram_gb: float,
+    sample_interval_s: float = 0.02,
+    empty_cuda_cache: bool = True,
+    cpu_normalization_cores: int | None = None,
+) -> tuple[np.ndarray, dict[str, float]]:
+    """Run warmups and repeated resource-monitored timings of a tensor callable."""
+    if repeats <= 0 or warmups < 0:
+        raise ValueError("repeats must be positive and warmups cannot be negative.")
+    for _ in range(warmups):
+        func()
+        synchronize_device(device)
+    measurements = [
+        measure_resources(
+            func,
+            device=device,
+            max_ram_gb=max_ram_gb,
+            sample_interval_s=sample_interval_s,
+            empty_cuda_cache=empty_cuda_cache,
+            cpu_normalization_cores=cpu_normalization_cores,
+        )
+        for _ in range(repeats)
+    ]
+    samples = np.asarray([measurement[0] for measurement in measurements])
+    resources = {
+        key: max(measurement[1][key] for measurement in measurements)
+        for key in measurements[0][1]
+    }
+    return samples, resources
 
 
 def configure_benchmark_helpers(namespace: dict[str, Any], *, backend: str | None = None) -> None:
@@ -263,6 +479,59 @@ def plot_speedup_cross_sections(df, title, filename):
     save_and_show(filename, fig, output_dir=OUTPUT_DIR, show_plots=SHOW_PLOTS)
 
 
+def plot_grid_resource_scaling(
+    frame: pd.DataFrame,
+    *,
+    title: str,
+    filename: str,
+    output_dir,
+    show_plots: bool,
+    methods: tuple[str, ...] = ("perturbative", "numerical"),
+) -> None:
+    """Plot peak resources against energy and angular grid sizes.
+
+    The upper row shows the maximum over all angular grids at each energy-grid
+    size. The lower row shows the maximum over all energy grids at each
+    angular-grid size. Columns contain process RAM, allocated VRAM, normalized
+    CPU utilization and GPU utilization, respectively.
+    """
+    metrics = (
+        ("ram_gb", "Peak RAM [GiB]"),
+        ("vram_allocated_gb", "Peak allocated VRAM [GiB]"),
+        ("cpu_percent", "Peak CPU [%]"),
+        ("gpu_percent", "Peak GPU [%]"),
+    )
+    fig, axes = plt.subplots(2, 4, figsize=(20, 9), sharex=False)
+    for row, (grid_column, xlabel) in enumerate(
+        (("n_energy", "Energy-grid size"), ("n_angle", "Angular-grid size"))
+    ):
+        for column, (metric, ylabel) in enumerate(metrics):
+            ax = axes[row, column]
+            for method in methods:
+                values = (
+                    frame.groupby(grid_column, as_index=False)[f"{method}_{metric}"]
+                    .max()
+                    .sort_values(grid_column)
+                )
+                ax.plot(
+                    values[grid_column],
+                    values[f"{method}_{metric}"],
+                    "o-",
+                    label=method.capitalize(),
+                )
+            ax.set_xscale("log", base=2)
+            ax.set_xticks(sorted(frame[grid_column].unique()))
+            ax.set_xticklabels([str(value) for value in sorted(frame[grid_column].unique())])
+            ax.set(xlabel=xlabel, ylabel=ylabel, title=ylabel)
+            if metric.endswith("percent"):
+                ax.set_ylim(0.0, 105.0)
+            ax.grid(alpha=0.25)
+            ax.legend(fontsize=8)
+    fig.suptitle(f"{title} — peak resource scaling")
+    fig.tight_layout()
+    save_and_show(filename, fig, output_dir=output_dir, show_plots=show_plots)
+
+
 _CONTEXT_CACHE: dict = {}
 _OSCILLATION_CACHE: dict = {}
 _EARTH_PROFILE_CACHE: dict = {}
@@ -285,15 +554,16 @@ def _oscillation_for(device):
     if device == DEVICE:
         return oscillation
     if device not in _OSCILLATION_CACHE:
-        _OSCILLATION_CACHE[device] = OscillationParameters.build(
-            theta12=THETA12,
-            theta13=THETA13,
-            theta23=THETA23,
-            delta=DELTA_CP,
-            DeltamSq21=DM21_EV2,
-            DeltamSq3l=DM3L_EV2,
-            antinu=False,
-            context=_context_for(device),
+        _ctx = _context_for(device)
+        _pmns = PMNS_SM(PMNSParams(
+            theta12=THETA12, theta13=THETA13, theta23=THETA23, delta=DELTA_CP, context=_ctx,
+        ))
+        _mass_spectrum = MassSpectrum_SM(
+            DeltamSq21=torch.as_tensor(DM21_EV2, device=_ctx.device, dtype=_ctx.dtype),
+            DeltamSq3l=torch.as_tensor(DM3L_EV2, device=_ctx.device, dtype=_ctx.dtype),
+        )
+        _OSCILLATION_CACHE[device] = OscillationParameters(
+            pmns=_pmns, mass_spectrum=_mass_spectrum, antinu=False,
         )
     return _OSCILLATION_CACHE[device]
 
@@ -326,7 +596,7 @@ def torch_pearth_probability(state, E_MeV, eta, depth_m, *, massbasis=True, devi
     """tpeanuts Earth probability helper shared by benchmark notebooks."""
     dev = device if device is not None else DEVICE
     if BENCHMARK_BACKEND == "nusquids":
-        return pearth_analytical(state, earth_profile_t, oscillation, E_MeV, eta, depth_m, massbasis=massbasis)
+        return earth_probability_state_analytical(state, earth_profile_t, oscillation, E_MeV, eta, depth_m, massbasis=massbasis)
 
     ctx = _context_for(dev)
     E_t = torch.as_tensor(E_MeV, device=dev, dtype=DTYPE)
@@ -335,12 +605,12 @@ def torch_pearth_probability(state, E_MeV, eta, depth_m, *, massbasis=True, devi
     osc_dev = _oscillation_for(dev)
     profile_dev = _earth_profile_for(dev)
     if EARTH_METHOD == "analytical":
-        return pearth(state_t, profile_dev, osc_dev, E_t, eta_t, depth_m, method="analytical", massbasis=massbasis, context=ctx)
+        return earth_probability_state(state_t, profile_dev, osc_dev, E_t, eta_t, depth_m, method="analytical", massbasis=massbasis, context=ctx)
     if EARTH_METHOD == "numerical":
         E_b, eta_b = torch.broadcast_tensors(E_t, eta_t)
         return torch.stack(
             [
-                pearth(
+                earth_probability_state(
                     state_t,
                     profile_dev,
                     osc_dev,
@@ -570,16 +840,16 @@ def _tpeanuts_earth_flux(E_1d, eta_1d, flux, *, device=None):
     E_t = torch.as_tensor(E_1d, device=dev, dtype=DTYPE)
     eta_t = torch.as_tensor(eta_1d, device=dev, dtype=DTYPE)
 
-    U_earth = earth_evolutor(
+    return earth_probability_state(
+        nustate=flux,
         profile_earth=profile_dev,
         oscillation=osc_dev,
-        E=E_t,
-        eta=eta_t,
+        E_MeV=E_t[:, None],
+        eta=eta_t[None, :],
         depth_m=EARTH_DEPTH_M,
+        method="analytical",
+        massbasis=True,
     )
-    U = osc_dev.pmns.pmns_matrix(antinu=osc_dev.antinu).to(device=U_earth.device, dtype=U_earth.dtype)
-    probabilities = probability_transition(U_earth @ U)
-    return torch.einsum("enba,ea->enb", probabilities, flux)
 
 
 def _legacy_earth_flux(E_np, eta_np, flux_np):
@@ -621,7 +891,7 @@ def _nusquids_earth_flux(E_1d, eta_1d, flux_np):
 
 
 def _tpeanuts_pearth_analytical(E_1d, eta_1d):
-    return pearth(
+    return earth_probability_state(
         MASS_WEIGHTS,
         earth_profile_t,
         oscillation,
@@ -638,7 +908,7 @@ def _tpeanuts_pearth_numerical(E_1d, eta_1d):
     E_b, eta_b = torch.broadcast_tensors(E_1d[:, None], eta_1d[None, :])
     return torch.stack(
         [
-            pearth(
+            earth_probability_state(
                 MASS_WEIGHTS,
                 earth_profile_t,
                 oscillation,
@@ -679,7 +949,7 @@ def nusquids_earth_matrix(state_np, E_1d, eta_1d, *, use_transition_matrix=False
 def tpeanuts_atm_probability(E_MeV, cos_zenith, *, initial_flavour="numu"):
     theta_deg = math.degrees(math.acos(float(np.clip(cos_zenith, -1.0, 1.0))))
     theta_t = torch.tensor(theta_deg, dtype=DTYPE, device=DEVICE)
-    P_mat = atmosphere_probability(
+    P_mat = atmosphere_probability_transition(
         oscillation,
         E_MeV,
         ATM_H_PROD_KM,
@@ -713,7 +983,7 @@ def nusquids_atm_matrix(E_1d, cosz_1d, *, initial_flavour="numu"):
 
 def _tpeanuts_solar_detector_device(E_1d, eta_1d, device):
     dev_ctx = RuntimeContext.resolve(device, DTYPE)
-    osc_dev = OscillationParameters.from_preset("_SM_NUFIT52_NO", antinu=False, context=dev_ctx)
+    osc_dev = PropagationConfig.oscillation_parameters_from_preset("_SM_NUFIT52_NO", antinu=False, context=dev_ctx)
     prof_dev = SolarProfile.default(context=dev_ctx)
     earth_dev = EarthProfile(
         params=EarthParameters(
@@ -725,7 +995,7 @@ def _tpeanuts_solar_detector_device(E_1d, eta_1d, device):
         context=dev_ctx,
     )
     mass = solar_probability_mass(osc_dev, E_1d, prof_dev, SOLAR_SOURCE)
-    return pearth_analytical(mass, earth_dev, osc_dev, E_1d[:, None], eta_1d[None, :], SOLAR_DETECTOR_DEPTH_M, massbasis=True)
+    return earth_probability_state_analytical(mass, earth_dev, osc_dev, E_1d[:, None], eta_1d[None, :], SOLAR_DETECTOR_DEPTH_M, massbasis=True)
 
 
 def get_largest_timing_row(df: pd.DataFrame, largest_ne: int, largest_neta: int):
@@ -738,6 +1008,14 @@ def get_largest_timing_row(df: pd.DataFrame, largest_ne: int, largest_neta: int)
 
 __all__ = [
     "configure_benchmark_helpers",
+    "synchronize_device",
+    "release_benchmark_memory",
+    "process_ram_gb",
+    "check_ram_budget",
+    "iter_grid_chunks",
+    "reduce_tensor_chunks",
+    "measure_resources",
+    "timed_resources",
     "energy_grid",
     "nadir_grid",
     "cos_zenith_from_nadir",
@@ -749,6 +1027,7 @@ __all__ = [
     "plot_energy_scaling",
     "plot_heatmap",
     "plot_speedup_cross_sections",
+    "plot_grid_resource_scaling",
     "torch_pearth_probability",
     "legacy_vacuum_matrix",
     "nusquids_vacuum_matrix",

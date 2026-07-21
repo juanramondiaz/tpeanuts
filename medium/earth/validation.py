@@ -39,9 +39,9 @@ Module functions:
         Build a legacy peanuts.earth.earthdensity object.
     build_validation_profiles(...)
         Build matching new and legacy Earth profile objects.
-    compare_pearth_with_legacy(...)
+    compare_earth_probability_state_with_legacy(...)
         Compare pointwise Earth probabilities against peanuts.earth.Pearth.
-    compare_pearth_integrated_with_legacy(...)
+    compare_earth_probability_exposure_with_legacy(...)
         Compare exposure-integrated Earth probabilities against
         peanuts.earth.Pearth_integrated.
 """
@@ -51,18 +51,19 @@ Module functions:
 from __future__ import annotations
 
 import importlib
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.core.numerical.geometry import OdeMethod
-from tpeanuts.medium.earth.exposure_integration import pearth_integrated
+from tpeanuts.medium.earth.exposure_integration import earth_probability_exposure
 from tpeanuts.medium.earth.exposure_table import ExposureParameters
-from tpeanuts.medium.earth.probability import PearthMethod, pearth
+from tpeanuts.medium.earth.probability import PearthMethod, earth_probability_state
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike
@@ -79,6 +80,7 @@ def ensure_legacy_importable() -> Path:
     return package_dir / "peanuts"
 
 
+@lru_cache(maxsize=1)
 def legacy_modules():
     """Import the legacy PMNS and Earth modules.
 
@@ -161,6 +163,176 @@ def legacy_earth_density(
     )
 
 
+def legacy_nadir_exposure(
+    eta: Optional[TensorLike],
+    *,
+    exposure: ExposureParameters,
+    normalized: bool,
+) -> tuple[np.ndarray, np.ndarray, dict[str, Any], float]:
+    """Build the nadir grid and weights used by the legacy backend."""
+    if eta is not None:
+        eta_array = np.asarray(torch.as_tensor(eta).detach().cpu(), dtype=np.float64).reshape(-1)
+        weights = np.ones_like(eta_array)
+        norm = np.trapz(weights, x=eta_array)
+        weights = weights / max(float(norm), np.finfo(np.float64).tiny)
+        return eta_array, weights, {"source": "user_eta_uniform", "normalized": True}, float(np.pi / max(eta_array.size, 1))
+
+    if exposure.detector_latitude_rad is None and exposure.exposure_csv_path is None:
+        raise ValueError(
+            "detector_latitude_rad is required when eta and exposure_csv_path are omitted."
+        )
+    from peanuts.time_average import NadirExposure
+
+    table = NadirExposure(
+        lam=-1 if exposure.detector_latitude_rad is None else float(exposure.detector_latitude_rad),
+        d1=exposure.exposure_d1,
+        d2=exposure.exposure_d2,
+        ns=exposure.exposure_ns,
+        normalized=normalized,
+        from_file=exposure.exposure_csv_path,
+        angle=exposure.exposure_angle,
+        daynight=exposure.exposure_daynight,
+    )
+    eta_array = np.asarray(table[:, 0], dtype=np.float64)
+    weights = np.asarray(table[:, 1], dtype=np.float64)
+    return eta_array, weights, {
+        "source": "legacy_NadirExposure",
+        "normalized": bool(normalized),
+        "d1": exposure.exposure_d1,
+        "d2": exposure.exposure_d2,
+        "ns": exposure.exposure_ns,
+        "daynight": exposure.exposure_daynight,
+        "detector_latitude_rad": exposure.detector_latitude_rad,
+        "from_file": exposure.exposure_csv_path,
+        "angle": exposure.exposure_angle,
+    }, float(np.pi / exposure.exposure_ns)
+
+
+def legacy_earth_probabilities(
+    incident_state: TensorLike,
+    oscillation: OscillationParameters,
+    E_MeV: TensorLike,
+    eta: TensorLike,
+    depth_m: float,
+    *,
+    density: object,
+    massbasis: bool,
+    method: PearthMethod = "analytical",
+) -> np.ndarray:
+    """Evaluate legacy Pearth over energy and nadir grids."""
+    _, legacy_earth = legacy_modules()
+    pmns = legacy_pmns_from_torch(oscillation.pmns)
+    energy = np.asarray(torch.as_tensor(E_MeV).detach().cpu(), dtype=np.float64).reshape(-1)
+    eta_array = np.asarray(torch.as_tensor(eta).detach().cpu(), dtype=np.float64).reshape(-1)
+    states = np.asarray(torch.as_tensor(incident_state).detach().cpu())
+    if states.ndim == 1:
+        states = np.broadcast_to(states, (energy.size, states.shape[0]))
+    if states.shape != (energy.size, 3):
+        raise ValueError("incident_state must have shape (3,) or (n_energy, 3).")
+    out = np.empty((energy.size, eta_array.size, 3), dtype=np.float64)
+    for i_energy, energy_value in enumerate(energy):
+        for i_eta, eta_value in enumerate(eta_array):
+            out[i_energy, i_eta] = np.asarray(
+                legacy_earth.Pearth(
+                    states[i_energy],
+                    density,
+                    pmns,
+                    float(oscillation.mass_spectrum.DeltamSq21),
+                    float(oscillation.mass_spectrum.DeltamSq3l),
+                    float(energy_value),
+                    float(eta_value),
+                    float(depth_m),
+                    mode=str(method),
+                    massbasis=bool(massbasis),
+                    full_oscillation=False,
+                    antinu=bool(oscillation.antinu),
+                ),
+                dtype=np.float64,
+            )
+    return out
+
+
+def legacy_integrate_probabilities(
+    probabilities_eta: np.ndarray,
+    eta: np.ndarray,
+    exposure: np.ndarray,
+    *,
+    method: str = "legacy_rectangle",
+    deta: Optional[float] = None,
+) -> np.ndarray:
+    """Integrate legacy angular probabilities with an explicit historical rule."""
+    if method == "legacy_rectangle":
+        if deta is None:
+            raise ValueError("deta is required for legacy_rectangle integration.")
+        return np.sum(probabilities_eta * exposure[None, :, None], axis=-2) * float(deta)
+    if method == "trapezoid":
+        return np.trapz(
+            probabilities_eta * exposure[None, :, None],
+            x=eta,
+            axis=-2,
+        )
+    raise ValueError("method must be 'legacy_rectangle' or 'trapezoid'.")
+
+
+def legacy_earth_probabilities_integrated(
+    incident_state: TensorLike,
+    oscillation: OscillationParameters,
+    E_MeV: TensorLike,
+    depth_m: float,
+    *,
+    density: object,
+    exposure: ExposureParameters,
+    normalized: bool,
+    method: PearthMethod = "analytical",
+) -> np.ndarray:
+    """Evaluate the original Peanuts exposure-integrated Earth routine."""
+    if exposure.detector_latitude_rad is None and exposure.exposure_csv_path is None:
+        raise ValueError(
+            "detector_latitude_rad is required when exposure_csv_path is omitted."
+        )
+    _, legacy_earth = legacy_modules()
+    pmns = legacy_pmns_from_torch(oscillation.pmns)
+    energy = np.asarray(torch.as_tensor(E_MeV).detach().cpu(), dtype=np.float64).reshape(-1)
+    states = np.asarray(torch.as_tensor(incident_state).detach().cpu())
+    if states.ndim == 1:
+        states = np.broadcast_to(states, (energy.size, states.shape[0]))
+    if states.shape != (energy.size, 3):
+        raise ValueError("incident_state must have shape (3,) or (n_energy, 3).")
+    return np.stack(
+        [
+            np.asarray(
+                legacy_earth.Pearth_integrated(
+                    states[index],
+                    density,
+                    pmns,
+                    float(oscillation.mass_spectrum.DeltamSq21),
+                    float(oscillation.mass_spectrum.DeltamSq3l),
+                    float(value),
+                    float(depth_m),
+                    mode=str(method),
+                    full_oscillation=False,
+                    antinu=bool(oscillation.antinu),
+                    lam=(
+                        -1.0
+                        if exposure.detector_latitude_rad is None
+                        else float(exposure.detector_latitude_rad)
+                    ),
+                    d1=float(exposure.exposure_d1),
+                    d2=float(exposure.exposure_d2),
+                    ns=int(exposure.exposure_ns),
+                    normalized=bool(normalized),
+                    from_file=exposure.exposure_csv_path,
+                    angle=exposure.exposure_angle,
+                    daynight=exposure.exposure_daynight,
+                ),
+                dtype=np.float64,
+            )
+            for index, value in enumerate(energy)
+        ],
+        axis=0,
+    )
+
+
 def build_validation_profiles(
     *,
     profile_earth: Optional[EarthProfile] = None,
@@ -228,7 +400,7 @@ def _diff_summary(torch_value: np.ndarray, legacy_value: np.ndarray) -> dict[str
     }
 
 
-def compare_pearth_with_legacy(
+def compare_earth_probability_state_with_legacy(
     nustate: TensorLike,
     oscillation: OscillationParameters,
     E_MeV: float,
@@ -244,7 +416,7 @@ def compare_pearth_with_legacy(
     ode_method: OdeMethod | None = default.earth_numerical_method,
     context: RuntimeContext = RuntimeContext.resolve(default.earth_device, default.dtype),
 ) -> dict[str, Any]:
-    """Compare ``pearth`` with legacy ``peanuts.earth.Pearth``.
+    """Compare ``earth_probability_state`` with legacy ``peanuts.earth.Pearth``.
 
     Args:
         nustate: Initial state. Interpreted as mass weights when
@@ -276,7 +448,7 @@ def compare_pearth_with_legacy(
     _, legacy_earth = legacy_modules()
     legacy_pmns = legacy_pmns_from_torch(oscillation.pmns)
 
-    torch_p = pearth(
+    torch_p = earth_probability_state(
         _numpy_state(nustate, complex_state=not massbasis),
         profile_earth,
         oscillation,
@@ -296,8 +468,8 @@ def compare_pearth_with_legacy(
         _numpy_state(nustate, complex_state=not massbasis),
         legacy_density,
         legacy_pmns,
-        float(oscillation.DeltamSq21),
-        float(oscillation.DeltamSq3l),
+        float(oscillation.mass_spectrum.DeltamSq21),
+        float(oscillation.mass_spectrum.DeltamSq3l),
         float(E_MeV),
         float(eta),
         float(depth_m),
@@ -313,7 +485,7 @@ def compare_pearth_with_legacy(
     )
 
 
-def compare_pearth_integrated_with_legacy(
+def compare_earth_probability_exposure_with_legacy(
     nustate: TensorLike,
     oscillation: OscillationParameters,
     E_MeV: float,
@@ -330,7 +502,7 @@ def compare_pearth_integrated_with_legacy(
     ode_method: OdeMethod | None = default.earth_numerical_method,
     context: RuntimeContext = RuntimeContext.resolve(default.earth_device, default.dtype),
 ) -> dict[str, Any]:
-    """Compare exposure-integrated ``pearth_integrated`` with legacy peanuts.
+    """Compare exposure-integrated ``earth_probability_exposure`` with legacy peanuts.
 
     Args:
         nustate: Initial mass-basis weights. The legacy integrated function
@@ -365,7 +537,7 @@ def compare_pearth_integrated_with_legacy(
     _, legacy_earth = legacy_modules()
     legacy_pmns = legacy_pmns_from_torch(oscillation.pmns)
 
-    torch_p = pearth_integrated(
+    torch_p = earth_probability_exposure(
         _numpy_state(nustate, complex_state=False),
         profile_earth,
         oscillation,
@@ -386,8 +558,8 @@ def compare_pearth_integrated_with_legacy(
         _numpy_state(nustate, complex_state=False),
         legacy_density,
         legacy_pmns,
-        float(oscillation.DeltamSq21),
-        float(oscillation.DeltamSq3l),
+        float(oscillation.mass_spectrum.DeltamSq21),
+        float(oscillation.mass_spectrum.DeltamSq3l),
         float(E_MeV),
         float(depth_m),
         mode=method,

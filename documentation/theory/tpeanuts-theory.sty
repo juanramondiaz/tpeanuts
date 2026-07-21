@@ -1,0 +1,245 @@
+% =============================================================================
+%  tpeanuts-theory.sty
+%  Visual style for the "Theoretical Foundations of tpeanuts" document
+% =============================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{tpeanuts-theory}[2026/07/18 v1.0 tpeanuts theory template]
+
+% -----------------------------------------------------------------------------
+% Fuentes y codificacion
+% -----------------------------------------------------------------------------
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage{microtype}
+\RequirePackage[english]{babel}
+\RequirePackage{csquotes}
+
+% -----------------------------------------------------------------------------
+% Matematicas
+% -----------------------------------------------------------------------------
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{mathtools}
+\RequirePackage{bm}
+\RequirePackage{physics}
+\DeclareMathOperator{\diag}{diag}
+
+% -----------------------------------------------------------------------------
+% Colores: uno por "parte" del codigo (paquete de alto nivel)
+% -----------------------------------------------------------------------------
+\RequirePackage[table]{xcolor}
+
+\definecolor{coreColor}{RGB}{31,78,140}        % core/            azul
+\definecolor{smColor}{RGB}{38,111,158}         % core/SM          azul claro
+\definecolor{bsmColor}{RGB}{123,31,140}        % core/BSM         morado
+\definecolor{numColor}{RGB}{0,105,92}          % core/numerical   verde azulado
+\definecolor{pertColor}{RGB}{0,77,64}          % core/perturbative verde oscuro
+\definecolor{mediumColor}{RGB}{0,121,107}      % medium/          verde
+\definecolor{vacuumColor}{RGB}{2,119,189}      % medium/vacuum
+\definecolor{solarColor}{RGB}{239,108,0}       % medium/solar
+\definecolor{earthColor}{RGB}{93,64,55}        % medium/earth
+\definecolor{atmoColor}{RGB}{0,131,143}        % medium/atmosphere
+\definecolor{externalColor}{RGB}{106,27,154}   % external/        morado
+\definecolor{legacyColor}{RGB}{97,97,97}       % peanuts/ legado  gris
+\definecolor{pipelineColor}{RGB}{62,39,35}     % pipeline/        marron
+\definecolor{utilColor}{RGB}{69,90,100}        % util/            gris azulado
+
+\colorlet{filecolor}{black!65}
+\colorlet{theoryColor}{coreColor}
+\colorlet{implColor}{mediumColor}
+\colorlet{noteColor}{orange!85!black}
+\colorlet{refColor}{black!55}
+\colorlet{pendingColor}{red!60!black}
+
+% -----------------------------------------------------------------------------
+% Resaltado y marcado dentro del cuerpo de texto
+% -----------------------------------------------------------------------------
+\RequirePackage{soul}
+\setul{1.5pt}{1.5pt}
+\newcommand{\keyresult}[1]{%
+  \ifmmode
+    \colorbox{yellow!35}{$\displaystyle #1$}%
+  \else
+    \sethlcolor{yellow!40}\hl{#1}%
+  \fi
+}
+\newcommand{\important}[1]{\textbf{\color{coreColor}#1}}
+\newcommand{\approxterm}[1]{\sethlcolor{orange!25}\hl{#1}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\pkgpath}[1]{{\small\ttfamily\color{filecolor}#1}}
+\newcommand{\pyfunc}[1]{\texttt{\color{implColor!80!black}#1}}
+\newcommand{\pyclass}[1]{\texttt{\bfseries\color{implColor!80!black}#1}}
+
+\RequirePackage[colorinlistoftodos,textsize=scriptsize,disable=false]{todonotes}
+\newcommand{\pending}[1][]{%
+  \todo[color=pendingColor!20,bordercolor=pendingColor]{Pending: #1}%
+  {\color{pendingColor}\textbf{[Section pending full theoretical development.]}}%
+}
+\newcommand{\notemargin}[1]{\todo[color=noteColor!20,bordercolor=noteColor]{#1}}
+
+% -----------------------------------------------------------------------------
+% Cajas tematicas (tcolorbox)
+% -----------------------------------------------------------------------------
+\RequirePackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable,theorems}
+
+\newtcolorbox{theorybox}[1][]{
+  enhanced, breakable,
+  colback=theoryColor!4, colframe=theoryColor,
+  colbacktitle=theoryColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Theoretical Foundation},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=theoryColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{implbox}[1][]{
+  enhanced, breakable,
+  colback=implColor!4, colframe=implColor,
+  colbacktitle=implColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Implementation in \texttt{tpeanuts}},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=implColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{notebox}[1][]{
+  enhanced, breakable,
+  colback=noteColor!6, colframe=noteColor,
+  colbacktitle=noteColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Approximations and Limitations},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=noteColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm,
+  before upper={%
+    \setlength{\parskip}{8pt plus 2pt minus 2pt}%
+    \setlist[itemize]{itemsep=10pt plus 2pt, topsep=6pt}%
+    \setlist[enumerate]{itemsep=10pt plus 2pt, topsep=6pt}%
+  },
+  #1
+}
+
+\newtcolorbox{refbox}[1][]{
+  enhanced, breakable,
+  colback=refColor!5, colframe=refColor,
+  colbacktitle=refColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Key References},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=refColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{keyeqbox}{
+  enhanced, breakable,
+  colback=yellow!8, colframe=black!70,
+  boxrule=0.4pt, sharp corners=all, rounded corners=all, arc=1mm,
+  left=3mm, right=3mm, top=1.5mm, bottom=1.5mm,
+}
+
+% Cabecera compacta de modulo: ruta de fichero + una linea de proposito
+\newcommand{\modulehead}[2]{%
+  \noindent\pkgpath{#1}\par
+  \noindent\textit{#2}\par\medskip
+}
+
+% -----------------------------------------------------------------------------
+% Titulos de parte / capitulo / seccion
+% -----------------------------------------------------------------------------
+\RequirePackage{titlesec}
+\RequirePackage{titletoc}
+
+\titleformat{\part}[display]
+  {\normalfont\Huge\bfseries\color{coreColor}}
+  {\filright\Large\MakeUppercase{\partname} \thepart}
+  {6pt}
+  {\titlerule[1pt]\vspace{8pt}\Huge}
+
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{coreColor}}
+  {\filleft\Large\chaptertitlename\ \thechapter}
+  {6pt}
+  {\titlerule[0.8pt]\vspace{6pt}\huge}
+\titlespacing*{\chapter}{0pt}{0pt}{20pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{implColor!70!coreColor}}
+  {\thesection}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{coreColor}}
+  {\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{0pt}{18pt plus 4pt minus 2pt}{8pt plus 2pt}
+
+% -----------------------------------------------------------------------------
+% Cabeceras/pies de pagina
+% -----------------------------------------------------------------------------
+\RequirePackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[RE]{\nouppercase{\leftmark}}
+\fancyhead[LO]{\nouppercase{\rightmark}}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[LE,RO]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% -----------------------------------------------------------------------------
+% Listas, tablas, codigo
+% -----------------------------------------------------------------------------
+\RequirePackage{enumitem}
+\setlist{itemsep=2pt, topsep=4pt}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+\RequirePackage{longtable}
+\RequirePackage{graphicx}
+
+\RequirePackage{listings}
+\definecolor{codebg}{RGB}{245,245,245}
+\lstdefinestyle{tpython}{
+  language=Python,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{coreColor}\bfseries,
+  commentstyle=\color{black!45}\itshape,
+  stringstyle=\color{solarColor!80!black},
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  frame=single,
+  rulecolor=\color{black!20},
+  xleftmargin=4pt, xrightmargin=4pt,
+  aboveskip=6pt, belowskip=6pt,
+}
+\lstset{style=tpython}
+
+% -----------------------------------------------------------------------------
+% Hipervinculos
+% -----------------------------------------------------------------------------
+\RequirePackage[
+  colorlinks=true,
+  linkcolor=coreColor,
+  citecolor=mediumColor,
+  urlcolor=externalColor,
+  bookmarksnumbered=true
+]{hyperref}
+\RequirePackage[capitalise,nameinlink]{cleveref}
+
+% -----------------------------------------------------------------------------
+% Bibliografia
+% -----------------------------------------------------------------------------
+\RequirePackage[
+  backend=biber,
+  style=numeric-comp,
+  sorting=nyt,
+  maxbibnames=6,
+  giveninits=true
+]{biblatex}
+
+\endinput

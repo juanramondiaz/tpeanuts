@@ -61,7 +61,7 @@ import torch
 from tpeanuts.util.type import TensorLike
 from tpeanuts.util.context import RuntimeContext
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.math import interp1d_linear, normalize_trapz
 from tpeanuts.util.torch_util import as_1d_tensor
 from tpeanuts.medium.earth.exposure_math import (
@@ -188,7 +188,7 @@ class NadirExposureTable:
         ``integral d eta exposure(eta) = 1`` over the stored ``eta`` grid
         (using the trapezoidal rule), after clamping negative weights to
         zero. This turns ``W(eta)`` into a proper probability density over
-        nadir angle so that ``pearth_integrated`` computes a weighted average
+        nadir angle so that ``earth_probability_exposure`` computes a weighted average
         rather than a weighted sum.
 
         Args:

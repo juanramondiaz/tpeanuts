@@ -1,0 +1,340 @@
+\chapter{\texttt{medium.solar} --- adiabatic MSW propagation in the Sun}
+\label{ch:solar}
+
+Solar neutrinos are produced deep in the high-density solar core and exit
+through a smoothly, monotonically decreasing electron density to vacuum.
+This chapter's physics is dominated by one fact exploited throughout: the
+density gradient is slow enough, on the scale of the relevant MSW
+resonances, that the \textbf{adiabatic approximation} applies almost
+everywhere in the standard oscillation parameter space -- a neutrino
+produced in a given local matter eigenstate stays in it as the density
+drops, so propagation reduces to an incoherent mixture of eigenstates
+rather than a coherent evolutor (see the note in
+\cref{sec:solar-no-evolutor}).
+
+\section{\texttt{profile.py} --- the tabulated solar model}
+\label{sec:solar-profile}
+
+\modulehead{medium/solar/profile.py}{\pyclass{SolarProfile}: tabulated
+solar radius, electron density, per-source production fractions, and
+per-source total fluxes.}
+
+\begin{implbox}
+\pyclass{SolarProfile} stores four tabulated quantities on a common radius
+grid $r/R_\odot\in[0,1]$: the electron density $n_e(r)$ (mol/cm$^3$), a
+production-fraction profile $f_{\rm source}(r)$ per neutrino-producing
+reaction (pp, $^8$B, $^7$Be, ...), and a total integrated flux
+$\Phi_{\rm source}$ per source. \pyfunc{SolarProfile.default} loads these
+from the package's bundled CSV tables (\code{tpeanuts/data/solar}), whose
+paths are fixed by \code{tpeanuts.config.default.solar\_model\_filename}
+and \code{solar\_fluxes\_filename} -- currently the \textbf{zenodo
+SF3-AGSS09} tables, a standard-solar-model dataset combining helioseismic
+constraints with the AGSS09 heavy-element abundances
+\parencite{Vinyoles2017B16}, tabulated over the full solar radius (2001
+rows). \pyclass{SolarParameters} allows overriding both file paths
+explicitly, but the defaults are the project's validated reference
+composition and should not be changed casually.
+\begin{itemize}
+  \item \pyfunc{electron\_density(r\_query)} / \pyfunc{production\_fraction(source, r\_query)}:
+    linear interpolation on the tabulated grid (\pyfunc{util.math.interp1d\_linear}),
+    clamped to the boundary values outside $[0,1]$.
+  \item \pyfunc{source\_fractions(sources)}: stacks one or several tabulated
+    (not interpolated) production-fraction profiles.
+  \item \pyfunc{normalized\_fraction(source)}: normalises a production
+    profile to unit trapezoidal integral over $r$
+    (\pyfunc{util.math.normalize\_trapz}).
+  \item \pyfunc{flux(source)}: the total (radius-integrated) flux
+    normalisation for one source, as tabulated.
+  \item \code{use\_LZ}: boolean flag (default \code{False}) selecting
+    whether \texttt{probability.py} (\cref{sec:solar-probability}) applies
+    the Landau-Zener correction of \cref{sec:solar-lz}.
+\end{itemize}
+\end{implbox}
+
+\begin{notebox}
+\textbf{Validity of the tabulated model.} The bundled solar model is a
+\emph{standard} solar model: a hydrostatic, helioseismically calibrated
+stellar-structure calculation, not a direct measurement. Its accuracy is
+therefore tied to the input microphysics (opacities, nuclear reaction
+rates, heavy-element abundances) and is typically quoted at the few-percent
+level for the core density and composition profiles that set $n_e(r)$ and
+the production-fraction shapes; solar-neutrino and helioseismic data
+provide independent, largely consistent cross-checks of this precision.
+Because $n_e(r)$ only ever enters through the dimensionless ratio $V_k$
+(\cref{sec:solar-matter-mixing}), a uniform rescaling error in the model's
+overall density normalisation would bias the resonance radius, not the
+qualitative adiabatic/non-adiabatic character of the propagation.
+\end{notebox}
+
+\section{\texttt{matter\_mixing.py} --- the adiabatic matter-mixing angles}
+\label{sec:solar-matter-mixing}
+
+\modulehead{medium/solar/matter\_mixing.py}{Closed-form matter-modified
+mixing angles $\theta_{12}^M(r)$, $\theta_{13}^M(r)$ used by the adiabatic
+solar-probability approximation.}
+
+\begin{theorybox}
+Because $\Delta m^2_{3\ell}\gg\Delta m^2_{21}$ and $\theta_{13}$ is small,
+the solar MSW problem separates hierarchically into two sequential
+effective 2-flavour resonances (the $1$--$3$ sector, then the $1$--$2$
+sector), each with the standard closed-form matter-mixing-angle solution
+\parencite{GiuntiKim2007} -- no numerical diagonalisation of the full
+$3\times3$ Hamiltonian is needed in the Standard Model case. Define the
+dimensionless matter-potential ratio and the effective atmospheric
+splitting
+\begin{align}
+  V_k(\Delta m^2,E,n_e) &= \frac{V(n_e)}{k(\Delta m^2,E)}
+  = \frac{2E\hbar c\,V_{CC}}{\Delta m^2}, \\
+  \Delta m^2_{ee} &= \cos^2\theta_{12}\,\Delta m^2_{31} + \sin^2\theta_{12}\,\Delta m^2_{32},
+\end{align}
+using $V$ and $k$ exactly as defined in \cref{ch:core-common}
+(\texttt{potential.py} section) -- $V_k$ is simply their ratio, evaluated
+here for a given splitting rather than embedded in the Hamiltonian. The
+matter-modified reactor angle is
+\begin{equation}
+  \keyresult{\theta_{13}^M = \tfrac12\arccos\!\left(
+    \frac{\cos2\theta_{13}-V_k(\Delta m^2_{ee},E,n_e)}
+         {\sqrt{\bigl(\cos2\theta_{13}-V_k(\Delta m^2_{ee},E,n_e)\bigr)^2+\sin^22\theta_{13}}}
+  \right)},
+\end{equation}
+and, using $\theta_{13}^M$ as an input, the matter-modified solar angle is
+\begin{equation}
+  \keyresult{\theta_{12}^M = \tfrac12\arccos\!\left(
+    \frac{\cos2\theta_{12}-V_k'}
+         {\sqrt{(\cos2\theta_{12}-V_k')^2+\sin^22\theta_{12}\cos^2(\theta_{13}^M-\theta_{13})}}
+  \right)},
+\end{equation}
+\begin{equation}
+  V_k' = V_k(\Delta m^2_{21},E,n_e)\cos^2\theta_{13}^M
+       + \frac{\Delta m^2_{ee}}{\Delta m^2_{21}}\sin^2(\theta_{13}^M-\theta_{13}).
+\end{equation}
+Each resonance occurs where the corresponding $V_k=\cos2\theta$, i.e.\
+where the vacuum mixing angle is driven to $\pi/4$ by the matter
+potential; away from resonance $\theta^M\to\theta$ (low density) or
+$\theta^M\to\pi/2$ (high density), recovering the vacuum and
+fully-suppressed limits respectively.
+\end{theorybox}
+
+\begin{notebox}
+\code{legacy\_precision=True} reproduces the legacy \texttt{peanuts}
+combined prefactor for $V_k$ ($3.868\times10^{-7}/2.533$, both factors
+independently rounded to 4 significant digits in the original
+implementation) rather than deriving the matter and kinetic prefactors
+separately from full-precision constants (\cref{ch:core-common}); the two
+choices differ by a relative $\sim3.6\times10^{-4}$ -- an order of
+magnitude larger than the matter-potential-only rounding error of
+\cref{ch:core-common}, since both legacy prefactors compound. Intended
+purely for bit-comparable validation against legacy \texttt{peanuts}.
+\end{notebox}
+
+\begin{implbox}
+\pyfunc{Vk(Deltam2, E, ne, antinu, legacy\_precision)},
+\pyfunc{DeltamSqee(oscillation)}, \pyfunc{th13\_M(oscillation, E, ne, ...)},
+\pyfunc{th12\_M(oscillation, E, ne, ..., th13m=None)} implement the four
+formulas above directly; \pyfunc{th12\_M} accepts a precomputed
+\code{th13m} to avoid recomputing it when both angles are needed together
+(as \pyfunc{Tei} below does).
+\end{implbox}
+
+\section{\texttt{landau\_zener.py} --- non-adiabatic corrections}
+\label{sec:solar-lz}
+
+\modulehead{medium/solar/landau\_zener.py}{Landau-Zener transition
+probability $P_{LZ}(E)$ quantifying the breakdown of the adiabatic
+approximation near the MSW resonance.}
+
+\begin{theorybox}
+At \emph{finite} adiabaticity, a neutrino crossing the MSW resonance can
+jump between the two local matter eigenstates instead of adiabatically
+following one of them. The exponential Landau-Zener approximation
+\parencite{Parke1986} gives the jump probability as
+\begin{equation}
+  \keyresult{P_{LZ} = \exp\!\left(-\frac{\pi}{2}\gamma_{\rm res}\right)},
+\end{equation}
+with the adiabaticity parameter evaluated at the resonance
+\parencite{GiuntiKim2007}
+\begin{equation}
+  \gamma_{\rm res} = \frac{\Delta m^2_{21}\sin^22\theta_{12}}{2E\hbar c\cos2\theta_{12}}\,L_n(r_{\rm res}),
+  \qquad
+  L_n = \left|\frac{n_e}{\mathrm{d}n_e/\mathrm{d}l}\right|_{\rm res},
+\end{equation}
+where $L_n$ is the electron-density scale height (in metres) at the
+resonance radius $r_{\rm res}(E)$, defined by $V_k(\Delta m^2_{21},E,n_e(r_{\rm
+res}))=\cos2\theta_{12}$ (i.e.\ where $\theta_{12}^M=\pi/4$). Large
+$\gamma_{\rm res}$ means a slowly varying density on the scale of the
+oscillation length at resonance, hence a vanishing jump probability
+(adiabatic); small $\gamma_{\rm res}$ means a comparatively abrupt density
+change, hence a sizeable jump probability.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{Scope and limitations, as documented in the module itself.} Only
+the $\theta_{12}$-sector resonance is tracked ($\theta_{13}$'s resonance
+sits deep in the solar core at very high density and is negligible for
+every standard solar source). $P_{LZ}=0$ is returned wherever no resonance
+exists in the solar volume: below-threshold energies, antineutrinos (no MSW
+resonance for standard parameters), and LMA-Dark parameters
+($\theta_{12}>\pi/4$, resonance at unphysical negative density). For
+standard LMA parameters and pp/$^8$B solar neutrinos,
+$\gamma_{\rm res}\sim10^3$--$10^4$, so $P_{LZ}\sim e^{-1500}\approx0$ and
+the pure adiabatic approximation is excellent; this module becomes
+relevant mainly for non-standard parameter explorations or precision
+studies in the 1--3 MeV range. Solar NSI is \textbf{not} included here: the
+resonance condition uses the standard $V_k$, and \pyfunc{Tei}
+(\cref{sec:solar-probability}) silently ignores \code{p\_lz} once
+\code{oscillation.nsi} is set, since both the resonance condition and the
+adiabaticity parameter would need to be rederived for off-diagonal
+$\epsilon$.
+\end{notebox}
+
+\begin{implbox}
+\pyfunc{density\_gradient(solar\_profile)}: $\mathrm{d}n_e/\mathrm{d}\hat r$
+on the tabulated grid via central differences (one-sided at the
+boundaries). \pyfunc{resonance\_radius(oscillation, E, solar\_profile)}:
+locates $r_{\rm res}(E)$ by linear interpolation at the first
+sign-change of $V_k-\cos2\theta_{12}$ along the (monotonically decreasing)
+density profile; returns \code{NaN} where no crossing exists.
+\pyfunc{plz(oscillation, E, solar\_profile)}: the $P_{LZ}(E)$ formula
+above, masked to exactly zero wherever \pyfunc{resonance\_radius} returns
+\code{NaN}.
+\end{implbox}
+
+\begin{notebox}[title={No Coherent Medium Evolutor}]
+\label{sec:solar-no-evolutor}
+Unlike every other medium in this document, \texttt{medium.solar} has
+\textbf{no \texttt{evolutor.py}}. This is a direct consequence of the
+adiabatic approximation, not an omission: once a neutrino is assigned to a
+local matter eigenstate at its production radius (\pyfunc{Tei}, next
+section), the adiabatic theorem guarantees it stays in the
+\emph{corresponding} eigenstate all the way to the solar surface, where the
+density has dropped to (effectively) zero and the local matter eigenstates
+have smoothly become the \emph{vacuum} mass eigenstates. No further
+coherent phase evolution needs computing: the production-point projection
+already \emph{is} the final incoherent mass-basis composition, and only the
+final flavour projection (\pyfunc{solar\_probability\_state}) remains.
+Consequently \texttt{medium.solar} exposes no
+\pyfunc{solar\_probability\_transition}: unlike the other media
+(\cref{ch:vacuum,ch:earth,ch:atmosphere}), there is no coherent evolutor $S$
+to build a transition matrix from, so \pyfunc{solar\_probability\_state} is
+the lowest-tier public probability function for this medium.
+\end{notebox}
+
+\section{\texttt{probability.py} --- production weights and flavour probabilities}
+\label{sec:solar-probability}
+
+\modulehead{medium/solar/probability.py}{\pyfunc{Tei} (production-point
+matter-eigenstate weights), \pyfunc{solar\_\allowbreak{}probability\_\allowbreak{}mass} (integrated
+over the production profile), \pyfunc{solar\_\allowbreak{}probability\_\allowbreak{}state} (final
+flavour probabilities), and \pyfunc{solar\_\allowbreak{}probability\_\allowbreak{}integrated}
+(spectrum-weighted energy average).}
+
+\begin{theorybox}
+\subsection*{\pyfunc{Tei}: flavour-to-matter-basis production weights}
+$T_{ei}$ answers: given an electron neutrino produced at electron density
+$n_e$ and energy $E$, what is the probability it is projected onto local
+matter eigenstate $i$? In the Standard Model (adiabatic, no LZ) case this
+is read directly off the matter-mixing angles of
+\cref{sec:solar-matter-mixing}:
+\begin{equation}
+  \keyresult{
+  \bigl(w_1,w_2,w_3\bigr) =
+  \Bigl(\cos^2\theta_{13}^M\cos^2\theta_{12}^M,\ \
+        \cos^2\theta_{13}^M\sin^2\theta_{12}^M,\ \
+        \sin^2\theta_{13}^M\Bigr)
+  },
+\end{equation}
+i.e.\ $|\langle\nu_e|\nu_i^M\rangle|^2$ for the standard PMNS-like
+parametrisation applied to the matter-modified angles. When a
+Landau-Zener probability $P_{LZ}$ is supplied (\cref{sec:solar-lz}), the
+$1$--$2$ sector weights mix according to the LZ jump probability,
+\begin{equation}
+  w_1 = (1-P_{LZ})\cos^2\theta_{12}^M + P_{LZ}\sin^2\theta_{12}^M,
+  \qquad
+  w_2 = (1-P_{LZ})\sin^2\theta_{12}^M + P_{LZ}\cos^2\theta_{12}^M,
+\end{equation}
+while $w_3=\sin^2\theta_{13}^M$ is untouched (the $\theta_{13}$ resonance
+is negligible, \cref{sec:solar-lz}). \textbf{When NSI is active}
+(\code{oscillation.nsi} set), this entire analytic construction is
+replaced by direct numerical diagonalisation: the full flavour-basis
+Hamiltonian $H=H_{\rm kin}+H_{\rm mat}^{\rm NSI}$
+(\pyfunc{hamiltonian\_flavour}, \cref{ch:core-common,ch:core-bsm}) is built
+at each $(E,n_e)$ point and diagonalised with \pyfunc{torch.linalg.eigh};
+the production weights are then simply the squared electron-flavour
+components of each matter eigenvector,
+\begin{equation}
+  w_i(E,n_e) = \bigl|\langle\nu_e|\nu_i^M(E,n_e)\rangle\bigr|^2 = |{\rm eigvec}[\dots,0,i]|^2,
+\end{equation}
+which supports arbitrary off-diagonal $\epsilon$ (including LMA-Dark-type
+degenerate scenarios) at the cost of losing the closed form; \code{p\_lz}
+is silently ignored in this path.
+
+\subsection*{From production weights to a final flavour probability}
+\pyfunc{solar\_probability\_mass} integrates $T_{ei}(E,n_e(r))$ over the
+production-radius distribution of one or more sources, weighted by each
+source's normalised production-fraction profile $f_{\rm source}(r)$
+(\cref{sec:solar-profile}):
+\begin{equation}
+  \keyresult{P_i(E) = \frac{\int_0^1 T_{ei}\bigl(E,n_e(r)\bigr)\,f_{\rm source}(r)\,\mathrm{d}r}
+                          {\int_0^1 f_{\rm source}(r)\,\mathrm{d}r}},
+\end{equation}
+evaluated by the trapezoidal rule, giving an energy-dependent (not
+radius-resolved) incoherent \emph{vacuum} mass-basis probability vector
+$P_i(E)$ for that source -- by the argument of the note above, this
+average over production radius already \emph{is} the mass-basis
+composition reaching the solar surface, with no further coherent step
+required. \pyfunc{solar\_probability\_state} performs the last, purely
+kinematic conversion to flavour, using the ordinary incoherent-mixture
+formula of
+\cref{ch:core-common} (\texttt{probability.py} section) with the
+\emph{identity} evolutor (there is nothing left to evolve coherently):
+\begin{equation}
+  \keyresult{P_\alpha(E) = \sum_i |U_{\alpha i}|^2\,P_i(E)},
+\end{equation}
+where $U$ is the ordinary \emph{vacuum} PMNS matrix
+(\cref{ch:core-common,ch:core-sm}) -- the matter-modified angles only ever
+appear inside $T_{ei}$, at the production point; every subsequent step in
+this chapter works with the vacuum mixing matrix.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{Tei(oscillation, E, ne, p\_lz=None, legacy\_precision=False)}:
+    the weight formulas above.
+  \item \pyfunc{solar\_probability\_mass(oscillation, E, profile, sources, ...)}:
+    builds the spatially resolved LZ mask (production radii above the
+    resonance density only, \cref{sec:solar-lz}) when
+    \code{profile.use\_LZ} and no NSI is active, then integrates $T_{ei}$
+    against the source's production-fraction profile as above.
+  \item \pyfunc{solar\_probability\_state(oscillation, E, profile, sources, ...)}:
+    the final flavour-probability formula above, via
+    \pyfunc{core.common.probability.probability\_incoherent}
+    (\cref{ch:core-common}) with the identity operator standing in for
+    ``no further coherent evolution''.
+  \item \pyfunc{solar\_probability\_integrated(oscillation, E, profile, sources, spectrum, ...)}:
+    builds \pyfunc{solar\_probability\_state} on an energy grid and
+    averages it with
+    \pyfunc{core.common.probability.probability\_integrated}
+    (\cref{ch:core-common}), weighted by an explicit production
+    \code{spectrum}.
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{flux.py} --- solar flux}
+
+\modulehead{medium/solar/flux.py}{\pyfunc{solar\_\allowbreak{}flux\_\allowbreak{}state} and
+\pyfunc{solar\_\allowbreak{}flux\_\allowbreak{}integrated}: apply per-source flux normalisations,
+optional spectra, and energy integration to
+\pyfunc{solar\_\allowbreak{}probability\_\allowbreak{}state}'s output.}
+
+\begin{implbox}
+\pyfunc{solar\_flux\_state(sources, profile, oscillation, E\_MeV, source\_spectrum=None, ...)}
+adds no new physics: it calls \pyfunc{solar\_probability\_state} above for
+the requested source(s), then \pyfunc{core.common.flux.flux\_state}
+(\cref{ch:core-common}) to apply each source's total flux normalisation
+(\pyfunc{SolarProfile.flux}) and optional energy spectrum -- the same
+minimal pattern established in \cref{ch:vacuum}.
+\pyfunc{solar\_flux\_integrated(...)} builds \pyfunc{solar\_flux\_state} on
+an energy grid and integrates it with
+\pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
+physical rate.
+\end{implbox}

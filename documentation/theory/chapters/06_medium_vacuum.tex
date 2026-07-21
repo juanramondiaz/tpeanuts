@@ -1,0 +1,165 @@
+\chapter{\texttt{medium.vacuum} --- coherent propagation in vacuum}
+\label{ch:vacuum}
+
+\texttt{medium.vacuum} is the simplest propagation medium in the project:
+$n_e\equiv0$ everywhere, so the matter term of the Hamiltonian
+(\cref{ch:core-common}) never enters and every formula reduces to the
+closed-form vacuum evolutor already derived, in general terms, in the
+coherent-propagation scheme of \cref{ch:core-sm}. Its role is twofold:
+
+\begin{itemize}
+  \item \textbf{Base case and test bed.} With no density profile to model
+    and a fully closed-form evolutor, this is the cheapest possible path
+    through the entire propagation stack (\pyclass{PMNS} $\to$
+    \pyfunc{kinetic\_eigenvalue\_vector} $\to$ evolutor $\to$ probability
+    $\to$ flux, \cref{ch:core-common}), with an exact analytic answer to
+    check every other piece against. It is, in practice, the first thing
+    exercised when validating a new oscillation preset, a new BSM
+    extension, or a refactor of the shared infrastructure: if
+    \texttt{medium.vacuum} disagrees with the legacy \texttt{peanuts}
+    reference (\cref{sec:vacuum-validation}), nothing built on top of it
+    can be trusted either.
+  \item \textbf{Physical use cases.} Vacuum propagation is the correct
+    description whenever matter effects are genuinely negligible along the
+    whole path: reactor and other short-baseline experiments, or any
+    scenario where the accumulated matter phase $V\cdot L$ is small enough
+    to ignore relative to the vacuum kinetic phases. It is also the
+    $n_e\to0$ reference limit that the matter-propagation media of the
+    following chapters must recover exactly in that limit.
+\end{itemize}
+
+\begin{notebox}
+\textbf{The four-module pattern.} \texttt{medium.vacuum} fixes a module
+layout that every subsequent medium in this part of the document repeats,
+adapted to that medium's own needs: an \texttt{evolutor.py} building the
+medium-specific $S$ from \pyclass{OscillationParameters} and geometry
+inputs; a \texttt{probability.py} converting that evolutor into transition
+and final-state probabilities via the shared
+\texttt{core.common.probability} conventions (\cref{ch:core-common}); a
+\texttt{flux.py} applying \texttt{core.common.flux} normalisations on top;
+and, where a legacy NumPy reference implementation exists to check against,
+a \texttt{validation.py} comparing the two numerically. Media with
+additional physical structure add further modules on top of this
+skeleton (\texttt{profile.py} for a density profile,
+\texttt{geometry.py} for path geometry, \texttt{exposure\_*.py} for
+detector exposure, ...) without changing this core four-piece contract.
+\end{notebox}
+
+\section{\texttt{evolutor.py} --- the vacuum evolutor}
+
+\modulehead{medium/vacuum/evolutor.py}{\pyfunc{vacuum\_evolutor} and
+\pyfunc{vacuum\_evolved\_state}: the closed-form coherent vacuum operator
+and its action on a state.}
+
+\begin{theorybox}
+With $H_{\rm mat}=0$, the reduced and flavour Hamiltonians coincide with
+the pure kinetic term, and the general coherent-propagation scheme of
+\cref{ch:core-sm} is exact and complete on its own (no reduction trick is
+needed, since there is no matter term to factor out):
+\begin{equation}
+  \keyresult{S(L,E) = U\,\diag\!\bigl(e^{-ik_1x},e^{-ik_2x},e^{-ik_3x}\bigr)\,U^\dagger},
+  \qquad x = \frac{L\,[\mathrm{m}]}{L_{\rm scale}},
+\end{equation}
+where $U$ is the full PMNS matrix (\cref{ch:core-common}), $k_i$ the
+dimensionless kinetic eigenvalues (\cref{ch:core-common},
+\texttt{potential.py} section), and the baseline $L$ (given in km) is
+converted to metres and non-dimensionalised by the same
+\code{evolution\_scale\_m} used throughout the project. This is the same
+formula the sterile extension recovers automatically for $n=4$
+(\cref{ch:core-bsm}), simply by passing a $4\times4$ \pyclass{PMNS\_sterile}
+object in place of \pyclass{PMNS\_SM}; nothing in this module is
+3-flavour-specific.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{vacuum\_evolutor(oscillation, E\_MeV, L\_km, ...)}: builds
+    $S$ exactly as above; broadcasts energy, baseline, and mass-splitting
+    batch shapes together before the phase multiplication.
+  \item \pyfunc{vacuum\_evolved\_state(nustate, oscillation, E\_MeV, L\_km, ...)}:
+    applies \pyfunc{core.common.evolutor.apply\_evolutor\_to\_state}
+    (\cref{ch:core-common}) to a coherent flavour-basis initial state.
+  \item \code{legacy\_precision} is accepted for call-site symmetry with
+    every matter-propagation evolutor in later chapters but is a genuine
+    no-op here: there is no matter potential for the flag to affect.
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{probability.py} --- vacuum probabilities}
+
+{\sloppy\modulehead{medium/vacuum/probability.py}{\pyfunc{vacuum\_\allowbreak{}probability\_\allowbreak{}transition}
+(the full transition-probability matrix), \pyfunc{vacuum\_\allowbreak{}probability\_\allowbreak{}state}
+(final-state probabilities for a given initial state), and
+\pyfunc{vacuum\_\allowbreak{}probability\_\allowbreak{}integrated} (spectrum-weighted energy average).}}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{vacuum\_probability\_transition(oscillation, E\_MeV, L\_km, ...)}:
+    builds $S$ and returns $P_{\beta\alpha}=|S_{\beta\alpha}|^2$ via
+    \pyfunc{core.common.probability.probability\_transition}
+    (\cref{ch:core-common}) -- the full $3\times3$ (or $4\times4$) channel
+    matrix, no initial state required.
+  \item \pyfunc{vacuum\_probability\_state(nustate, oscillation, E\_MeV, L\_km, massbasis, ...)}:
+    dispatches to the coherent or incoherent formula of
+    \cref{ch:core-common} (\texttt{evolutor.py}/\texttt{probability.py}
+    sections) via \pyfunc{probability\_state}, according to
+    \code{massbasis}: \code{False} evolves \code{nustate} as coherent
+    flavour amplitudes ($P_\beta=|(S\,\psi)_\beta|^2$); \code{True} (the
+    default here) treats it as incoherent mass-basis weights
+    ($P_\beta=\sum_i|(S\,U)_{\beta i}|^2w_i$). Either way the function
+    returns a final flavour-probability vector, never a flux.
+  \item \pyfunc{vacuum\_probability\_integrated(nustate, oscillation, E\_MeV, L\_km, spectrum, ...)}:
+    builds \pyfunc{vacuum\_probability\_state} on an energy grid and averages
+    it with \pyfunc{core.common.probability.probability\_integrated}
+    (\cref{ch:core-common}), weighted by an explicit production
+    \code{spectrum} -- there is no default weight, since a flat spectrum
+    over an arbitrary grid is a modelling choice.
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{flux.py} --- vacuum flux}
+
+\modulehead{medium/vacuum/flux.py}{\pyfunc{vacuum\_\allowbreak{}flux\_\allowbreak{}state} and
+\pyfunc{vacuum\_\allowbreak{}flux\_\allowbreak{}integrated}: apply \texttt{core.common.flux}
+normalisation and energy integration to
+\pyfunc{vacuum\_\allowbreak{}probability\_\allowbreak{}state}'s output.}
+
+\begin{implbox}
+\pyfunc{vacuum\_flux\_state(nustate, oscillation, E\_MeV, L\_km, flux, spectrum, massbasis, ...)}
+adds no new physics: it calls \pyfunc{vacuum\_probability\_state} above,
+then \pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}) to apply
+the flux normalisation and optional spectral weight. This is the minimal
+instance of the flux pattern that every later medium's \texttt{flux.py}
+extends. \pyfunc{vacuum\_flux\_integrated(...)} builds
+\pyfunc{vacuum\_flux\_state} on an energy grid and integrates it with
+\pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
+physical rate rather than the normalised average of
+\pyfunc{vacuum\_probability\_integrated}.
+\end{implbox}
+
+\section{\texttt{validation.py} --- cross-check against legacy \texttt{peanuts}}
+\label{sec:vacuum-validation}
+
+\modulehead{medium/vacuum/validation.py}{Numerical comparison against the
+bundled legacy, NumPy-based \texttt{peanuts} package.}
+
+\begin{implbox}
+The legacy vacuum implementation is scalar (one energy, one baseline, one
+initial state at a time); this module evaluates both implementations on
+matching scalar inputs and compares the results directly, establishing the
+pattern reused by \texttt{medium.solar.validation} and
+\texttt{medium.earth.validation} (\cref{ch:solar,ch:earth}).
+\begin{itemize}
+  \item \pyfunc{ensure\_legacy\_importable()} / \pyfunc{legacy\_modules()}:
+    locate and import the bundled \code{peanuts} package (kept in the
+    repository specifically as this validation reference, not as a runtime
+    dependency of \texttt{tpeanuts} itself).
+  \item \pyfunc{legacy\_pmns\_from\_torch(...)}: rebuilds a legacy
+    \code{peanuts.pmns.PMNS} object from a torch \pyclass{PMNS} instance's
+    parameters, so both implementations start from identical inputs.
+  \item \pyfunc{compare\_vacuum\_probability\_state\_with\_legacy(...)} and
+    \pyfunc{compare\_vacuum\_evolved\_\allowbreak{}state\_with\_\allowbreak{}legacy(...)}:
+    run both implementations and return their outputs (and/or a residual)
+    for the test suite to assert against.
+\end{itemize}
+\end{implbox}

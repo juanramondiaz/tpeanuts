@@ -300,3 +300,94 @@ def test_earth_profile_prem_model_also_valid():
     )
     assert check_no_nan_inf(n_e)
     assert check_positive(n_e)
+
+
+def _two_shell_prem_profile(**params_kwargs) -> EarthProfile:
+    """Synthetic two-shell PREM profile with constant n_e/n_n per shell."""
+    rj = torch.tensor([0.5, 1.0], device=DEVICE, dtype=DTYPE)
+    coefficients = torch.tensor([[2.0, 0.0], [1.0, 0.0]], device=DEVICE, dtype=DTYPE)
+    coefficients_n = torch.tensor([[1.6, 0.0], [0.8, 0.0]], device=DEVICE, dtype=DTYPE)
+    return _profile(
+        rj, coefficients,
+        profile_perturbative_name="prem",
+        profile_perturbative_kwargs={"coefficients_n": coefficients_n},
+        **params_kwargs,
+    )
+
+
+def test_density_n_x_eta_layer_selection_nadir():
+    profile = _two_shell_prem_profile()
+    eta = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
+
+    inner = profile.density_n_x_eta(torch.tensor(0.3, device=DEVICE, dtype=DTYPE), eta)
+    outer = profile.density_n_x_eta(torch.tensor(0.7, device=DEVICE, dtype=DTYPE), eta)
+
+    assert_close(inner, torch.tensor(1.6, dtype=DTYPE), name="inner-shell neutron density")
+    assert_close(outer, torch.tensor(0.8, dtype=DTYPE), name="outer-shell neutron density")
+
+
+def test_density_n_x_eta_outside_earth_is_zero():
+    profile = _two_shell_prem_profile()
+    eta = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
+    x = torch.tensor([1.01, 1.2, 5.0], device=DEVICE, dtype=DTYPE)
+
+    n_n = profile.density_n_x_eta(x, eta)
+
+    assert_close(n_n, torch.zeros_like(n_n), name="neutron density outside Earth is zero")
+
+
+def test_call_neutron_matches_density_n_x_eta():
+    profile = _two_shell_prem_profile()
+    x = torch.tensor([0.0, 0.3, 0.8], device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor([0.0, 0.4, 1.0], device=DEVICE, dtype=DTYPE)
+
+    direct = profile.density_n_x_eta(x, eta)
+    via_call = profile.call_neutron(x, eta)
+
+    assert_close(via_call, direct, name="call_neutron matches density_n_x_eta")
+
+
+def test_density_n_x_eta_raises_for_even_power_without_include_neutron():
+    profile = _two_shell_profile()
+    x = torch.tensor(0.3, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="neutron-density coefficients"):
+        profile.density_n_x_eta(x, eta)
+
+
+def test_density_n_x_eta_even_power_with_include_neutron_matches_coefficients():
+    rj = torch.tensor([0.5, 1.0], device=DEVICE, dtype=DTYPE)
+    coefficients = torch.tensor([[2.0, 0.0, 0.0], [1.0, 0.0, 0.0]], device=DEVICE, dtype=DTYPE)
+    coefficients_n = torch.tensor([[1.6, 0.0, 0.0], [0.8, 0.0, 0.0]], device=DEVICE, dtype=DTYPE)
+    profile = _profile(
+        rj, coefficients,
+        profile_perturbative_name="even_power",
+        profile_perturbative_kwargs={"coefficients_n": coefficients_n},
+    )
+    eta = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
+
+    inner = profile.density_n_x_eta(torch.tensor(0.3, device=DEVICE, dtype=DTYPE), eta)
+    outer = profile.density_n_x_eta(torch.tensor(0.7, device=DEVICE, dtype=DTYPE), eta)
+
+    assert_close(inner, torch.tensor(1.6, dtype=DTYPE), name="inner-shell neutron density (even_power)")
+    assert_close(outer, torch.tensor(0.8, dtype=DTYPE), name="outer-shell neutron density (even_power)")
+
+
+def test_even_power_default_include_neutron_loads_earth_density_nn_csv():
+    profile = _default_profile(profile_perturbative_name="even_power", profile_perturbative_kwargs={"include_neutron": True})
+    eta = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
+
+    n_n = profile.density_n_x_eta(torch.tensor(0.0, device=DEVICE, dtype=DTYPE), eta)
+
+    assert check_no_nan_inf(n_n)
+    assert check_positive(n_n)
+
+
+def test_density_n_x_eta_raises_for_prem_without_include_neutron():
+    profile = _default_profile(profile_perturbative_name="prem")
+    x = torch.tensor(0.3, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="neutron-density coefficients"):
+        profile.density_n_x_eta(x, eta)

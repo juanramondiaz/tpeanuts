@@ -26,6 +26,9 @@ import pytest
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.solar.matter_mixing import DeltamSqee, Vk, th12_M, th13_M
 from tpeanuts.medium.solar.probability import Tei
 from tpeanuts.util.context import RuntimeContext
@@ -46,16 +49,13 @@ def make_oscillation(
     DeltamSq3l: float = 2.517e-3,
     dtype: torch.dtype = DTYPE,
 ) -> OscillationParameters:
-    return OscillationParameters.build(
-        theta12=0.59,
-        theta13=0.15,
-        theta23=0.78,
-        delta=1.20,
-        DeltamSq21=7.42e-5,
-        DeltamSq3l=DeltamSq3l,
-        antinu=antinu,
-        context=make_context(dtype),
+    ctx = make_context(dtype)
+    pmns = PMNS_SM(PMNSParams(theta12=0.59, theta13=0.15, theta23=0.78, delta=1.20, context=ctx))
+    mass_spectrum = MassSpectrum_SM(
+        DeltamSq21=torch.as_tensor(7.42e-5, device=ctx.device, dtype=ctx.dtype),
+        DeltamSq3l=torch.as_tensor(DeltamSq3l, device=ctx.device, dtype=ctx.dtype),
     )
+    return OscillationParameters(pmns=pmns, mass_spectrum=mass_spectrum, antinu=antinu)
 
 
 def test_vk_legacy_prefactor_matches_original_formula_and_broadcasts():

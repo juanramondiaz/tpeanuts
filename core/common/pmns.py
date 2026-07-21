@@ -21,9 +21,9 @@ Shared PMNS mixing-matrix infrastructure for peanuts-torch.
 
 This module defines the parts of the PMNS mixing-matrix machinery that are
 common to every flavour scenario:
-    1) the Standard Model 3-flavour case (``tpeanuts.core.SM.pmns.PMNS_SM``)
+    1) the Standard Model 3-flavour case (``tpeanuts.core.SM.sm_pmns.PMNS_SM``)
     2) BSM extensions such as the 3+1 sterile-neutrino case
-        (``tpeanuts.core.BSM.PMNS_sterile.PMNS_sterile``).
+        (``tpeanuts.core.BSM.bsm_sterile.PMNS_sterile``).
 
 Both concrete classes subclass the abstract ``PMNS`` defined here.
 
@@ -48,13 +48,13 @@ Module contents:
         and the 4x4 (or larger) BSM cases,
         
         and implements the flavour-count-agnostic parts of the public interface:
-          (``refresh``, ``H_flavour_basis``, ``H_mass_basis``, 
-          ``select_antinu``, ``__getitem__``, ``conjugate``, ``transpose``, 
-          ``dagger``, ``reduced_conjugate``, ``reduced_transpose``, 
+          (``refresh``, ``reduced_basis``,
+          ``select_antinu``, ``__getitem__``, ``conjugate``, ``transpose``,
+          ``dagger``, ``reduced_conjugate``, ``reduced_transpose``,
           ``reduced_dagger``).
-        
+
         Concrete subclasses must implement:
-          ``pmns_matrix``, ``reduced``, and ``operator_flavour_basis``,
+          ``pmns_matrix``, ``reduced``, and ``flavour_basis``,
         since the product structure of the full  mixing matrix is genuinely
         different per scenario (extra active-sterile rotations are inserted
         at specific points that follow from a scenario-specific commutation
@@ -77,13 +77,10 @@ Main attributes after initialization:
     pmns.U
         Reduced matrix U_red = R13 @ R12.
 
-    pmns.operator_flavour_basis(...)
-        Transforms any reduced-basis operator to the flavour basis.
+    pmns.flavour_basis(...)
+        Transforms any reduced-basis operator (or Hamiltonian) to the flavour basis.
 
-    pmns.H_flavour_basis(...)
-        Transforms a reduced-basis Hamiltonian to the flavour basis.
-
-    pmns.H_mass_basis(...)
+    pmns.reduced_basis(...)
         Transforms a flavour-basis Hamiltonian to the mass basis using the
         reduced mixing matrix.
 
@@ -199,11 +196,12 @@ class PMNS(torch.nn.Module, abc.ABC):
     Abstract base class for PMNS-compatible mixing-matrix generators.
 
     Shared, flavour-count-agnostic machinery for every PMNS scenario in this
-    project. Concrete subclasses (``tpeanuts.core.SM.pmns.PMNS_SM`` for the
-    3-flavour Standard Model, ``tpeanuts.core.BSM.PMNS_sterile.PMNS_sterile``
+    project. Concrete subclasses (``tpeanuts.core.SM.sm_pmns.PMNS_SM`` for the
+    3-flavour Standard Model, ``tpeanuts.core.BSM.bsm_sterile.PMNS_sterile``
     for the 3+1 sterile-neutrino extension) only need to supply
     ``n_flavours``/``n_active``/``n_sterile`` and implement ``pmns_matrix``,
-    ``reduced``, and ``operator_flavour_basis``.
+    ``reduced`` and ``outer_block``. The shared ``flavour_basis`` and
+    ``reduced_basis`` transformations use the scenario-specific outer block.
 
     Parameters
     ----------
@@ -231,7 +229,7 @@ class PMNS(torch.nn.Module, abc.ABC):
     these blocks into the full and reduced mixing matrices (which extra 
     rotations are inserted, and where) -- that is why
      
-       ``pmns_matrix``, ``reduced``, ``operator_flavour_basis``
+       ``pmns_matrix``, ``reduced``, ``outer_block``
     
     remain abstract here.
     """
@@ -403,6 +401,22 @@ class PMNS(torch.nn.Module, abc.ABC):
         """
         return self._phase_diag(2, cast(torch.Tensor, self.params.delta))
 
+    @abc.abstractmethod
+    def outer_block(
+        self,
+        antinu: Union[bool, torch.Tensor] = False,
+    ) -> torch.Tensor:
+        """Build the scenario-specific outer mixing block.
+
+        Args:
+            antinu: Bool or boolean tensor selecting the antineutrino
+                convention.
+
+        Returns:
+            Complex unitary tensor shaped (..., n_flavours, n_flavours).
+        """
+        raise NotImplementedError
+
     @torch.no_grad()
     def select_antinu(
         self,
@@ -467,8 +481,8 @@ class PMNS(torch.nn.Module, abc.ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def operator_flavour_basis(
+    @torch.no_grad()
+    def flavour_basis(
         self,
         operator_reduced: torch.Tensor,
         antinu: Union[bool, torch.Tensor] = False,
@@ -476,7 +490,7 @@ class PMNS(torch.nn.Module, abc.ABC):
         device: Optional[torch.device | str] = None,
         dtype: Optional[torch.dtype] = None,
     ) -> torch.Tensor:
-        """Transform an operator from the reduced to the flavour basis.
+        """Transform an operator (or Hamiltonian) from the reduced to the flavour basis.
 
         Args:
             operator_reduced: Reduced-basis operator shaped
@@ -488,79 +502,75 @@ class PMNS(torch.nn.Module, abc.ABC):
         Returns:
             Operator represented in the full flavour basis.
         """
-        raise NotImplementedError
-
-    @torch.no_grad()
-    def H_flavour_basis(
-        self,
-        H_reduced: torch.Tensor,
-        antinu: Union[bool, torch.Tensor] = False,
-        *,
-        device: Optional[torch.device | str] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> torch.Tensor:
-        """Transform a reduced-basis Hamiltonian to the flavour basis.
-
-        Args:
-            H_reduced: Reduced-basis Hamiltonian shaped
-                (..., n_flavours, n_flavours).
-            antinu: Boolean scalar or tensor mask selecting antineutrinos.
-            device: Optional output device; defaults to H_reduced.device.
-            dtype: Optional output dtype; defaults to H_reduced.dtype.
-
-        Returns:
-            Hamiltonian represented in the full flavour basis.
-        """
-        return self.operator_flavour_basis(
-            H_reduced,
-            antinu=antinu,
-            device=device,
-            dtype=dtype,
-        )
-
-    @torch.no_grad()
-    def H_mass_basis(
-        self,
-        H_flavour: torch.Tensor,
-        antinu: Union[bool, torch.Tensor] = False,
-        *,
-        device: Optional[torch.device | str] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> torch.Tensor:
-        """Transform a flavour-basis Hamiltonian to the reduced mass basis.
-
-        Applies ``H_mass = Ured^dagger H_flavour Ured`` with
-        ``Ured = reduced(antinu=antinu)``.
-
-        Args:
-            H_flavour: Flavour-basis Hamiltonian shaped
-                (..., n_flavours, n_flavours).
-            antinu: Boolean scalar or tensor mask selecting antineutrinos.
-            device: Optional output device; defaults to H_flavour.device.
-            dtype: Optional output dtype; defaults to H_flavour.dtype.
-
-        Returns:
-            Hamiltonian represented in the reduced mass basis.
-        """
         n = self.n_flavours
-        if H_flavour.shape[-2:] != (n, n):
-            raise ValueError(f"H_flavour must have final dimensions ({n}, {n}).")
+        if operator_reduced.shape[-2:] != (n, n):
+            raise ValueError(
+                f"operator_reduced must have final dimensions ({n}, {n})."
+            )
 
         output_device = (
-            H_flavour.device if device is None else torch.device(device)
+            operator_reduced.device if device is None else torch.device(device)
         )
-        output_dtype = H_flavour.dtype if dtype is None else dtype
-        H_flavour = H_flavour.to(
+        output_dtype = operator_reduced.dtype if dtype is None else dtype
+        operator_reduced = operator_reduced.to(
+            device=output_device,
+            dtype=output_dtype,
+        )
+        O_outer = self.outer_block(antinu=antinu).to(
             device=output_device,
             dtype=output_dtype,
         )
 
-        Ured = self.reduced(antinu=antinu).to(
+        return O_outer @ operator_reduced @ O_outer.conj().transpose(-2, -1)
+
+    @torch.no_grad()
+    def reduced_basis(
+        self,
+        O_flavour_basis: torch.Tensor,
+        antinu: Union[bool, torch.Tensor] = False,
+        *,
+        device: Optional[torch.device | str] = None,
+        dtype: Optional[torch.dtype] = None,
+    ) -> torch.Tensor:
+        """Transform a general flavour-basis operator to the reduced basis.
+
+        Applies ``O_reduced = O_outer^dagger O_flavour O_outer``.
+
+        Args:
+            O_flavour_basis: Flavour-basis operator shaped
+                (..., n_flavours, n_flavours).
+            antinu: Boolean scalar or tensor mask selecting antineutrinos.
+            device: Optional output device; defaults to the operator device.
+            dtype: Optional output dtype; defaults to the operator dtype.
+
+        Returns:
+            Operator represented in the reduced basis.
+        """
+        n = self.n_flavours
+        if O_flavour_basis.shape[-2:] != (n, n):
+            raise ValueError(
+                f"O_flavour_basis must have final dimensions ({n}, {n})."
+            )
+
+        output_device = (
+            O_flavour_basis.device if device is None else torch.device(device)
+        )
+        output_dtype = O_flavour_basis.dtype if dtype is None else dtype
+        O_flavour_basis = O_flavour_basis.to(
             device=output_device,
             dtype=output_dtype,
         )
 
-        return Ured.conj().transpose(-2, -1) @ H_flavour @ Ured
+        O_outer = self.outer_block(antinu=antinu).to(
+            device=output_device,
+            dtype=output_dtype,
+        )
+
+        return (
+            O_outer.conj().transpose(-2, -1)
+            @ O_flavour_basis
+            @ O_outer
+        )
 
     @torch.no_grad()
     def refresh(self) -> None:

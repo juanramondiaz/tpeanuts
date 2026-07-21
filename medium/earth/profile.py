@@ -28,8 +28,18 @@ EarthProfile methods:
 
     shells_x(...): Return shell intersections and crossing masks.
     trajectory_profile(...): Build the perturbative profile in trajectory coordinates.
-    density_x_eta(...): Evaluate pointwise trajectory density.
+    density_x_eta(...): Evaluate pointwise trajectory electron density.
+    density_n_x_eta(...): Evaluate pointwise trajectory neutron density.
     call(...) and __call__(...): Pointwise compatibility interfaces.
+    call_neutron(...): Pointwise neutron-density compatibility interface.
+
+density_n_x_eta / call_neutron require a perturbative profile model built
+with neutron-density coefficients (EvenPowerProfileLayered and
+PremTabulatedProfile both support include_neutron=True, reading a
+composition-derived n_n(r) table alongside their default n_e(r) table); they
+raise a clear ValueError otherwise. See
+core.common.hamiltonian.hamiltonian_matter_reduced for the 3+1 sterile
+extension's neutral-current matter term these feed.
 
 """
 
@@ -43,7 +53,7 @@ from typing import Any, Optional
 import torch
 
 import tpeanuts.util.constant as constant
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.core.numerical.geometry import OdeMethod
 from tpeanuts.medium.earth.probability import PearthMethod
 from tpeanuts.util.context import RuntimeContext
@@ -320,12 +330,80 @@ class EarthProfile:
 
         return n_e
 
+    @torch.no_grad()
+    def density_n_x_eta(
+        self,
+        x: TensorLike,
+        eta: TensorLike,
+    ) -> Tensor:
+        """Evaluate pointwise neutron density along a trajectory.
+
+        Enables the 3+1 sterile extension's neutral-current matter term (see
+        ``core.common.hamiltonian.hamiltonian_matter_reduced``). Requires the
+        selected perturbative profile model to be built with neutron-density
+        coefficients: both ``EvenPowerProfileLayered`` and
+        ``PremTabulatedProfile`` support this via ``include_neutron=True``
+        (or an explicit ``coefficients_n``).
+
+        Args:
+            x: Dimensionless coordinate along the Earth chord.
+            eta: Detector nadir angle in radians.
+
+        Returns:
+            Neutron density in mol/cm^3 with broadcast input shape.
+
+        Raises:
+            ValueError: If the selected profile model was not built with
+                neutron-density coefficients (``include_neutron=True`` /
+                ``coefficients_n``), or does not support neutron density at
+                all.
+        """
+        if not hasattr(self._profile_perturbative, "evaluate_neutron"):
+            raise ValueError(
+                f"The '{self.profile_perturbative_name}' Earth profile model "
+                "does not provide neutron-density data required for the 3+1 "
+                "sterile extension's neutral-current (NC) matter term. Use "
+                "the PREM tabulated profile instead "
+                "(profile_perturbative_name='prem500', "
+                "profile_perturbative_kwargs={'include_neutron': True})."
+            )
+
+        dev = self.device
+        dt = self.dtype
+        x = as_tensor(x, device=dev, dtype=dt)
+        eta = as_tensor(eta, device=dev, dtype=dt)
+
+        xabs = torch.abs(x)
+        eta_b = eta + torch.zeros_like(xabs)
+        cos_eta = torch.cos(eta_b)
+        outside = xabs > cos_eta
+
+        trajectory_profile, xj, crossed = self.trajectory_profile(eta_b)
+
+        neg_inf = torch.tensor(float("-inf"), device=dev, dtype=dt)
+        xj_eff = torch.where(crossed, xj, neg_inf)
+
+        idx = torch.searchsorted(xj_eff, xabs[..., None], right=False).squeeze(-1)
+        idx = torch.clamp(idx, 0, xj_eff.shape[-1] - 1)
+
+        n_n = trajectory_profile.evaluate_neutron(xabs, layer_index=idx)
+        n_n = torch.where(outside, torch.zeros_like(n_n), n_n)
+
+        return n_n
+
     def call(
         self,
         r: Tensor,
         eta: Tensor,
     ) -> Tensor:
         return self.density_x_eta(r, eta)
+
+    def call_neutron(
+        self,
+        r: Tensor,
+        eta: Tensor,
+    ) -> Tensor:
+        return self.density_n_x_eta(r, eta)
 
     def __call__(
         self,
@@ -352,4 +430,16 @@ class EarthProfile:
         )
 
     __repr__ = __str__
+
+
+def build_earth_profile(
+    earth_profile: Optional[EarthProfile],
+    *,
+    params: Optional[EarthParameters] = None,
+    context: RuntimeContext,
+) -> EarthProfile:
+    """Return an existing Earth profile or build one from configured defaults."""
+    if earth_profile is not None:
+        return earth_profile
+    return EarthProfile(params=params or EarthParameters(), context=context)
     

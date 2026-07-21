@@ -54,6 +54,10 @@ from tpeanuts.core.perturbative.models.prem import (
     PremTabulatedProfile,
     PremProfileSegment,
 )
+from tpeanuts.core.perturbative.models.atmosphere import (
+    AtmospherePolynomialProfile,
+    AtmospherePolynomialSegment,
+)
 
 __all__ = [
     "PerturbativeOuterSegment",
@@ -63,4 +67,6 @@ __all__ = [
     "EvenPowerProfileSegment",
     "PremTabulatedProfile",
     "PremProfileSegment",
+    "AtmospherePolynomialProfile",
+    "AtmospherePolynomialSegment",
 ]

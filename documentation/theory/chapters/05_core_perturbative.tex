@@ -1,0 +1,362 @@
+\chapter{\texttt{core.perturbative} --- perturbative approximation}
+\label{ch:core-perturbative}
+
+\begin{notebox}[title={This Chapter Describes an Approximation}]
+Everything in this chapter is a \textbf{first-order perturbative
+approximation} to the exact position-dependent Schr\"odinger equation
+(\cref{ch:core-common}), offered as a cheaper alternative to the exact
+numerical method of \cref{ch:core-numerical} \emph{within a restricted
+validity range} -- it is not a second, independently correct propagation
+method.
+
+\textbf{The approximation.} Within one segment, the Hamiltonian is split
+into a constant average and a position-dependent residual,
+$H(x)=H_{\rm avg}+\delta H(x)$, where $H_{\rm avg}$ uses the
+segment-\emph{average} density and $\delta H(x)$ captures the fluctuation
+around it. The evolutor is expanded to \textbf{first order} in $\delta H$:
+$S\approx U_0+U_1$, with $U_0=\exp(-iH_{\rm avg}L)$ exact for the constant
+average (\cref{sec:perturbative-evolutor}), and $U_1$ the first Dyson-series
+correction from $\delta H$.
+
+\textbf{Range and conditions of validity.} The truncation is controlled by
+the phase the \emph{residual} potential accumulates over the segment,
+$|\delta V(x)|\cdot L$: the approximation is trustworthy while this stays
+small compared to 1 throughout the segment (equivalently, while the
+neglected second- and higher-order Dyson terms stay small relative to
+$U_1$). In practice this means: (a) the profile model
+(\cref{sec:perturbative-models}) must fit the true density well enough,
+and/or segments must be short enough, that the density does not deviate
+strongly from its local average within any one segment; (b) accuracy is
+expected to degrade for segments spanning a large density contrast (e.g.\ a
+sharp discontinuity treated as a single segment). \textbf{No automatic
+error estimate or order check is built into this code path} -- unlike
+\cref{ch:core-numerical}'s explicit accuracy note, there is no signal here
+that a given (segment, profile-model) choice has left the valid regime; it
+must be established externally, typically by cross-validating against the
+exact numerical evolutor of \cref{ch:core-numerical} for representative
+parameters before trusting a perturbative configuration in production.
+\end{notebox}
+
+This chapter covers \texttt{spectral.py} (the closed-form spectral
+decomposition every perturbative segment evolutor is built from),
+\texttt{evolutor.py} (the zeroth- and first-order evolution operators
+themselves), and the family of interchangeable density-profile models that
+supply the analytic inputs the first-order correction needs.
+
+\section{\texttt{spectral.py} --- closed-form spectral decomposition}
+
+\modulehead{core/perturbative/spectral.py}{Trace/traceless splitting,
+characteristic-polynomial invariants, and closed-form spectral projectors
+for a $3\times3$ or $4\times4$ Hermitian Hamiltonian.}
+
+\begin{theorybox}
+\subsection*{Trace and traceless parts}
+Any Hermitian $H$ splits uniquely into a multiple of the identity and a
+traceless remainder,
+\begin{equation}
+  \keyresult{T = H - \frac{\Tr(H)}{N}\,I_N}, \qquad N=H.\text{shape}[-1]\in\{3,4\}.
+\end{equation}
+Since $I_N$ commutes with everything, $H$ and $T$ share the same
+eigenvectors, and $H$'s eigenvalues are simply $T$'s shifted uniformly by
+$\Tr(H)/N$. Working with $T$ instead of $H$ removes the sub-leading term of
+the characteristic polynomial (no $\lambda^{N-1}$ term, since $\Tr(T)=0$),
+which is what makes the closed-form projector formulas below tractable.
+
+\subsection*{Characteristic-polynomial invariants}
+For $N=3$, $T$'s characteristic polynomial is $\lambda^3+c_1\lambda+c_0=0$
+with
+\begin{equation}
+  c_1 = -\tfrac12\Tr(T^2), \qquad c_0 = -\tfrac13\Tr(T^3).
+\end{equation}
+The $N=4$ projector formula additionally needs
+$e_3=\tfrac13\Tr(T^3)=-c_0$ (kept as a separate function in the code to
+avoid a sign-confusion bug, since both invariants are used together for
+$N=4$). The eigenvalues $\lambda_a$ themselves have no closed-form solver
+in this module -- they are obtained numerically via
+\pyfunc{torch.linalg.eigvalsh}; only the \emph{projectors} below are
+closed-form, given the eigenvalues.
+
+\subsection*{Closed-form spectral projectors}
+The spectral theorem writes $T=\sum_a\lambda_a M_a$ with
+$M_a=\prod_{b\neq a}\frac{T-\lambda_b I}{\lambda_a-\lambda_b}$ (the
+Lagrange/Sylvester interpolation projector). Using Cayley--Hamilton and
+$\Tr(T)=0$ to eliminate the "other" eigenvalues $\lambda_{b\neq a}$ from
+this product, it reduces to an explicit polynomial in $T$ (and $T^2$, plus
+$T^3$ for $N=4$) with coefficients depending only on $\lambda_a$ and the
+invariants above:
+For $N=3$:
+\begin{equation}
+  \keyresult{M_a = \frac{(\lambda_a^2+c_1)\,I + \lambda_a T + T^2}{3\lambda_a^2+c_1}}.
+\end{equation}
+For $N=4$:
+\begin{equation}
+  \keyresult{M_a = \frac{T^3+\lambda_a T^2+(c_1+\lambda_a^2)T+(\lambda_a^3+c_1\lambda_a-e_3)\,I}{4\lambda_a^3+2c_1\lambda_a-e_3}}.
+\end{equation}
+Both denominators equal $p'(\lambda_a)$, the derivative of the
+characteristic polynomial at that root: they vanish exactly when
+$\lambda_a$ is a repeated eigenvalue. Both formulas were verified
+symbolically and numerically (against direct Lagrange interpolation and
+against \pyfunc{torch.linalg.eigh} eigenvector outer products) to match to
+floating-point precision.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{Degeneracy fallback.} Near a (near-)degenerate spectrum the
+closed-form projector formulas lose precision well before their
+denominator literally reaches zero, since $p'(\lambda_a)\to0$
+continuously. \pyfunc{\_spectral\_degeneracy\_mask} flags batch entries
+whose minimum pairwise eigenvalue gap is small \emph{relative} to the
+spectrum scale (or whose scale itself is numerically zero, the $T\approx0$
+case, where the relative test would be $0/0$); flagged entries have their
+projectors replaced wholesale by $M_a=v_av_a^\dagger$ from a direct
+\pyfunc{torch.linalg.eigh(T)} call -- exact and stable by construction,
+independent of the closed-form formula's conditioning, computed only when
+at least one batch entry actually needs it. This module runs entirely
+under \code{@torch.no\_grad()}, so the well-known gradient instability of
+degenerate eigenvectors is not a concern here (the perturbative path is
+used for forward propagation, not for differentiating through the
+spectrum).
+\end{notebox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{hamiltonian\_traceless(H)}: returns $(T,\Tr H)$.
+  \item \pyfunc{hamiltonian\_traceless\_c0/c1/e3(T)}: the invariants above.
+  \item \pyfunc{hamiltonian\_traceless\_eigenvalues(T)}: $\lambda_a$ via
+    \pyfunc{torch.linalg.eigvalsh}.
+  \item \pyfunc{hamiltonian\_spectral\_projectors\_traceless(T, ...)}:
+    builds $M_a$ (closed form, with the \pyfunc{eigh} fallback above);
+    returns $(M,\lambda,c_1)$.
+  \item \pyfunc{hamiltonian\_spectral\_data(H)}: the one-stop entry point
+    used by \texttt{evolutor.py} -- computes $T$, $\Tr H$, $\lambda$, $c_1$,
+    and $M$ in one call, reusing intermediate products ($T^2$, $T^3$)
+    across every invariant and the projector formula to avoid redundant
+    matrix multiplications.
+  \item \pyfunc{spectral\_projector\_residuals(M, T, lam)}: diagnostic
+    residual norms (completeness $\sum_aM_a=I$, idempotency
+    $M_a^2=M_a$, orthogonality $M_aM_b=0$, unit trace, and
+    reconstruction $\sum_a\lambda_aM_a=T$) -- used both by the test suite
+    and by the degeneracy instrumentation itself.
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{evolutor.py} --- perturbative segment evolution}
+\label{sec:perturbative-evolutor}
+
+\modulehead{core/perturbative/evolutor.py}{\pyfunc{evolutor\_zero\_order}
+(exact, for the segment-average Hamiltonian) and
+\pyfunc{evolutor\_first\_order} (the first Dyson-series correction from the
+density residual), combined into the segment evolutor below.}
+
+\begin{theorybox}
+\subsection*{Zeroth order: exact evolution under the average Hamiltonian}
+Given the spectral decomposition $H_{\rm avg}=T+\Tr(H_{\rm avg})/N\cdot I$
+from the previous section, the spectral theorem gives $\exp(-iH_{\rm avg}L)$
+\emph{exactly} (not perturbatively) as
+\begin{equation}
+  \keyresult{U_0 = \sum_a \exp\!\Bigl[-i\Bigl(\lambda_a+\tfrac{\Tr H_{\rm avg}}{N}\Bigr)L\Bigr]\,M_a},
+\end{equation}
+since conjugating by the identity-shift only shifts every eigenvalue by the
+same constant $\Tr(H_{\rm avg})/N$, leaving the projectors $M_a$
+untouched. $U_0$ is the entire answer if the segment's density were exactly
+constant at its average value; every approximation in this chapter lives
+in the correction below.
+
+\subsection*{First order: the Dyson-series correction from the residual}
+Writing $H(x)=H_{\rm avg}+\delta H(x)$ with $\delta H(x)=\delta V(x)\,P$ (a
+position-independent \emph{direction} matrix $P$ scaled by the
+position-dependent residual potential $\delta V(x)=V(x)-V_{\rm avg}$; see
+below for $P$), first-order time-dependent perturbation theory in the
+interaction picture defined by $U_0$ gives
+\begin{equation}
+  U_1 = -i\int_{x_1}^{x_2} U_0(x_2,x')\,\delta H(x')\,U_0(x',x_1)\,\mathrm{d}x'.
+\end{equation}
+Expanding $U_0$ in the spectral basis, $U_0(x_2,x')=\sum_a
+e^{-i\lambda_a(x_2-x')}M_a$, and inserting $\delta H(x')=\delta V(x')P$
+turns the operator integral into a sum over eigenvalue \emph{pairs} of a
+scalar oscillatory integral of the residual density weighted by the matrix
+$M_aPM_b$:
+\begin{equation}
+  \keyresult{U_1 = -i\sum_{a,b} I_{ab}\;M_a\,P\,M_b},
+  \qquad
+  I_{ab} = \int_{x_1}^{x_2}\delta V(x')\,e^{-i\lambda_a(x_2-x')-i\lambda_b(x'-x_1)}\,\mathrm{d}x'.
+\end{equation}
+$I_{ab}$ (a ``spectral oscillatory integral'' of the residual profile) is
+computed analytically by the active profile model
+(\cref{sec:perturbative-models}, \pyfunc{residual\_integral}); it is the
+only place the specific density parametrisation enters the perturbative
+machinery -- \texttt{evolutor.py} itself never sees a profile's functional
+form, only $I_{ab}(\lambda_a,\lambda_b)$.
+
+\textbf{The direction matrix $P$.} For the plain Standard Model or 3+1
+sterile case (no NSI), only the electron-flavour entry of $H_{\rm mat}$
+varies with density, so $P=\diag(1,0,\dots,0)$ and the sandwich $M_aPM_b$
+reduces to the rank-1 outer product of $M_a$'s first column with $M_b$'s
+first row -- the closed-form shortcut used when the caller passes no
+explicit $P$. When NSI is active, the coupling $\epsilon$ is
+position-independent (only the electron density magnitude, not the NSI
+coupling itself, varies along the segment), so the same first-order
+structure applies with
+\begin{equation}
+  P = O^\dagger\bigl(\diag(1,0,\dots,0)+\epsilon\bigr)O
+\end{equation}
+in the reduced basis (\cref{ch:core-bsm}) -- fixed once per segment (built
+at $V{=}1$) and reused for both $H_{\rm avg}$'s matter term and this
+first-order sandwich, since it no longer reduces to the SM rank-1
+shortcut once $\epsilon$ breaks the electron-only structure.
+
+\textbf{The neutral-current direction $P_{NC}$.} When the optional 3+1
+sterile neutral-current term is active (\cref{ch:core-common}), it
+contributes a second, wholly independent first-order term, since the
+electron- and neutron-density residuals fluctuate independently along the
+segment:
+\begin{equation}
+  \keyresult{U_1 = -i\sum_{a,b} I_{ab}^{(e)}\;M_a\,P_{CC}\,M_b
+             \;-i\sum_{a,b} I_{ab}^{(n)}\;M_a\,P_{NC}\,M_b},
+\end{equation}
+where $I_{ab}^{(n)}$ is the same spectral oscillatory integral as
+$I_{ab}^{(e)}$ but of the \emph{neutron}-density residual
+($\pyfunc{residual\_integral\_neutron}$, below), and
+$P_{NC}=O^\dagger\diag(0,0,0,-1)\,O$ is the (always rotated) direction
+matrix derived in \cref{ch:core-common}. Unlike $P_{CC}$, $P_{NC}$ never
+reduces to a rank-1 shortcut regardless of whether NSI is active, since it
+never commutes with $O$; the CC term above may still use its own rank-1
+shortcut independently, since the two contributions are additive and
+computed separately. Omitting the neutral-current term (the default)
+recovers the CC(+NSI)-only expression exactly.
+
+\subsection*{Combining orders, and the zero-length convention}
+The segment evolutor is $U=U_0+U_1$
+(\pyfunc{evolutor\_perturbative\_from\_H}), with two guards applied by the
+code around this core formula: (1) if the profile model reports no
+perturbation for a segment (a genuinely constant density, e.g.\
+\pyfunc{has\_perturbation()} is \code{False}), $U_1$ is skipped entirely
+--- both because it is identically zero and to avoid computing
+$I_{ab}$ needlessly; (2) zero-length segments are forced to the identity
+operator (\pyfunc{enforce\_identity\_for\_zero\_length}) regardless of the
+formula above, since $L=0$ is a genuine edge case (e.g.\ a trajectory that
+grazes but does not cross a layer) rather than a regime where the
+perturbative expansion itself is being tested.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{Hermitian conjugate, again.} \pyfunc{evolutor\_perturbative\_segment}
+builds $H_{\rm kin}$ via \pyfunc{hamiltonian\_kinetic\_reduced}
+(\cref{ch:core-common}), which -- exactly as flagged there and in
+\cref{ch:core-bsm} -- always uses $U_{\rm red}\diag(k)U_{\rm
+red}^\dagger$, never the plain transpose. This matters even more visibly
+here: for the 3+1 sterile case the code computes the segment's flavour-basis
+trace directly as $\Tr(H_{\rm kin}+H_{\rm mat})$ rather than assuming
+$\Tr(H_{\rm kin})=\sum_ik_i$ (only guaranteed for a \emph{real} $U_{\rm
+red}$) or $\Tr(H_{\rm mat})=V$ (only true for the plain
+$\diag(1,0,\dots,0)$ direction) -- both shortcuts used safely in the
+pure-SM fast path, both invalid once the sterile CP phase $\delta_{14}$ or
+a generic NSI $\epsilon$ is active.
+\end{notebox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{evolutor\_zero\_order(H, L, ...)}: the exact $U_0$ formula
+    above; can also return the spectral data for reuse by the first-order
+    call, avoiding a second diagonalisation.
+  \item \pyfunc{evolutor\_first\_order(M, lam, trace\_H, profile\_model, ..., P=None, P\_nc=None)}:
+    the $U_1$ formula above, using the rank-1 shortcut for the CC term when
+    \code{P} is \code{None}; when \code{P\_nc} is also supplied, adds the
+    independent neutral-current sandwich term using
+    \pyfunc{profile\_model.residual\_integral\_neutron} and
+    \pyfunc{matter\_potential\_nc}.
+  \item \pyfunc{evolutor\_perturbative\_from\_H(H, L, profile\_model, ..., P=None, P\_nc=None)}:
+    combines both orders, with the no-perturbation and zero-length guards;
+    the no-perturbation check also consults
+    \pyfunc{profile\_model.has\_perturbation\_neutron()} when \code{P\_nc}
+    is supplied.
+  \item \pyfunc{evolutor\_perturbative\_segment(oscillation, E\_MeV,
+    profile\_model, ..., include\_matter\_nc=False)}: the user-facing entry
+    point -- builds the reduced Hamiltonian (SM, sterile, NSI, or any
+    combination, mirroring \cref{ch:core-common,ch:core-bsm}) from the
+    profile model's segment average, then evolves it perturbatively via the
+    function above. The plain Standard Model case takes a dedicated fast
+    path (bit-identical output, avoiding the general-$N$ machinery's
+    overhead). \code{include\_matter\_nc=True} additionally requires
+    \code{profile\_model.potential\_n} to be set (i.e.\ the profile was
+    built with neutron-density coefficients, next section) and is silently
+    ignored for a 3-flavour \code{oscillation.pmns}, mirroring
+    \pyfunc{hamiltonian\_matter\_reduced}'s own convention
+    (\cref{ch:core-common}).
+\end{itemize}
+\end{implbox}
+
+\section{Comparing the perturbative density-profile models}
+\label{sec:perturbative-models}
+
+\modulehead{core/perturbative/models/*}{Three interchangeable profile
+models, each supplying \code{average}, \code{length}, \code{zero\_mask},
+\code{potential}, \pyfunc{residual\_integral}, and
+\pyfunc{has\_perturbation} to the model-agnostic evolutor above.}
+
+\begin{implbox}
+None of the mathematics in \texttt{evolutor.py} or \texttt{spectral.py}
+changes between models: they differ purely in \emph{how} the segment's
+density profile $n_e(x)$ is parametrised, and hence in the closed-form
+expression used for $I_{ab}$.
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Model & Density parametrisation and usage \\
+\midrule
+\parbox[t]{3.2cm}{\code{even\_power}} &
+  \parbox[t]{9.4cm}{$n_e(x)=a+bx^2+cx^4+\delta_1x^6+\dots$ (even powers only,
+  arbitrary order) in the raw trajectory coordinate $x$. Appropriate
+  whenever the segment is symmetric about the trajectory's point of
+  closest approach to a spherically symmetric medium (e.g.\ an
+  Earth-crossing chord through one shell), which forces $n_e(x)=n_e(-x)$
+  and eliminates odd powers identically. The general-order model used for
+  Earth propagation.} \\[30pt]
+\parbox[t]{3.2cm}{\code{prem}} &
+  \parbox[t]{9.4cm}{$n_e(x)=a+bx^2$: the 2-coefficient special case of
+  \code{even\_power} truncated at the quadratic term, matching the PREM
+  reference model's own native linear-in-$r^2$ parametrisation per shell
+  \parencite{DziewonskiAnderson1981}. A lighter-weight specialisation, not
+  an independent formulation -- it exists to avoid the general
+  \code{even\_power} machinery's overhead when only two coefficients are
+  ever needed.} \\[30pt]
+\parbox[t]{3.2cm}{\code{atmosphere}} &
+  \parbox[t]{9.4cm}{$n_e(q)=\sum_kc_kq^k$ (every power, even and odd) in a
+  \emph{centred and rescaled} local coordinate $q=(x-\text{centre})/\text{half-width}$.
+  Atmosphere segments are not symmetric about their own centre the way an
+  Earth chord is, so odd terms are required; the local coordinate keeps the
+  fitted coefficients well-conditioned regardless of the segment's absolute
+  position or width.} \\[30pt]
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every model computes its own \pyfunc{residual\_integral} in closed form for
+ordinary (non-degenerate) eigenvalue gaps, switching to a Taylor expansion
+in $\lambda_a-\lambda_b$ near degeneracy to avoid the numerical instability
+of the closed form as the oscillation frequency approaches zero -- the same
+degeneracy-awareness pattern as the spectral projectors themselves
+(previous section), applied independently at the profile-model level.
+\pyfunc{perturbative\_profile\_selection} (\code{core/perturbative/models/model\_selection.py})
+maps a public model name (\code{"even\_power"}, \code{"prem"}, ...) to the
+concrete layered-profile class, so medium code can request a model without
+importing model-specific classes directly.
+
+\textbf{Optional neutron-density coefficients.} All three segment classes
+optionally accept a second, independent set of coefficients for the neutron
+density $n_n$ -- same functional form and coordinate as the electron-density
+fit above, fitted or supplied separately -- exposing \code{average\_n},
+\code{potential\_n}, \pyfunc{residual\_integral\_neutron}, and
+\pyfunc{has\_perturbation\_neutron} alongside the electron-only attributes,
+required by \pyfunc{evolutor\_perturbative\_segment}'s
+\code{include\_matter\_nc=True} (previous section). They default to
+\code{None}, reproducing the pre-existing CC-only behaviour exactly; the
+layered profile classes that build these segments
+(\code{EvenPowerProfileLayered}, \code{PremTabulatedProfile}) load them from
+a composition-derived neutron-density table when constructed with
+\code{include\_neutron=True} (\cref{ch:earth}), and
+\code{AtmospherePolynomialProfile} fits them from a separate neutron-density
+sample at the same nodes (\cref{ch:atmosphere}).
+\end{implbox}

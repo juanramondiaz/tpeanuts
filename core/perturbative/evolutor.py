@@ -46,12 +46,13 @@ import torch
 
 from tpeanuts.core.perturbative.spectral import hamiltonian_spectral_data
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.core.common.potential import matter_potential
+from tpeanuts.core.common.potential import matter_potential_cc, matter_potential_nc
 from tpeanuts.core.common.hamiltonian import (
     hamiltonian_kinetic_reduced,
-    hamiltonian_matter_reduced,
+    _matter_direction_reduced,
 )
 from tpeanuts.util.constant import R_E
+from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.torch_util import enforce_identity_for_zero_length, infer_device_dtype
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real
 
@@ -67,27 +68,29 @@ def evolutor_zero_order(
     """Compute the exact zeroth-order operator for the average Hamiltonian.
 
     The function diagonalizes the traceless Hamiltonian and evaluates
-    ``U0 = sum_a exp[-i(lambda_a + Tr(H)/3)L] M_a``. When requested, the same
+    ``U0 = sum_a exp[-i(lambda_a + Tr(H)/N)L] M_a``, N = H.shape[-1] (3 for
+    the SM, 4 for the 3+1 sterile extension). When requested, the same
     spectral data are returned so the first-order term can reuse them without
     a second diagonalization.
 
     Args:
-        H: Dimensionless average Hamiltonian shaped (..., 3, 3).
+        H: Dimensionless average Hamiltonian shaped (..., N, N), N in {3, 4}.
         L: Dimensionless segment length.
         trace_H: Optional precomputed trace of H.
         zero_mask: Optional mask selecting segments that must return identity.
         return_spectral: Return ``(U0, spectral_data)`` when True.
 
     Returns:
-        U0 shaped (..., 3, 3), optionally paired with its spectral data.
+        U0 shaped (..., N, N), optionally paired with its spectral data.
     """
+    N = H.shape[-1]
     spectral = hamiltonian_spectral_data(H, trace_H=trace_H)
     lam = spectral["lam"]
     trace = spectral["trace"].to(dtype=lam.dtype)
     length = L.to(dtype=lam.dtype)
 
     phase = torch.exp(
-        -1j * (lam + trace[..., None] / 3.0) * length[..., None]
+        -1j * (lam + trace[..., None] / N) * length[..., None]
     )
     U0 = (phase[..., :, None, None] * spectral["M"]).sum(dim=-3)
 
@@ -108,43 +111,109 @@ def evolutor_first_order(
     antinu: Union[bool, torch.Tensor] = False,
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
+    P: torch.Tensor | None = None,
+    P_nc: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Compute the first-order correction for a density-profile model.
 
+    The correction is ``U1 = -i sum_{a,b} I_ab (M_a @ P @ M_b)``, where
+    ``I_ab`` is the spectral oscillatory integral of the residual density
+    profile and ``P`` is the (position-independent) matter-potential
+    "direction" matrix -- ``diag(1, 0, ..., 0)`` for the plain Standard Model
+    /sterile matter term (only the electron flavour couples), or
+    ``O^dagger (diag(1,0,...,0) + epsilon) O`` in the reduced basis for NSI
+    (see ``tpeanuts.core.BSM.bsm_nsi.NSIConfig.epsilon_tensor`` and
+    ``PMNS.outer_block``), since only the profile's electron-density
+    magnitude varies along the segment, not the fixed NSI coupling epsilon.
+
+    When ``P_nc`` is also supplied, a second, independent sandwich term is
+    added using the profile's neutron-density residual integral
+    (``profile_model.residual_integral_neutron(la, lb)``) and
+    ``core.common.potential.matter_potential_nc``, enabling the 3+1 sterile
+    extension's neutral-current matter term (see
+    ``core.common.hamiltonian.hamiltonian_matter_reduced``). This term always
+    uses the general sandwich formula (``P_nc`` never commutes with the
+    reduced-basis rotation ``O``), independent of whether the CC term above
+    took the rank-1 shortcut.
+
     Args:
-        M: Spectral projectors shaped (..., 3, 3, 3).
-        lam: Traceless-Hamiltonian eigenvalues shaped (..., 3).
+        M: Spectral projectors shaped (..., N, N, N), N in {3, 4}.
+        lam: Traceless-Hamiltonian eigenvalues shaped (..., N).
         trace_H: Trace of the full dimensionless Hamiltonian.
         profile_model: Object exposing ``residual_integral(la, lb)``. The
-            returned integral must have units of electron density times
-            evolution coordinate and be broadcastable with the spectral matrix
-            pairs.
+            returned integral must have units of density times evolution
+            coordinate and be broadcastable with the spectral matrix pairs.
+            When ``P_nc`` is given, it must also expose
+            ``residual_integral_neutron(la, lb)``.
         antinu: Select the antineutrino matter-potential sign.
         evolution_scale_m: Length scale used to normalize the potential.
         legacy_precision: If True, use the legacy peanuts matter-potential
-            prefactor for the first-order correction.
+            prefactor for the first-order CC correction. Has no NC
+            counterpart (see ``matter_potential_nc``), so it never affects
+            the NC term.
+        P: Optional matter-potential direction matrix shaped (..., N, N),
+            broadcastable against the batch shape of ``M`` (e.g. unbatched,
+            or batched only by antinu when ``antinu`` is a per-trajectory
+            mask -- it must stay independent of position/segment/energy
+            batch dims, since it is evaluated once "at V=1" by the caller).
+            When None (the common case), uses the closed-form rank-1
+            shortcut equivalent to ``P = diag(1, 0, ..., 0)``
+            (``M[...,:,:,0]``/``M[...,:,0,:]``) -- bit-identical to, and
+            faster than, the general sandwich formula with that same P.
+        P_nc: Optional neutral-current matter-potential direction matrix,
+            same shape/batch constraints as ``P``. None (the default) omits
+            the NC correction entirely, reproducing the pre-existing
+            CC-only behaviour exactly.
 
     Returns:
-        First-order correction U1 shaped (..., 3, 3).
+        First-order correction U1 shaped (..., N, N).
     """
-    eigenvalues_H = lam + trace_H[..., None] / 3.0
-    integral = profile_model.residual_integral(
-        la=eigenvalues_H[..., :, None],
-        lb=eigenvalues_H[..., None, :],
-    )
-    potential_correction = matter_potential(
+    N = M.shape[-1]
+    eigenvalues_H = lam + trace_H[..., None] / N
+    la = eigenvalues_H[..., :, None]
+    lb = eigenvalues_H[..., None, :]
+    integral = profile_model.residual_integral(la=la, lb=lb)
+    potential_correction = matter_potential_cc(
         integral,
         antinu=antinu,
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
     ).to(dtype=M.dtype)
 
-    return (-1j) * torch.einsum(
-        "...ab,...ai,...bj->...ij",
-        potential_correction,
-        M[..., :, :, 0],
-        M[..., :, 0, :],
-    )
+    if P is None:
+        U1 = (-1j) * torch.einsum(
+            "...ab,...ai,...bj->...ij",
+            potential_correction,
+            M[..., :, :, 0],
+            M[..., :, 0, :],
+        )
+    else:
+        P = P.to(device=M.device, dtype=M.dtype)
+        U1 = (-1j) * torch.einsum(
+            "...ab,...aik,...kl,...blj->...ij",
+            potential_correction,
+            M,
+            P,
+            M,
+        )
+
+    if P_nc is not None:
+        integral_nc = profile_model.residual_integral_neutron(la=la, lb=lb)
+        potential_correction_nc = matter_potential_nc(
+            integral_nc,
+            antinu=antinu,
+            evolution_scale_m=evolution_scale_m,
+        ).to(dtype=M.dtype)
+        P_nc = P_nc.to(device=M.device, dtype=M.dtype)
+        U1 = U1 + (-1j) * torch.einsum(
+            "...ab,...aik,...kl,...blj->...ij",
+            potential_correction_nc,
+            M,
+            P_nc,
+            M,
+        )
+
+    return U1
 
 
 def evolutor_perturbative_from_H(
@@ -157,11 +226,13 @@ def evolutor_perturbative_from_H(
     antinu: Union[bool, torch.Tensor] = False,
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
+    P: torch.Tensor | None = None,
+    P_nc: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Combine zeroth- and first-order evolution for one density segment.
 
     Args:
-        H: Dimensionless average Hamiltonian shaped (..., 3, 3).
+        H: Dimensionless average Hamiltonian shaped (..., N, N), N in {3, 4}.
         L: Segment length in evolution coordinates.
         profile_model: Density-profile model providing the residual integral
             and perturbation mask for the first-order correction.
@@ -171,9 +242,15 @@ def evolutor_perturbative_from_H(
         evolution_scale_m: Length scale used to normalize H and the correction.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor for the first-order correction.
+        P: Optional matter-potential direction matrix forwarded to
+            ``evolutor_first_order`` (see its docstring). None reproduces the
+            plain Standard Model/sterile ``diag(1,0,...,0)`` direction.
+        P_nc: Optional neutral-current direction matrix forwarded to
+            ``evolutor_first_order``. None (the default) omits the NC
+            correction entirely.
 
     Returns:
-        Perturbative segment operator U0 + U1 shaped (..., 3, 3).
+        Perturbative segment operator U0 + U1 shaped (..., N, N).
     """
     U0, spectral = evolutor_zero_order(
         H,
@@ -182,14 +259,27 @@ def evolutor_perturbative_from_H(
         return_spectral=True,
     )
 
-    perturbation_mask = profile_model.has_perturbation().to(device=U0.device)
+    known_any_perturbation = getattr(profile_model, "any_perturbation", None)
+    if known_any_perturbation is False:
+        # Constant profile models carry structural metadata, avoiding a
+        # tensor reduction and CPU/GPU synchronization in this common path.
+        # A constant CC segment also has a constant NC term (both come from
+        # the same physical shell), so this shortcut is valid regardless of
+        # P_nc.
+        perturbation_mask = None
+    else:
+        perturbation_mask = profile_model.has_perturbation().to(device=U0.device)
+        if P_nc is not None:
+            perturbation_mask = perturbation_mask | profile_model.has_perturbation_neutron().to(
+                device=U0.device
+            )
 
     # A segment with no perturbation (e.g. a constant-density segment) has a
     # zero first-order correction everywhere, and would just be masked back
     # to zero below. Skipping evolutor_first_order in that case avoids the
     # residual_integral spectral-oscillatory-integral computation entirely
     # when its result is guaranteed to be discarded.
-    if not bool(torch.any(perturbation_mask)):
+    if perturbation_mask is None or not bool(torch.any(perturbation_mask)):
         U = U0
     else:
         U1 = evolutor_first_order(
@@ -200,6 +290,8 @@ def evolutor_perturbative_from_H(
             antinu=antinu,
             evolution_scale_m=evolution_scale_m,
             legacy_precision=legacy_precision,
+            P=P,
+            P_nc=P_nc,
         )
 
         mask = perturbation_mask
@@ -222,70 +314,182 @@ def evolutor_perturbative_segment(
     E_MeV: TensorLike,
     profile_model: object,
     *,
+    antinu: Union[bool, torch.Tensor, None] = None,
     debug: bool = False,
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
+    include_matter_nc: bool = False,
 ) -> torch.Tensor:
     """Build a reduced Hamiltonian for one profile model and evolve it perturbatively.
 
-    3-flavour SM only (via ``hamiltonian_kinetic_reduced``/
-    ``hamiltonian_matter_reduced``); ``oscillation.DeltamSq41`` is unused.
+    Supports the 3-flavour Standard Model, the 3+1 sterile extension
+    (``oscillation.BSM_extension_sterile``, using
+    ``oscillation.mass_spectrum.DeltamSq41``),
+    and NSI (``oscillation.nsi``, active for either flavour count, rotated
+    into the reduced basis with ``pmns.outer_block`` -- see
+    ``NSIConfig.epsilon_tensor``), all via
+    ``tpeanuts.core.common.hamiltonian.hamiltonian_kinetic_reduced``. The
+    plain Standard Model case (``not oscillation.BSM_extension``) takes the
+    original code path unchanged (bit-identical output, same performance).
 
     Args:
-        oscillation: Built pmns object plus mass splittings and antinu
-            selection. ``oscillation.pmns`` must expose the reduced mixing
-            matrix.
+        oscillation: Built pmns object plus mass splittings, antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute.
+            ``oscillation.pmns`` must expose the reduced mixing matrix.
         E_MeV: Neutrino energy in MeV.
         profile_model: Perturbative density-profile model exposing
             ``average``, ``length``, ``zero_mask``, ``potential``,
-            ``residual_integral(la, lb)``, and ``has_perturbation()``.
+            ``residual_integral(la, lb)``, and ``has_perturbation()``. When
+            ``include_matter_nc`` is True, it must also expose
+            ``potential_n``, ``residual_integral_neutron(la, lb)``, and
+            ``has_perturbation_neutron()`` (see e.g.
+            ``EvenPowerProfileSegment``/``PremProfileSegment`` built with
+            neutron-density coefficients).
+        antinu: Optional scalar or batched antineutrino selector. If omitted,
+            ``oscillation.antinu`` is used.
         debug: If True, print diagnostic intermediate checks.
         evolution_scale_m: Positive scale in metres defining H and the
             evolution coordinate.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in perturbative corrections. The segment average
             potential is supplied by the profile model.
+        include_matter_nc: If True, also apply the 3+1 sterile extension's
+            neutral-current matter term using ``profile_model``'s
+            neutron-density data (only meaningful when
+            ``oscillation.pmns`` is 4-flavour; silently ignored otherwise,
+            matching ``core.common.hamiltonian.hamiltonian_matter_reduced``).
+            Requires ``profile_model.potential_n`` to be set (i.e. the
+            profile was built with neutron-density coefficients); raises
+            ValueError otherwise. False (the default) reproduces the
+            pre-existing CC-only behaviour exactly.
 
     Returns:
-        Complex segment evolutor shaped (..., 3, 3).
+        Complex segment evolutor shaped (..., N, N), N in {3, 4}.
     """
     pmns = oscillation.pmns
-    antinu = oscillation.antinu
+    n_flavours = int(pmns.n_flavours)
+    if antinu is None:
+        antinu = oscillation.antinu
 
-    device, rdtype = infer_device_dtype(
-        E_MeV,
-        profile_model.length,
-        profile_model.average,
-        profile_model.potential,
-    )
+    # Profile models normalize all their fields at construction time.  Use
+    # that context as the single source of truth and normalize only the public
+    # energy input here; copying every profile field again in this hot path is
+    # redundant for every Earth segment evaluation.
+    device = profile_model.length.device
+    rdtype = profile_model.length.dtype
     cdtype = cdtype_from_real(rdtype)
 
     E_MeV = as_tensor(E_MeV, device=device, dtype=rdtype)
-    V = profile_model.potential.to(device=device, dtype=rdtype)
-    naverage = profile_model.average.to(device=device, dtype=rdtype)
-    L = profile_model.length.to(device=device, dtype=rdtype)
-    zero_mask = profile_model.zero_mask.to(device=device)
+    V = profile_model.potential
+    L = profile_model.length
+    zero_mask = profile_model.zero_mask
+
+    if V.device != device or V.dtype != rdtype:
+        raise ValueError("profile_model.potential must match profile_model.length device and dtype.")
+    if zero_mask.device != device or zero_mask.dtype != torch.bool:
+        raise ValueError("profile_model.zero_mask must be boolean and share the profile device.")
 
     Ured = pmns.reduced(antinu=antinu)
-    Hkin, ki = hamiltonian_kinetic_reduced(
-        DeltamSq21=oscillation.DeltamSq21,
-        DeltamSq3l=oscillation.DeltamSq3l,
-        E_MeV=E_MeV,
-        Ured=Ured,
-        evolution_scale_m=evolution_scale_m,
-        return_ki=True,
-        legacy_precision=legacy_precision,
-    )
+    P = None
+    P_nc = None
 
-    H = Hkin + hamiltonian_matter_reduced(V, legacy_precision=legacy_precision)
-    trace_H = (
-        ki[..., 0]
-        + ki[..., 1]
-        + ki[..., 2]
-        + V
-    ).to(dtype=cdtype)
+    if not oscillation.BSM_extension:
+        Hkin, ki = hamiltonian_kinetic_reduced(
+            oscillation,
+            E_MeV,
+            Ured,
+            evolution_scale_m=evolution_scale_m,
+            return_ki=True,
+            legacy_precision=legacy_precision,
+        )
+
+        Hmat = torch.zeros((*V.shape, 3, 3), device=device, dtype=cdtype)
+        Hmat[..., 0, 0] = V.to(dtype=cdtype)
+        H = Hkin + Hmat
+        trace_H = (
+            ki[..., 0]
+            + ki[..., 1]
+            + ki[..., 2]
+            + V
+        ).to(dtype=cdtype)
+    else:
+        context = RuntimeContext(device=device, dtype=rdtype)
+        # hamiltonian_kinetic_reduced always uses the Hermitian conjugate:
+        # the pure-SM/NSI-only reduced matrix is real (plain transpose
+        # would coincide), but the 3+1 sterile reduced matrix
+        # Ured = R13 R12 R14 is genuinely complex whenever delta14 != 0
+        # (R14 carries that CP phase), and PMNS_sterile.flavour_basis
+        # dresses this segment operator back to the flavour basis as
+        # O @ (.) @ O^dagger, which is only the correct inverse of
+        # U_full = O @ Ured (up to a diagonal phase that commutes with
+        # diag(ki)) when Hkin itself is built with the Hermitian conjugate:
+        # Ured @ diag(ki) @ Ured^dagger. The plain transpose there silently
+        # produces the wrong flavour basis Hamiltonian for delta14 != 0
+        # (see the analytical-vs-numerical earth regression tests).
+        Hkin = hamiltonian_kinetic_reduced(
+            oscillation,
+            E_MeV,
+            Ured,
+            evolution_scale_m=evolution_scale_m,
+            legacy_precision=legacy_precision,
+        )
+
+        include_nc = include_matter_nc and n_flavours == 4
+        if include_nc and getattr(profile_model, "potential_n", None) is None:
+            raise ValueError(
+                "include_matter_nc=True requires profile_model to have been "
+                "built with neutron-density coefficients (e.g. "
+                "include_neutron=True on the layered profile model that "
+                "produced this segment)."
+            )
+
+        P_nc = None
+        if not oscillation.BSM_extension_NSI and not include_nc:
+            # Exact fast path, unchanged: diag(V,0,...,0) is invariant under
+            # the outer mixing block O, so no rotation is needed and the
+            # first-order correction can use the rank-1 shortcut (P stays
+            # None, see evolutor_first_order).
+            Hmat = torch.zeros(
+                (*V.shape, n_flavours, n_flavours), device=device, dtype=cdtype,
+            )
+            Hmat[..., 0, 0] = V.to(dtype=cdtype)
+        else:
+            # Only the electron-density magnitude V(x) varies along the
+            # segment; the NSI coupling epsilon is position-independent, so
+            # the reduced-basis matter *direction* P is computed once (at
+            # V=1) and reused both for H's average matter term and, unlike
+            # the SM diag(1,0,...,0) case, for the first-order correction
+            # sandwich (see ``evolutor_first_order``) -- it no longer
+            # reduces to the rank-1 shortcut once epsilon breaks the
+            # electron-only structure. The same holds for the NC direction
+            # P_nc below: it never commutes with O (see
+            # ``core.common.hamiltonian``'s module docstring), so it always
+            # needs the general sandwich regardless of whether NSI is on.
+            #
+            # _matter_direction_reduced returns V-independent direction
+            # matrices; V=1 is baked into that helper (not
+            # ``torch.ones_like(V)``), so P/P_nc stay batch-independent --
+            # required by evolutor_first_order's P-sandwich einsum, which
+            # allows only exactly 2 trailing dims, no leading "..." batch.
+            P, P_nc = _matter_direction_reduced(
+                oscillation, antinu=antinu, include_nc=include_nc, context=context,
+            )
+            Hmat = V.to(dtype=cdtype)[..., None, None] * P
+            if include_nc:
+                Hmat = Hmat + profile_model.potential_n.to(dtype=cdtype)[..., None, None] * P_nc
+
+        H = Hkin + Hmat
+        # Full honest diagonal sum: unlike the pure-SM fast path above,
+        # neither ``sum(ki) == trace(Hkin)`` (only guaranteed for a *real*
+        # reduced mixing matrix; the sterile reduced matrix can be complex
+        # when the active-sterile CP phase delta14 is non-zero) nor
+        # ``trace(Hmat) == V`` (only true for the diagonal
+        # ``diag(1,0,...,0)`` direction; a general NSI epsilon has other
+        # non-zero diagonal entries) can be assumed here.
+        trace_H = torch.diagonal(H, dim1=-2, dim2=-1).sum(dim=-1)
 
     if debug:
+        naverage = profile_model.average
         herm_err = (
             H
             - H.conj().transpose(-1, -2)
@@ -316,4 +520,6 @@ def evolutor_perturbative_segment(
         antinu=antinu,
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
+        P=P,
+        P_nc=P_nc,
     )

@@ -83,7 +83,7 @@ from typing import Any, Optional
 
 import numpy as np
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 
 
 FLUX_BLOCK_RE = re.compile(
@@ -152,7 +152,7 @@ def find_honda_data_dir(path: str | os.PathLike[str] | None = None) -> Path:
     This only resolves a filesystem path; it does not parse or validate the
     physics content of the tables. Candidates are tried in order: an
     explicit path argument, the ``HONDA_DATA_DIR`` environment variable,
-    then ``tpeanuts.util.default.honda_dataset``. The first candidate
+    then ``tpeanuts.config.default.honda_dataset``. The first candidate
     directory that exists and contains at least one ``*.d.gz`` file is
     returned.
 

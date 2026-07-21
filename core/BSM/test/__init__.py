@@ -19,14 +19,15 @@
 """
 Tests for tpeanuts.core.BSM.
 
+Generic Hamiltonian-builder tests (kinetic/matter/reduced/flavour) now live
+in ``core/common/test/test3_hamiltonian.py``, since that machinery is no
+longer BSM-specific.
+
 Package modules:
-    test1_bsm_hamiltonian
-        Tests for the BSM Hamiltonian builders (kinetic/matter/reduced/
-        flavour), independent of whether the extension is NSI or sterile.
     test2_bsm_nsi
         Tests specific to the NSIConfig parameter container and its
-        integration with the BSM Hamiltonian builders.
+        integration with the common Hamiltonian builders.
     test3_bsm_sterile
         Tests specific to the PMNS_sterile 3+1 mixing matrix and its
-        integration with the BSM Hamiltonian builders and evolutor.
+        integration with the common Hamiltonian builders and evolutor.
 """

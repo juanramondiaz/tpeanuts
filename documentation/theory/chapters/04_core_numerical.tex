@@ -1,0 +1,183 @@
+\chapter{\texttt{core.numerical} --- general numerical propagation}
+\label{ch:core-numerical}
+
+This chapter covers the medium-independent numerical evolutor: exact
+matrix-exponential integration of the propagation Hamiltonian over a
+piecewise-constant-density discretisation of the path. It makes no
+assumption on the size of matter effects and works unmodified for the
+Standard Model, NSI, the 3+1 sterile extension, or any combination
+(\cref{ch:core-common,ch:core-sm,ch:core-bsm}), since it consumes
+\pyfunc{hamiltonian\_flavour} directly rather than any scenario-specific
+formula. It is the general-purpose reference method against which the
+perturbative approximation (\cref{ch:core-perturbative}) is validated.
+
+\section{\texttt{geometry.py} --- trajectory discretisation}
+
+\modulehead{core/numerical/geometry.py}{\pyclass{Trajectory}: the geometry
+container passed from a medium profile to the numerical evolutor, and
+\pyfunc{segment\_sample\_points}, the quadrature-rule helper that builds
+it.}
+
+\begin{theorybox}
+Composing segment evolutors (\cref{ch:core-common}, \texttt{evolutor.py}
+section) requires splitting a propagation path into $N$ segments delimited
+by $N+1$ boundary points along some geometry coordinate $x$ (a chord
+length, a radius, a zenith-angle parametrisation -- whatever the medium
+finds natural). For each segment, the numerical core needs exactly two
+further pieces of information, both computed once by the medium-specific
+module that builds the \pyclass{Trajectory} and never revisited by
+\texttt{core.numerical} itself:
+\begin{itemize}
+  \item the \textbf{dimensionless evolution length} of the segment,
+    $\Delta x^{\rm evo}_j = \Delta x_j / L_{\rm scale}$, i.e.\ the physical
+    segment length divided by the same \code{evolution\_scale\_m} used to
+    non-dimensionalise the Hamiltonian (\cref{ch:core-common},
+    \texttt{potential.py} section) -- this is what actually multiplies
+    $H$ in the matrix exponential below, not $\Delta x_j$ itself;
+  \item a \textbf{sample coordinate} $\bar x_j$ per segment, at which the
+    medium's electron density (or any other property entering $H$) is
+    evaluated once and treated as \emph{constant} over the whole segment
+    -- the piecewise-constant-density approximation that makes the
+    per-segment problem exactly solvable (next section).
+\end{itemize}
+\pyfunc{segment\_sample\_points} implements three quadrature rules for
+$\bar x_j$ from the $N+1$ boundary coordinates $x_0,\dots,x_N$:
+\begin{equation}
+  \bar x_j =
+  \begin{cases}
+    \tfrac12\bigl(x_j+x_{j+1}\bigr) & \text{\code{"midpoint"}\ (default)}, \\
+    x_j & \text{\code{"left"}}, \\
+    x_{j+1} & \text{\code{"right"}}.
+  \end{cases}
+\end{equation}
+\keyresult{The midpoint rule is second-order accurate} in the segment
+width for a smoothly varying density (the segment's leading-order
+mismatch between the true, continuously varying $n_e(x)$ and the
+constant $n_e(\bar x_j)$ used on it cancels to first order when $\bar x_j$
+is the segment centre, by the same Taylor-expansion argument as the
+midpoint rule in quadrature); the endpoint rules (\code{"left"}/
+\code{"right"}) are only first-order accurate, and exist mainly to match
+legacy or directionally-biased sampling conventions.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{Trajectory} (dataclass): \code{x} (shape $(N{+}1,)$, the
+    geometry-coordinate boundaries), \code{dx\_evolution} (shape $(N,)$,
+    the dimensionless evolution lengths $\Delta x^{\rm evo}_j$ above),
+    \code{sample\_x} (shape $(N,)$, the $\bar x_j$ above), and \code{meta}
+    (a plain \code{dict} of medium-specific bookkeeping -- layer indices,
+    crossing flags, ... -- that \texttt{core.numerical} never interprets).
+  \item \pyfunc{segment\_sample\_points(x, method)}: builds \code{sample\_x}
+    from \code{x} via the three rules above; broadcasts over any leading
+    batch dimensions, and returns an empty (zero-segment) result for a
+    single-boundary-point input.
+  \item Every medium-specific geometry module (e.g.\
+    \texttt{medium.earth.geometry}, \texttt{medium.atmosphere.profile})
+    builds its own \code{x} in whatever coordinate is natural for that
+    medium, converts it to \code{dx\_evolution} using \emph{that medium's}
+    evolution scale, and calls \pyfunc{segment\_sample\_points} to fill
+    \code{sample\_x} -- \pyclass{Trajectory} is the single, medium-agnostic
+    hand-off point to \texttt{core.numerical}.
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{evolutor.py} --- matrix-exponential composition}
+
+\modulehead{core/numerical/evolutor.py}{\pyfunc{evolutor\_numerical\_segment}
+and \pyfunc{evolutor\_numerical}: exact per-segment matrix exponentials,
+composed into the total evolutor.}
+
+\begin{theorybox}
+\subsection*{Exact solution on a piecewise-constant-density segment}
+The propagation Hamiltonian $H(x)$ varies continuously with $x$ through the
+local electron density $n_e(x)$. Given the \pyclass{Trajectory} of the
+previous section, \texttt{core.numerical} approximates $H(x)$ as
+\textbf{piecewise constant}: on segment $j$ (between boundaries $x_j$ and
+$x_{j+1}$), $H(x)\approx H_j$, where
+\begin{equation}
+  H_j \equiv \text{\pyfunc{hamiltonian\_flavour}}\bigl(\text{oscillation},\,E,\,n_e(\bar x_j)\bigr)
+\end{equation}
+is the full flavour-basis Hamiltonian (\cref{ch:core-common}) evaluated
+once at the segment's sample point $\bar x_j$. \textbf{This is the
+\emph{only} approximation in the method}: given a constant $H_j$, the
+position-dependent Schr\"odinger equation
+$i\,\mathrm{d}S/\mathrm{d}x=H_j\,S$ (\cref{ch:core-common},
+\texttt{evolutor.py} section) integrates \emph{exactly} -- not
+approximately -- over the segment, via the matrix exponential:
+\begin{equation}
+  \keyresult{S_j = \exp\bigl(-i\,H_j\,\Delta x^{\rm evo}_j\bigr)}.
+\end{equation}
+No eigendecomposition, diagonalisation, or perturbative expansion is
+involved: \pyfunc{torch.linalg.matrix\_exp} evaluates this directly (via a
+scaling-and-squaring / Pad\'e algorithm), batched over every segment and
+every other broadcast dimension (energy, angle, ...) simultaneously, and
+remains differentiable end-to-end. Because $H_j$ is built with
+\pyfunc{hamiltonian\_flavour} -- the single, fully general
+Hamiltonian-assembly function (\cref{ch:core-common,ch:core-sm,ch:core-bsm}) --
+this formula is correct as written for the 3-flavour Standard Model, NSI,
+the 3+1 sterile extension, or any combination, with $H_j$ simply changing
+size ($3\times3$ or $4\times4$) and content accordingly; nothing in this
+module branches on which scenario is active. In particular, an optional
+neutron density $n_n(\bar x_j)$ sampled alongside $n_e(\bar x_j)$ is
+forwarded straight through to \pyfunc{hamiltonian\_flavour} as
+\code{n\_n\_mol\_cm3}, enabling the 3+1 sterile extension's neutral-current
+term (\cref{ch:core-common}) with no change to this module's own logic:
+omitting it (the default) reproduces the pre-existing CC-only behaviour
+exactly.
+
+\subsection*{Composing the total evolutor}
+The $N$ per-segment evolutors are composed into the total operator via the
+ordered product already established generically in
+\cref{ch:core-common}:
+\begin{equation}
+  S(x_N,x_0) = S_{N-1}\,S_{N-2}\cdots S_1\,S_0,
+\end{equation}
+using \pyfunc{compose\_segment\_evolutors} (\cref{ch:core-common}) with its
+binary-tree reduction for $O(\log N)$ parallel depth on GPU rather than
+$O(N)$ sequential steps. Optionally, \pyfunc{evolutor\_numerical} can
+instead return the \emph{history} of partial products
+$S(x_j,x_0)$ for every $j=0,\dots,N$ (an accumulating loop rather than the
+tree reduction, since every intermediate result is needed): useful for
+path-resolved quantities, e.g.\ probabilities evaluated at every crossed
+layer of a medium rather than only at the final boundary.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{evolutor\_numerical\_segment(oscillation, E\_MeV, n\_e\_mol\_cm3,
+    dx\_evolution, *, n\_n\_mol\_cm3=None, ...)}: builds one $H_j$ per segment
+    (the segment dimension is the final axis of
+    \code{n\_e\_mol\_cm3}/\code{dx\_evolution}), broadcasting
+    \code{oscillation.mass\_spectrum} and \code{antinu} to the segment shape
+    via \code{dataclasses.replace} before calling \pyfunc{hamiltonian\_flavour}
+    once for the whole segment batch, then exponentiates:
+    \code{torch.linalg.matrix\_exp(-1j * H * dx[...,None,None])}.
+  \item \pyfunc{evolutor\_numerical(oscillation, E\_MeV, n\_e\_mol\_cm3,
+    dx\_evolution, *, n\_n\_mol\_cm3=None, return\_history=False, ...)}: calls
+    the above, then either composes the segments into a single operator
+    (\pyfunc{compose\_segment\_evolutors}) or accumulates and returns the
+    full per-segment history.
+  \item Both functions run under \code{@torch.no\_grad()}: the numerical
+    evolutor is used for forward propagation, not for parameter inference
+    through automatic differentiation.
+\end{itemize}
+\end{implbox}
+
+\begin{notebox}
+\textbf{Accuracy is entirely a discretisation choice, made outside this
+module.} \texttt{core.numerical} performs no adaptive step-size control and
+no local error estimate: the accuracy of $S(x_N,x_0)$ is fixed entirely by
+how finely the \pyclass{Trajectory} passed in discretises the path (how
+many segments $N$, and which quadrature rule fixed $\bar x_j$, previous
+section) -- both decided by the calling medium-specific module before
+\texttt{core.numerical} ever sees the problem. Refining the trajectory
+(more, smaller segments) is the only way to improve accuracy; there is no
+mechanism to detect that a given $N$ is insufficient. This is the
+computational cost paid for generality: unlike the perturbative
+approximation (\cref{ch:core-perturbative}), which is only valid in a
+restricted regime but is $\mathcal{O}(1)$ in the number of density
+evaluations, the numerical method is valid everywhere but its accuracy is
+$\mathcal{O}(N)$ in the number of \pyfunc{hamiltonian\_flavour}
+evaluations and matrix exponentials.
+\end{notebox}

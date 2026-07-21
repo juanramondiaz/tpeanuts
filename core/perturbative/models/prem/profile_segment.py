@@ -49,7 +49,7 @@ from typing import Optional, Union
 
 import torch
 
-from tpeanuts.core.common.potential import matter_potential
+from tpeanuts.core.common.potential import matter_potential_cc, matter_potential_nc
 from tpeanuts.util.constant import R_E
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.torch_util import infer_device_dtype
@@ -65,6 +65,9 @@ class PremProfileSegment:
         x2: Segment end in the profile coordinate.
         a: Constant term of n_e(x) in profile coordinates  [mol cm⁻³].
         b: Coefficient of the x² term  [mol cm⁻³ (profile_unit)⁻²].
+        a_n: Optional constant term of n_n(x), enabling the 3+1 sterile
+            extension's neutral-current matter term.
+        b_n: Optional coefficient of the x² term of n_n(x).
         antinu: Antineutrino selector for the MSW potential sign.
         profile_scale_m: Positive scale in metres defining the profile
             coordinate.
@@ -90,6 +93,8 @@ class PremProfileSegment:
         a: TensorLike,
         b: TensorLike,
         *,
+        a_n: TensorLike | None = None,
+        b_n: TensorLike | None = None,
         antinu: Union[bool, torch.Tensor] = False,
         profile_scale_m: TensorLike = R_E,
         evolution_scale_m: TensorLike = R_E,
@@ -143,7 +148,7 @@ class PremProfileSegment:
             integral / safe_length,
         )
 
-        self.potential = matter_potential(
+        self.potential = matter_potential_cc(
             self.average,
             antinu=antinu,
             evolution_scale_m=evolution_scale,
@@ -153,6 +158,32 @@ class PremProfileSegment:
         self.potential = torch.where(
             self.zero_mask, torch.zeros_like(self.potential), self.potential
         )
+
+        self.a_n = None
+        self.b_n = None
+        self.average_n = None
+        self.potential_n = None
+        if a_n is not None:
+            a_n = as_tensor(a_n, device=device, dtype=dtype)
+            b_n = as_tensor(b_n, device=device, dtype=dtype)
+            self.a_n = torch.broadcast_to(a_n, base_shape)
+            self.b_n = torch.broadcast_to(b_n * ratio ** 2, base_shape)
+
+            integral_n = self.a_n * self.length + self.b_n * (self.x2 ** 3 - self.x1 ** 3) / 3.0
+            self.average_n = torch.where(
+                self.zero_mask,
+                torch.zeros_like(integral_n),
+                integral_n / safe_length,
+            )
+            self.potential_n = matter_potential_nc(
+                self.average_n,
+                antinu=antinu,
+                evolution_scale_m=evolution_scale,
+                context=RuntimeContext(device=device, dtype=dtype),
+            )
+            self.potential_n = torch.where(
+                self.zero_mask, torch.zeros_like(self.potential_n), self.potential_n
+            )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Static helpers: oscillatory monomial integrals
@@ -328,6 +359,77 @@ class PremProfileSegment:
         out = phase * b * (i2 - x_sq_avg * i0)
         return torch.where(is_zero, torch.zeros_like(out), out)
 
+    @torch.no_grad()
+    def residual_integral_neutron(
+        self,
+        la: torch.Tensor,
+        lb: torch.Tensor,
+        *,
+        small_ratio: float = 1.0e-2,
+        dl_zero_eps: float = 0.0,
+    ) -> torch.Tensor:
+        """Neutron-density counterpart of ``residual_integral`` (uses ``b_n``).
+
+        Enables the 3+1 sterile extension's neutral-current matter term (see
+        ``core.perturbative.evolutor.evolutor_first_order``). Requires
+        ``a_n``/``b_n`` to have been supplied at construction time. Note
+        ``x_sq_avg`` is purely geometric (shared with ``residual_integral``);
+        only ``b_n`` enters the residual, since the constant term ``a_n``
+        cancels against ``average_n`` exactly, as for the electron-density
+        formula (see the module docstring).
+
+        Raises:
+            ValueError: If this segment has no neutron-density coefficients.
+        """
+        if self.b_n is None:
+            raise ValueError(
+                "This segment has no neutron-density coefficients. Build it "
+                "with a_n/b_n to enable the 3+1 sterile extension's "
+                "neutral-current matter term."
+            )
+        if not torch.is_complex(la):
+            cdtype = torch.complex128 if la.dtype == torch.float64 else torch.complex64
+            la = la.to(dtype=cdtype)
+        if not torch.is_complex(lb):
+            lb = lb.to(dtype=la.dtype)
+
+        target_ndim = la.ndim
+        x1 = self._lift(self.x1, target_ndim).to(device=la.device, dtype=la.dtype)
+        x2 = self._lift(self.x2, target_ndim).to(device=la.device, dtype=la.dtype)
+        x_sq_avg = self._lift(self.x_sq_avg, target_ndim).to(
+            device=la.device, dtype=la.dtype
+        )
+        b_n = self._lift(self.b_n, target_ndim).to(device=la.device, dtype=la.dtype)
+
+        dl = la - lb
+
+        if dl_zero_eps > 0.0:
+            is_zero = torch.abs(dl) < dl_zero_eps
+        else:
+            is_zero = dl == 0
+
+        denom = la + lb
+        ratio = torch.where(
+            torch.abs(denom) > 0,
+            torch.abs(dl / denom),
+            torch.full_like(torch.abs(dl), float("inf")),
+        )
+        is_small = ratio < small_ratio
+
+        safe_dl = torch.where(is_small | is_zero, torch.ones_like(dl), dl)
+
+        i2_full = self._oscillatory_monomial(2, x1, x2, safe_dl)
+        i0_full = self._oscillatory_monomial(0, x1, x2, safe_dl)
+        i2_taylor = self._taylor_monomial(2, x1, x2, dl)
+        i0_taylor = self._taylor_monomial(0, x1, x2, dl)
+
+        i2 = torch.where(is_small, i2_taylor, i2_full)
+        i0 = torch.where(is_small, i0_taylor, i0_full)
+
+        phase = torch.exp(-1j * la * x2 + 1j * lb * x1)
+        out = phase * b_n * (i2 - x_sq_avg * i0)
+        return torch.where(is_zero, torch.zeros_like(out), out)
+
     def has_perturbation(self) -> torch.Tensor:
         """Return True for segments where b ≠ 0 (non-constant residual).
 
@@ -338,3 +440,19 @@ class PremProfileSegment:
             Boolean tensor shaped ``(...,)`` matching the segment batch.
         """
         return torch.abs(self.b) > 0
+
+    def has_perturbation_neutron(self) -> torch.Tensor:
+        """Return True for segments where b_n ≠ 0 (non-constant NC residual).
+
+        Mirrors ``has_perturbation`` for the neutron-density coefficient.
+
+        Raises:
+            ValueError: If this segment has no neutron-density coefficients.
+        """
+        if self.b_n is None:
+            raise ValueError(
+                "This segment has no neutron-density coefficients. Build it "
+                "with a_n/b_n to enable the 3+1 sterile extension's "
+                "neutral-current matter term."
+            )
+        return torch.abs(self.b_n) > 0

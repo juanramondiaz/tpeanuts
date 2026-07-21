@@ -34,20 +34,24 @@ implementation against the legacy NumPy/Numba ``peanuts`` package
 Re-exported names:
     EarthProfile: Torch representation of the Earth electron-density profile
         and trajectory geometry (see ``medium.earth.profile``).
-    compare_pearth_with_legacy: Compare pointwise Earth probabilities against
-        legacy peanuts (see ``medium.earth.validation``).
-    compare_pearth_integrated_with_legacy: Compare exposure-integrated Earth
+    compare_earth_probability_state_with_legacy: Compare pointwise Earth
         probabilities against legacy peanuts (see ``medium.earth.validation``).
+    compare_earth_probability_exposure_with_legacy: Compare exposure-integrated
+        Earth probabilities against legacy peanuts (see
+        ``medium.earth.validation``).
 """
 
-from tpeanuts.medium.earth.profile import EarthProfile
+from tpeanuts.medium.earth.profile import EarthProfile, build_earth_profile
+from tpeanuts.medium.earth.geometry import build_atmosphere_trajectories
 from tpeanuts.medium.earth.validation import (
-    compare_pearth_integrated_with_legacy,
-    compare_pearth_with_legacy,
+    compare_earth_probability_exposure_with_legacy,
+    compare_earth_probability_state_with_legacy,
 )
 
 __all__ = [
     "EarthProfile",
-    "compare_pearth_with_legacy",
-    "compare_pearth_integrated_with_legacy",
+    "build_earth_profile",
+    "build_atmosphere_trajectories",
+    "compare_earth_probability_state_with_legacy",
+    "compare_earth_probability_exposure_with_legacy",
 ]

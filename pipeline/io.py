@@ -20,8 +20,8 @@
 I/O helpers for detector-level fluxes after full propagation.
 
 These helpers serialize and reassemble the per-particle, per-angle outputs of
-the atmosphere pipeline (see ``pipeline.pipeline_atmosphere`` /
-``pipeline.atmosphere_flux``): one torch file holds the production, surface,
+the atmosphere pipelines (see ``pipeline.atmosphere`` and
+``pipeline.atmosphere_earth``): one torch file holds the production, surface,
 and detector fluxes for a single produced particle (e.g. ``"numu"`` or
 ``"anti_nue"``) evaluated at a single detector angle (alpha, the detector
 zenith convention, or theta, the atmosphere zenith convention). The
@@ -77,7 +77,7 @@ from typing import Any, Dict, Optional
 
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.io import (
     angle_to_filename,
     ensure_output_directory,

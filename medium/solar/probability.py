@@ -38,14 +38,16 @@ below the resonance is purely adiabatic and its weights are left unchanged.
 
 NSI extension
 -------------
-When ``epsilon`` (a Hermitian 3×3 NSI coupling matrix) is supplied to
-``Tei``, ``solar_probability_mass``, or ``psolar``, the analytic mixing-angle
-path is replaced by a fully numerical one: the total Hamiltonian
+When ``oscillation.nsi`` is set (a Hermitian 3×3 NSI coupling matrix, see
+``tpeanuts.core.common.oscillation.OscillationParameters``), ``Tei``,
+``solar_probability_mass``, and ``solar_probability_state`` replace the
+analytic mixing-angle path by a fully numerical one: the total Hamiltonian
 ``H = H_kin + H_mat^NSI`` is assembled via
-``tpeanuts.core.BSM.hamiltonian.hamiltonian_flavour_bsm`` at each
-(energy, density) grid point and diagonalised with ``torch.linalg.eigh``.
-The squared modulus of the electron-flavour component of each matter
-eigenstate gives the production weights directly:
+``tpeanuts.core.common.hamiltonian.hamiltonian_flavour`` (which reads
+``oscillation.nsi.epsilon`` internally) at each (energy, density) grid point
+and diagonalised with ``torch.linalg.eigh``. The squared modulus of the
+electron-flavour component of each matter eigenstate gives the production
+weights directly:
 
     w_i(E, r) = |<ν_e | ν_i^M(E, r)>|²  =  |eigvec[..., 0, i]|²
 
@@ -54,13 +56,26 @@ LMA-Dark and other NSI-degenerate scenarios. The LZ correction from
 ``landau_zener`` is skipped when NSI is active, since the LZ formula and
 resonance condition both change in the presence of non-diagonal ε.
 
+No transition function
+-----------------------
+Unlike the other media, this module does not expose a
+``solar_probability_transition``. The adiabatic solar model has no coherent
+evolution operator ``S`` to build a transition matrix from: production
+weights are computed directly in the mass basis via MSW level crossing
+(``Tei``/``solar_probability_mass``), not by evolving a flavour-basis state
+through an evolutor. ``solar_probability_state`` is therefore the lowest-tier
+public probability function for this medium.
+
 Module functions:
     Tei(...)
         Compute matter-basis production weights for one radius/density grid.
     solar_probability_mass(...)
         Integrate source production profiles into mass-basis probabilities.
-    psolar(...)
+    solar_probability_state(...)
         Convert source mass-basis probabilities into flavour probabilities.
+    solar_probability_integrated(...)
+        Average final flavour probabilities over energy, weighted by an
+        explicit production spectrum.
 """
 
 
@@ -75,6 +90,7 @@ import tpeanuts.util.constant as constant
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.core.common.probability import (
     probability_incoherent,
+    probability_integrated,
 )
 from tpeanuts.medium.solar.matter_mixing import th12_M, th13_M
 from tpeanuts.util.type import cdtype_from_real
@@ -89,7 +105,6 @@ def Tei(
     ne: TensorLike,
     *,
     p_lz: Optional[torch.Tensor] = None,
-    epsilon: Optional[torch.Tensor] = None,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
     """Compute adiabatic mass-eigenstate production weights.
@@ -97,8 +112,8 @@ def Tei(
     Returns the probability that an electron neutrino produced in matter
     is projected onto each of the three effective mass eigenstates.
 
-    Standard (SM) path  — ``epsilon`` is None
-    ------------------------------------------
+    Standard (SM) path  — ``oscillation.nsi`` is None
+    ---------------------------------------------------
     The matter mixing angles theta_12^M and theta_13^M are evaluated
     analytically via ``matter_mixing.th12_M`` and ``matter_mixing.th13_M``.
     When ``p_lz`` is also provided, the nu_1^M / nu_2^M weights are mixed to
@@ -111,12 +126,13 @@ def Tei(
     resonance lies in the deep solar core and is negligible for standard
     solar sources.
 
-    NSI path  — ``epsilon`` is not None
-    -------------------------------------
+    NSI path  — ``oscillation.nsi`` is set
+    -----------------------------------------
     The total Hamiltonian ``H = H_kin + H_mat^NSI`` is assembled via
-    ``tpeanuts.core.BSM.hamiltonian.hamiltonian_flavour_bsm`` and
-    diagonalised with ``torch.linalg.eigh``. Production weights are the
-    squared electron-flavour components of each matter eigenstate:
+    ``tpeanuts.core.common.hamiltonian.hamiltonian_flavour`` (reading
+    ``oscillation.nsi.epsilon``) and diagonalised with
+    ``torch.linalg.eigh``. Production weights are the squared
+    electron-flavour components of each matter eigenstate:
 
         w_i(E, r) = |<nu_e | nu_i^M(E, r)>|^2 = |eigvec[..., 0, i]|^2
 
@@ -126,16 +142,14 @@ def Tei(
 
     Args:
         oscillation: Oscillation parameters supplying theta12, theta13,
-            DeltamSq21, and DeltamSq3l.
+            DeltamSq21, DeltamSq3l, and the optional ``nsi`` (NSIConfig)
+            attribute.
         E: Neutrino energy in MeV.
         ne: Electron density samples in mol/cm^3.
         p_lz: Optional Landau-Zener transition probability tensor,
             broadcastable with the internal cos^2(theta_12^M) /
-            sin^2(theta_12^M) outputs. Ignored when ``epsilon`` is not None.
-        epsilon: Optional 3×3 complex NSI coupling matrix (Hermitian). When
-            supplied, activates the numerical diagonalisation path. Accepts
-            any shape broadcastable over the ``(E, ne)`` batch dimensions as
-            long as the final two dimensions are ``(3, 3)``.
+            sin^2(theta_12^M) outputs. Ignored when ``oscillation.nsi`` is
+            set.
         legacy_precision: If True, evaluate the analytic matter-mixing angles
             with the legacy peanuts ``Vk`` prefactor for bit-comparable
             validation (see ``medium.solar.matter_mixing``). Ignored in the
@@ -145,14 +159,13 @@ def Tei(
         Real tensor of matter-production weights with final mass-index
         dimension 3, shape broadcast-compatible with ``(E, ne)``.
     """
-    if epsilon is not None:
-        from tpeanuts.core.BSM.hamiltonian import hamiltonian_flavour_bsm
+    if oscillation.nsi is not None:
+        from tpeanuts.core.common.hamiltonian import hamiltonian_flavour
 
-        H = hamiltonian_flavour_bsm(
+        H = hamiltonian_flavour(
             oscillation,
             E,
             ne,
-            epsilon=epsilon,
             evolution_scale_m=constant.R_SUN,
         )
         # eigh returns columns as eigenvectors; row 0 = electron-flavour
@@ -195,13 +208,12 @@ def solar_probability_mass(
     profile: object,
     sources: str | Sequence[str],
     *,
-    epsilon: Optional[torch.Tensor] = None,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
     """Integrate solar production profiles into mass-basis probabilities.
 
-    Standard (SM) path  — ``epsilon`` is None
-    ------------------------------------------
+    Standard (SM) path  — ``oscillation.nsi`` is None
+    -----------------------------------------------------
     If ``profile.use_LZ`` is True, a spatially resolved Landau-Zener
     correction is applied per (energy, production radius) pair: the LZ
     transition probability P_LZ(E) is multiplied by a boolean mask that is
@@ -209,24 +221,22 @@ def solar_probability_mass(
     r_prod < r_res(E)), so that only those neutrinos effectively cross the
     MSW resonance.
 
-    NSI path  — ``epsilon`` is not None
-    -------------------------------------
+    NSI path  — ``oscillation.nsi`` is set
+    -------------------------------------------
     The full Hamiltonian ``H = H_kin + H_mat^NSI`` is diagonalised at each
     (E, r) grid point (see ``Tei``). The ``profile.use_LZ`` flag is ignored
     in this path.
 
     Args:
         oscillation: Oscillation parameters supplying theta12, theta13,
-            DeltamSq21, and DeltamSq3l.
+            DeltamSq21, DeltamSq3l, and the optional ``nsi`` (NSIConfig)
+            attribute.
         E: Neutrino energy in MeV. Scalar or 1-D tensor in the standard
             pipeline; multi-dimensional E is supported for the adiabatic path
             but LZ corrections are applied only when E is 0-D or 1-D.
         profile: SolarProfile-like object exposing radius, density,
             source_fractions(), and the optional ``use_LZ`` boolean flag.
         sources: Source key or ordered source keys available in ``profile``.
-        epsilon: Optional 3×3 complex NSI coupling matrix (Hermitian).
-            When supplied, activates the numerical diagonalisation path in
-            ``Tei`` and disables Landau-Zener corrections.
         legacy_precision: If True, evaluate ``Tei`` with the legacy peanuts
             ``Vk`` prefactor for bit-comparable validation (see
             ``medium.solar.matter_mixing``). Ignored in the NSI path.
@@ -248,7 +258,7 @@ def solar_probability_mass(
     use_lz = getattr(profile, "use_LZ", False)
     p_lz_spatial: Optional[torch.Tensor] = None
 
-    if use_lz and epsilon is None and E_t.ndim <= 1:
+    if use_lz and oscillation.nsi is None and E_t.ndim <= 1:
         from tpeanuts.medium.solar.landau_zener import (
             plz as _plz,
             resonance_radius as _resonance_radius,
@@ -275,7 +285,6 @@ def solar_probability_mass(
         E_t[..., None],
         density,
         p_lz=p_lz_spatial,
-        epsilon=epsilon,
         legacy_precision=legacy_precision,
     )
 
@@ -304,13 +313,12 @@ def solar_probability_mass(
     return integral / torch.clamp(norm_lifted, min=torch.finfo(radius_samples.dtype).tiny)[..., None]
 
 
-def psolar(
+def solar_probability_state(
     oscillation: OscillationParameters,
     E: TensorLike,
     profile: object,
     sources: str | Sequence[str],
     *,
-    epsilon: Optional[torch.Tensor] = None,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
     """Compute adiabatic solar flavour probabilities for one or more sources.
@@ -323,7 +331,7 @@ def psolar(
            over the solar radius and builds incoherent mass-basis weights
            ``P_i(E)``, optionally including Landau-Zener corrections when
            ``profile.use_LZ`` is True (SM path), or using numerical
-           diagonalisation when ``epsilon`` is supplied (NSI path).
+           diagonalisation when ``oscillation.nsi`` is set (NSI path).
         2. The mass weights are projected to final flavour probabilities with
            the vacuum PMNS probabilities,
            ``P_alpha(E) = sum_i |U_{alpha i}|^2 P_i(E)``.
@@ -332,15 +340,12 @@ def psolar(
     flux. For several sources, a leading source dimension is preserved.
 
     Args:
-        oscillation: Built pmns object plus mass splittings and antinu
-            selection.
+        oscillation: Built pmns object plus mass splittings, antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute.
         E: Neutrino energy in MeV.
         profile: SolarProfile-like object exposing radius, density,
             source_fractions(), and the optional ``use_LZ`` boolean flag.
         sources: Source key or ordered source keys available in ``profile``.
-        epsilon: Optional 3×3 complex NSI coupling matrix (Hermitian).
-            When supplied, activates the numerical diagonalisation path (see
-            ``solar_probability_mass`` and ``Tei``).
         legacy_precision: If True, evaluate the underlying matter-mixing
             angles with the legacy peanuts ``Vk`` prefactor for
             bit-comparable validation (see ``medium.solar.matter_mixing``).
@@ -355,7 +360,6 @@ def psolar(
         E,
         profile,
         sources,
-        epsilon=epsilon,
         legacy_precision=legacy_precision,
     )
 
@@ -371,4 +375,54 @@ def psolar(
         pmns=oscillation.pmns,
         antinu=oscillation.antinu,
         real_dtype=weights.dtype,
+    )
+
+
+def solar_probability_integrated(
+    oscillation: OscillationParameters,
+    E: TensorLike,
+    profile: object,
+    sources: str | Sequence[str],
+    spectrum: torch.Tensor,
+    *,
+    legacy_precision: bool = False,
+    energy_dim: int = -2,
+) -> torch.Tensor:
+    """Average final solar flavour probabilities over energy.
+
+    Builds the energy-resolved probabilities with ``solar_probability_state``
+    and averages them with ``core.common.probability.probability_integrated``,
+    weighted by an explicit production ``spectrum``.
+
+    Args:
+        oscillation: Built pmns object plus mass splittings, antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute.
+        E: Neutrino energy grid in MeV, one-dimensional, matching
+            ``E_grid_MeV`` of ``probability_integrated``.
+        profile: SolarProfile-like object exposing radius, density,
+            source_fractions(), and the optional ``use_LZ`` boolean flag.
+        sources: Source key or ordered source keys available in ``profile``.
+        spectrum: Spectral weight w(E), required (no default).
+        legacy_precision: If True, evaluate the underlying matter-mixing
+            angles with the legacy peanuts ``Vk`` prefactor for
+            bit-comparable validation (see ``medium.solar.matter_mixing``).
+        energy_dim: Axis of the resulting probability tensor holding the
+            energy grid. Must not be the final (flavour) axis.
+
+    Returns:
+        Spectrum-weighted average probability, with the energy axis removed.
+    """
+    probabilities = solar_probability_state(
+        oscillation,
+        E,
+        profile,
+        sources,
+        legacy_precision=legacy_precision,
+    )
+
+    return probability_integrated(
+        probabilities,
+        E,
+        spectrum,
+        energy_dim=energy_dim,
     )

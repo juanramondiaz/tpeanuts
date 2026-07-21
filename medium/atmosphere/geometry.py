@@ -74,6 +74,25 @@ from __future__ import annotations
 from typing import Union, Optional
 import torch
 
+
+def _angle_distance(
+    angle_grid: torch.Tensor,
+    *,
+    alpha_deg: Optional[float],
+    theta_deg: Optional[float],
+    angle_mode: str,
+) -> torch.Tensor:
+    """Return angular distance using the alpha or theta convention."""
+    if angle_mode == "alpha":
+        if alpha_deg is None:
+            raise ValueError("alpha_deg is required when angle_mode='alpha'.")
+        return torch.abs(angle_grid - float(alpha_deg))
+    if angle_mode == "theta":
+        if theta_deg is None:
+            raise ValueError("theta_deg is required when angle_mode='theta'.")
+        return torch.abs(angle_grid - float(theta_deg))
+    raise ValueError("angle_mode must be 'alpha' or 'theta'.")
+
 from tpeanuts.util.constant import R_E_KM
 from tpeanuts.util.type import TensorLike, as_tensor
 from tpeanuts.util.torch_util import resolve_device

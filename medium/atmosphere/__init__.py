@@ -35,13 +35,16 @@ Package contents:
         Earth surface.
     probabilities
         Transition matrices and final state probabilities at the Earth
-        surface.
+        surface, plus energy/angular/height-integrated variants.
     flux
-        Flux normalization helpers built on top of atmosphere probabilities.
+        Flux normalization helpers built on top of atmosphere probabilities,
+        plus energy/angular/height-integrated variants.
     io
         Readers and writers for Atmosphere height-flux datasets.
 
-Atmosphere-plus-Earth flux workflows live in tpeanuts.pipeline.
+Atmosphere-plus-Earth flux workflows, including surface-to-detector
+composition, live in tpeanuts.pipeline (see
+``pipeline.atmosphere_earth``) rather than in this package.
 """
 
 from tpeanuts.medium.atmosphere.density import (
@@ -60,12 +63,24 @@ from tpeanuts.external.nusquids.density import (
     atmosphere_density_nusquids,
 )
 from tpeanuts.medium.atmosphere.profile import AtmosphereProfile
-from tpeanuts.medium.atmosphere.evolutor import atmosphere_evolutor
-from tpeanuts.medium.atmosphere.probability import (
-    atmosphere_probability,
-    patmosphere,
+from tpeanuts.medium.atmosphere.evolutor import (
+    atmosphere_evolutor,
+    atmosphere_evolutor_analytical,
+    atmosphere_evolutor_numerical,
 )
-from tpeanuts.medium.atmosphere.flux import atmosphere_flux
+from tpeanuts.medium.atmosphere.probability import (
+    atmosphere_probability_transition,
+    atmosphere_probability_state,
+    atmosphere_probability_integrated,
+    atmosphere_probability_integrated_angular,
+    atmosphere_probability_integrated_height,
+)
+from tpeanuts.medium.atmosphere.flux import (
+    atmosphere_flux_state,
+    atmosphere_flux_integrated,
+    atmosphere_flux_integrated_angular,
+    atmosphere_flux_integrated_height,
+)
 from tpeanuts.medium.atmosphere.io import OutputConfig, load_directory
 
 __all__ = [
@@ -80,9 +95,17 @@ __all__ = [
     "atmosphere_density_nusquids",
     "AtmosphereProfile",
     "atmosphere_evolutor",
-    "atmosphere_probability",
-    "patmosphere",
-    "atmosphere_flux",
+    "atmosphere_evolutor_analytical",
+    "atmosphere_evolutor_numerical",
+    "atmosphere_probability_transition",
+    "atmosphere_probability_state",
+    "atmosphere_probability_integrated",
+    "atmosphere_probability_integrated_angular",
+    "atmosphere_probability_integrated_height",
+    "atmosphere_flux_state",
+    "atmosphere_flux_integrated",
+    "atmosphere_flux_integrated_angular",
+    "atmosphere_flux_integrated_height",
     "OutputConfig",
     "load_directory",
 ]

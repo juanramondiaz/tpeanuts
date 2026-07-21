@@ -39,7 +39,7 @@ import os
 import pandas as pd
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.medium.earth.exposure_math import make_eta_grid, _daynight_slice
 from tpeanuts.util.math import interp1d_linear
 

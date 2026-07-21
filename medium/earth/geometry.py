@@ -48,13 +48,59 @@ Module functions:
 from __future__ import annotations
 
 import torch
+from tpeanuts.medium.atmosphere.geometry import (
+    atmosphere_path_grid,
+    atmosphere_path_length,
+)
 from tpeanuts.util.constant import R_E
+from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import as_tensor
 from tpeanuts.core.numerical.geometry import (
     OdeMethod,
     Trajectory,
     segment_sample_points,
 )
+
+
+def build_atmosphere_trajectories(
+    production: dict[str, object],
+    *,
+    detector_depth_m: float = 0.0,
+    trajectory_steps: int = 200,
+    context: RuntimeContext = RuntimeContext.resolve(None, torch.float64),
+) -> dict[str, torch.Tensor]:
+    """Build atmosphere-path diagnostics in the detector geometry frame."""
+    h = as_tensor(
+        production["h_grid_km"], device=context.device, dtype=context.dtype
+    )
+    theta = as_tensor(
+        production["theta_deg"], device=context.device, dtype=context.dtype
+    )
+    depth_km = torch.as_tensor(
+        detector_depth_m / 1.0e3,
+        device=context.device,
+        dtype=context.dtype,
+    )
+    length = atmosphere_path_length(
+        h_km=h,
+        theta_deg=theta,
+        depth_km=depth_km,
+        device=context.device,
+        dtype=context.dtype,
+    )
+    path, altitude = atmosphere_path_grid(
+        h_km=h,
+        theta_deg=theta,
+        depth_km=depth_km,
+        n_steps=trajectory_steps,
+        device=context.device,
+        dtype=context.dtype,
+    )
+    return {
+        "L_atm_km": length,
+        "s_atm_grid_km": path,
+        "h_path_grid_km": altitude,
+    }
 
 
 def detector_radius_fraction(

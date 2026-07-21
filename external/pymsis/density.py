@@ -65,7 +65,7 @@ import numpy as np
 import torch
 import pymsis
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.constant import GCM3_TO_NUCLEON_MOLCM3, N_A
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import as_datetime64, constant_float_row, ensure_1d

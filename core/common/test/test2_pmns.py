@@ -27,7 +27,7 @@ import math
 import pytest
 import torch
 
-from tpeanuts.core.SM.pmns import PMNS_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.core.common.pmns import PMNSParams
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.test_utils import assert_close
@@ -272,7 +272,36 @@ def test_vacuum_flavour_projector_is_doubly_stochastic_and_cp_even():
     assert_close(P.sum(dim=1), torch.ones(3, device=DEVICE, dtype=DTYPE), name="flavour-row sums")
 
 
-def test_operator_flavour_basis_and_mass_basis_transformations():
+def test_outer_block_matches_r23_delta_and_drives_flavour_basis():
+    """``outer_block`` (promoted from a private per-module helper, see
+    ``tpeanuts.core.common.hamiltonian.hamiltonian_reduced`` and
+    ``PMNS_sterile.flavour_basis``) is O = R23 . Delta for the
+    3-flavour SM, and is exactly what ``flavour_basis`` uses
+    internally (O @ op @ O^dagger).
+    """
+    pmns = make_pmns()
+    operator = torch.diag(
+        torch.tensor([0.2, 1.0, 3.0], device=DEVICE, dtype=torch.complex128)
+    )
+
+    O = pmns.outer_block()
+    expected_O = pmns.R23() @ pmns.Delta()
+    assert_close(O, expected_O, name="outer_block == R23 @ Delta")
+
+    expected_flavour = O @ operator @ O.conj().transpose(-2, -1)
+    assert_close(
+        pmns.flavour_basis(operator), expected_flavour,
+        name="flavour_basis via outer_block",
+    )
+
+    O_antinu = pmns.outer_block(antinu=True)
+    assert_close(
+        O_antinu, pmns.R23().conj() @ pmns.Delta().conj(),
+        name="outer_block antinu conjugates R23 and Delta",
+    )
+
+
+def test_flavour_basis_and_reduced_basis_transformations():
     pmns = make_pmns()
     identity = torch.eye(3, device=DEVICE, dtype=torch.complex128)
     operator = torch.diag(
@@ -287,11 +316,15 @@ def test_operator_flavour_basis_and_mass_basis_transformations():
         @ pmns.R23().transpose(-2, -1)
     )
 
-    assert_close(pmns.operator_flavour_basis(identity), identity, name="identity basis transform")
-    assert_close(pmns.operator_flavour_basis(operator), expected_flavour, name="operator_flavour_basis")
+    assert_close(pmns.flavour_basis(identity), identity, name="identity basis transform")
+    assert_close(pmns.flavour_basis(operator), expected_flavour, name="flavour_basis")
 
-    flavour_h = pmns.reduced() @ operator @ pmns.reduced().conj().transpose(-2, -1)
-    assert_close(pmns.H_mass_basis(flavour_h), operator, name="H_mass_basis inverse transform")
+    operator_flavour = pmns.flavour_basis(operator)
+    assert_close(
+        pmns.reduced_basis(operator_flavour),
+        operator,
+        name="reduced_basis inverse transform",
+    )
 
-    with pytest.raises(ValueError, match="H_flavour must have final dimensions"):
-        pmns.H_mass_basis(torch.ones(2, 2, device=DEVICE, dtype=torch.complex128))
+    with pytest.raises(ValueError, match="O_flavour_basis must have final dimensions"):
+        pmns.reduced_basis(torch.ones(2, 2, device=DEVICE, dtype=torch.complex128))

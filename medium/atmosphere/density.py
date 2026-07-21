@@ -30,10 +30,14 @@ The units used by the public functions are:
     h_km             : km above the Earth's surface
     mass_density     : g / cm^3
     electron_density : mol / cm^3
+    neutron_density  : mol / cm^3
 
 Electron density is obtained from mass density using the electron fraction Ye
 and the shared mass-to-molar-density conversion constant. PyMSIS calculations
-use the electron fraction stored in their backend configuration.
+use the electron fraction stored in their backend configuration. Neutron
+density uses the complementary fraction (1 - Ye), enabling the 3+1 sterile
+extension's neutral-current matter term (see
+``core.common.hamiltonian.hamiltonian_matter_reduced``).
 
 Module functions:
 
@@ -53,7 +57,7 @@ from typing import Literal, Optional
 
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.io import load_datafile_2column
 from tpeanuts.util.constant import GCM3_TO_NUCLEON_MOLCM3
 from tpeanuts.util.context import RuntimeContext
@@ -86,7 +90,7 @@ except ImportError:
     atmosphere_density_pymsis = None
 
 
-DensityType = Literal["electron_density", "mass_density"]
+DensityType = Literal["electron_density", "mass_density", "neutron_density"]
 
 
 @torch.no_grad()
@@ -197,10 +201,12 @@ def atmosphere_density(
         source: Density backend. Accepted values are ``"exponential"``,
             ``"nusquids"``, ``"earthatm"``, ``"nusquids_earthatm"``,
             ``"file"``, ``"mceq"``, ``"msis"``, and ``"pymsis"``.
-        density_type: Output quantity. ``"mass_density"`` returns g/cm^3 and
-            ``"electron_density"`` returns mol/cm^3.
+        density_type: Output quantity. ``"mass_density"`` returns g/cm^3;
+            ``"electron_density"`` and ``"neutron_density"`` return mol/cm^3,
+            using the electron fraction Ye and its complement (1 - Ye)
+            respectively.
         Ye: Electron fraction used to convert non-PyMSIS mass densities into
-            electron density.
+            electron or neutron density.
         rho0_gcm3: Zero-altitude density for the exponential backend in
             g/cm^3.
         scale_height_km: Scale height for the exponential backend in km.
@@ -229,9 +235,10 @@ def atmosphere_density(
     source = str(source).lower().strip()
     density_type = str(density_type).lower().strip()
 
-    if density_type not in {"electron_density", "mass_density"}:
+    if density_type not in {"electron_density", "mass_density", "neutron_density"}:
         raise ValueError(
-            "density_type must be 'electron_density' or 'mass_density'."
+            "density_type must be 'electron_density', 'mass_density', "
+            "or 'neutron_density'."
         )
 
     device, dtype = context.device, context.dtype
@@ -309,5 +316,7 @@ def atmosphere_density(
         device=rho_gcm3.device,
         dtype=dtype,
     )
+    if density_type == "neutron_density":
+        return (1.0 - electron_fraction) * rho_gcm3 * GCM3_TO_NUCLEON_MOLCM3
     return electron_fraction * rho_gcm3 * GCM3_TO_NUCLEON_MOLCM3
 

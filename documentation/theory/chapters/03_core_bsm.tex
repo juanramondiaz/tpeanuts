@@ -1,0 +1,495 @@
+\chapter{\texttt{core.BSM} --- Beyond-the-Standard-Model extensions}
+\label{ch:core-bsm}
+
+This chapter covers the two supported BSM extensions: non-standard
+interactions (NSI) in the 3-flavour sector, and a fourth light sterile
+neutrino (the ``3+1'' scheme). Both reuse as much as possible of the
+infrastructure from \cref{ch:core-common}: NSI only modifies $H_{\rm mat}$,
+reusing whichever \pyclass{PMNS} object is otherwise in use, and the
+sterile sector extends the factorisation $U=O\,U_{\rm red}$ to
+$4\times4$. There is no separate \texttt{core.BSM} Hamiltonian-assembly
+module: \pyfunc{hamiltonian\_reduced} and \pyfunc{hamiltonian\_flavour}
+(\cref{ch:core-common}, \texttt{hamiltonian.py} section) already handle NSI,
+the sterile extension, or both simultaneously.
+
+\section{\texttt{bsm\_nsi.py} --- non-standard interactions}
+
+\modulehead{core/BSM/bsm\_nsi.py}{parametric configuration of NSI couplings
+and construction of the $\epsilon$ matrix.}
+
+\begin{theorybox}
+NSI are effective four-fermion operators that modify coherent forward
+scattering beyond the standard MSW potential \parencite{Grossman1995}. The
+matter Hamiltonian in the flavour basis generalises to
+\begin{equation}
+  \keyresult{H_{\rm mat}^{\rm NSI} = V\left(\begin{pmatrix}1&0&0\\0&0&0\\0&0&0\end{pmatrix} + \epsilon\right)},
+  \qquad V = \pm\sqrt2\,G_F\,n_e\,L_{\rm scale},
+\end{equation}
+with $\epsilon$ a dimensionless $3\times3$ Hermitian matrix,
+\begin{equation}
+  \epsilon = \begin{pmatrix}
+    \epsilon_{ee} & \epsilon_{e\mu} & \epsilon_{e\tau} \\
+    \epsilon_{e\mu}^* & \epsilon_{\mu\mu} & \epsilon_{\mu\tau} \\
+    \epsilon_{e\tau}^* & \epsilon_{\mu\tau}^* & \epsilon_{\tau\tau}
+  \end{pmatrix}.
+\end{equation}
+Diagonal entries are real; off-diagonal entries are generally complex. The
+Standard Model limit is $\epsilon=0$. Only the traceless part of $\epsilon$
+matters for oscillations (an overall trace is an irrelevant global phase),
+so fixing $\epsilon_{\mu\mu}=0$ is a valid convention for the diagonal
+sector without loss of physical generality.
+
+\textbf{No NSI-specific mixing matrix.} \pyclass{NSIConfig} touches only
+$H_{\rm mat}$: it does not define, or require, any dedicated \pyclass{PMNS}
+subclass. If the sterile extension is not also active, NSI propagation
+reuses the plain 3-flavour \pyclass{PMNS\_SM} object from \cref{ch:core-sm}
+completely unchanged -- the same $U$, $O$, $U_{\rm red}$ as the pure
+Standard Model case. \pyclass{OscillationParameters.nsi} is simply an
+optional, orthogonal attribute alongside \code{pmns}
+(\cref{ch:core-common}, \texttt{oscillation.py} section): which mixing
+scenario is active and whether NSI is active are two independent choices,
+and every combination (SM+NSI, sterile alone, sterile+NSI) is valid.
+\end{theorybox}
+
+\begin{theorybox}
+\subsection*{Transforming the matter Hamiltonian: Standard Model versus NSI}
+In the plain Standard Model, the reduced-basis matter term needs no
+rotation at all: $H_{\rm mat}^{\rm red}=H_{\rm mat}^{\rm flavour}=\diag(V,0,\dots,0)$,
+because $O\,H_{\rm mat}\,O^\dagger=H_{\rm mat}$ exactly (\cref{ch:core-sm}) --
+the matter term is identical in the flavour and reduced bases, so it is
+simply added to the reduced kinetic term as-is.
+
+When NSI are active this shortcut disappears: as shown below,
+$O\,H_{\rm mat}^{\rm NSI}\,O^\dagger\neq H_{\rm mat}^{\rm NSI}$ in general.
+\pyfunc{hamiltonian\_matter\_reduced} (\cref{ch:core-common}) therefore
+takes the opposite route: it builds $H_{\rm mat}^{\rm NSI}$ directly in the
+\emph{flavour} basis as above, and then rotates it explicitly \emph{down}
+into the reduced basis,
+\begin{equation}
+  \keyresult{H_{\rm mat}^{\rm NSI,\,red} = O^\dagger\,H_{\rm mat}^{\rm NSI,\,flavour}\,O},
+\end{equation}
+the exact inverse of the flavour-basis dressing $O(\cdot)O^\dagger$
+(\cref{ch:core-common}). Because the transformation is performed
+explicitly here -- rather than assumed to be a no-op, as in the SM case
+above -- the identity
+$H_{\rm flavour}=\text{\pyfunc{pmns.flavour\_basis}}(H_{\rm red})$ holds
+exactly for \emph{arbitrary} $\epsilon$, not only for the
+diagonal-uniform Standard Model limit.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{Adjoint, not transpose.} $O$ is generally complex ($\Delta$ carries
+$e^{i\delta}$), so $O^\dagger=(O^{*})^{T}$ and the plain transpose $O^{T}$
+differ whenever $\delta\neq0$. The rotation above \textbf{must} use the
+conjugate transpose (\code{O.conj().transpose(-2,-1)} in
+\pyfunc{hamiltonian\_matter\_reduced}) to preserve Hermiticity: for
+Hermitian $\epsilon$ (and hence Hermitian $H_{\rm mat}^{\rm NSI}$),
+$O^\dagger\,H\,O$ is again Hermitian for any unitary $O$, whereas $O^{T}\,H\,O$
+is not, in general, even Hermitian -- let alone the physically correct
+transformed operator. This mirrors the identical requirement already
+established for the kinetic term (\cref{ch:core-common},
+\texttt{pmns.py}/\texttt{hamiltonian.py} sections): the Hermitian conjugate
+is the only convention consistent with a unitary change of basis for an
+operator; the plain transpose coincides with it only by accident, when the
+matrix involved happens to be real.
+\end{notebox}
+
+\begin{notebox}
+Since $H_{\rm mat}^{\rm NSI}$ is no longer proportional to $\diag(V,0,0)$,
+the commutation property $O\,H_{\rm mat}\,O^\dagger=H_{\rm mat}$ assumed by
+the general factorisation \cref{eq:H-factorization} \textbf{no longer holds
+in general} once $\epsilon$ has entries outside the $ee$ block. The code
+does not rely on it being true -- as shown above,
+\pyfunc{hamiltonian\_matter\_reduced} builds $H_{\rm mat}^{\rm NSI}$ in the
+flavour basis and rotates it explicitly, so the result is exact for any
+$\epsilon$. What \emph{is} lost is the Standard Model \emph{simplification}
+(\cref{ch:core-sm}) that $H_{\rm red}$ needs no reference to
+$\theta_{23}/\delta$ and can be built with a real $U_{\rm red}$: for
+generic NSI, $H_{\rm red}$ is genuinely complex and depends on every
+mixing parameter, so the closed-form spectral formulas used elsewhere in
+the project no longer apply, and the relevant diagonalisation (e.g.\ in
+\texttt{medium.solar.probability}) is performed numerically instead, via
+\code{torch.linalg.eigh}.
+\end{notebox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{NSIConfig} (frozen dataclass): stores the six independent
+    parameters of $\epsilon$ (3 real diagonal + 3 complex off-diagonal) and
+    exposes \pyfunc{epsilon\_tensor\_base()} (the raw complex $3\times3$
+    tensor), \pyfunc{epsilon\_tensor(n\_flavours=...)} (embedded for any
+    flavour count, zero-padded for the sterile rows/columns), and
+    \pyfunc{is\_sm\_limit}.
+  \item \pyfunc{NSIConfig.from\_preset(name)} builds named configurations
+    from \code{tpeanuts.config.presets.NSI\_PRESETS}
+    (\cref{sec:nsi-presets}), each with its physical justification
+    documented.
+  \item The $\epsilon$ tensor is read via
+    \pyfunc{oscillation.nsi.epsilon\_tensor(...)}, passed through
+    \pyfunc{pmns.select\_antinu} ($\epsilon\to\epsilon^{*}$ for
+    antineutrinos, mirroring the $U\to U^{*}$ convention), and injected
+    directly into \pyfunc{hamiltonian\_matter\_reduced}
+    (\cref{ch:core-common}) -- the single Hamiltonian-assembly function
+    handling this case; there is no separate \texttt{core.BSM} builder.
+\end{itemize}
+\end{implbox}
+
+\begin{refbox}
+Original NSI proposal: \cite{Grossman1995}. Model-independent bounds:
+\cite{BiggioBlennowFM2009}. LMA-Dark degeneracy in the global fit:
+\cite{Esteban2018LMADark}. IceCube DeepCore bounds: \cite{IceCube2022NSI}.
+\end{refbox}
+
+\section{NSI presets}
+\label{sec:nsi-presets}
+
+\modulehead{tpeanuts/config/presets.py}{\code{NSI\_PRESETS}: named,
+literature-justified $\epsilon$ configurations, built via
+\pyfunc{NSIConfig.from\_preset}.}
+
+\begin{implbox}
+Every preset below sets a handful of $\epsilon$ parameters to a
+representative, literature-motivated value (all other components default
+to zero) rather than to a unique global best fit: current data leaves large
+NSI degeneracies, so no single preferred point exists. Their purpose is
+threefold: (1) give the validation notebooks and tests physically motivated
+$\epsilon$ values instead of arbitrary numbers, covering diagonal-only,
+off-diagonal, single- and multi-parameter regimes; (2) reproduce, and stay
+traceable to, specific published sensitivity/bound studies; and
+(3) let users reach a standard benchmark scenario (e.g.\ the LMA-Dark
+degeneracy) by name instead of re-deriving its $\epsilon$ values.
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Preset & $\epsilon$ values and origin \\
+\midrule
+\parbox[t]{3.2cm}{\code{sm\_\allowbreak{}no\_\allowbreak{}nsi}} &
+  \parbox[t]{9.4cm}{All $\epsilon=0$. Standard Model limit; equivalent to
+  passing \code{nsi=None}.} \\[10pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}diagonal\_\allowbreak{}biggio2009}} &
+  \parbox[t]{9.4cm}{$\epsilon_{ee}=0.30$, $\epsilon_{\tau\tau}=0.15$.
+  Diagonal-only benchmark within the model-independent 90\% CL bounds of
+  \textcite{BiggioBlennowFM2009} ($|\epsilon_{ee}|<0.50$,
+  $|\epsilon_{\tau\tau}|<0.33$).} \\[18pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}lma\_\allowbreak{}dark\_\allowbreak{}esteban2018}} &
+  \parbox[t]{9.4cm}{$\epsilon_{ee}=-2.0$. The LMA-Dark degenerate solar
+  solution of \textcite{Esteban2018LMADark}: this large negative
+  $\epsilon_{ee}$ flips the sign of the effective MSW potential, mimicking
+  $\theta_{12}\to\pi/2-\theta_{12}\approx56.6^\circ$ (paired with the
+  \code{"\_LMA\_DARK\_NUFIT52\_NO"} oscillation preset,
+  \cref{ch:core-common}).} \\[24pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}offdiag\_\allowbreak{}icecube2022}} &
+  \parbox[t]{9.4cm}{$\epsilon_{\mu\tau}=0.005$, $\epsilon_{\tau\tau}=0.015$.
+  Sits near the 90\% CL boundary of the IceCube DeepCore atmospheric
+  analysis \parencite{IceCube2022NSI}
+  ($|\epsilon_{\mu\tau}|<0.0060$, $|\epsilon_{\tau\tau}-\epsilon_{\mu\mu}|<0.018$).} \\[18pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}dune\_\allowbreak{}etau}} &
+  \parbox[t]{9.4cm}{$\epsilon_{e\tau}=0.15$ (real). Representative DUNE
+  Near Detector sensitivity benchmark \parencite{DUNE2021BSM}: this
+  flavour-changing coupling produces the strongest degeneracies with
+  $\delta_{CP}$, the mass ordering, and $\theta_{23}$.} \\[18pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}hyperk\_\allowbreak{}etau}} &
+  \parbox[t]{9.4cm}{$\epsilon_{ee}=0.20$, $\epsilon_{e\tau}=0.10$ (real).
+  Combines a diagonal MSW correction with a flavour-changing coupling,
+  representative of Hyper-Kamiokande sensitivity studies
+  \parencite{HyperK2015Proposal}.} \\[18pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}globalfit\_\allowbreak{}esteban2018}} &
+  \parbox[t]{9.4cm}{$\epsilon_{ee}=0.25$, $\epsilon_{e\tau}=0.12$,
+  $\epsilon_{\mu\tau}=0.01$, $\epsilon_{\tau\tau}=0.08$. Multi-parameter
+  benchmark within the allowed region of the global oscillation analysis of
+  \textcite{Esteban2018LMADark}; not a unique best fit, since significant
+  correlations remain.} \\[22pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}ee\_\allowbreak{}only}} &
+  \parbox[t]{9.4cm}{$\epsilon_{ee}=0.30$. Simplest possible NSI scenario:
+  only the effective MSW potential is modified, with no flavour-changing
+  coupling \parencite{BiggioBlennowFM2009}.} \\[10pt]
+\parbox[t]{3.2cm}{\code{nsi\_\allowbreak{}mutau\_\allowbreak{}only}} &
+  \parbox[t]{9.4cm}{$\epsilon_{\mu\tau}=0.01$ (real). Atmospheric
+  $\mu$--$\tau$ benchmark representative of IceCube/KM3NeT sensitivity to
+  flavour-changing matter interactions \parencite{Coloma2017IceCubeNSI}.} \\[14pt]
+\bottomrule
+\end{tabular}
+\end{center}
+\end{implbox}
+
+\begin{refbox}
+\cite{BiggioBlennowFM2009,Esteban2018LMADark,IceCube2022NSI,DUNE2021BSM,HyperK2015Proposal,Coloma2017IceCubeNSI}.
+\end{refbox}
+
+\section{\texttt{bsm\_sterile.py} --- the 3+1 scheme}
+
+\modulehead{core/BSM/bsm\_sterile.py}{\pyclass{PMNS\_sterile}: $4\times4$
+mixing for one additional light sterile neutrino.}
+
+\begin{theorybox}
+A fourth mass eigenstate $\nu_4$ and a fourth sterile flavour eigenstate
+$\nu_s$ are added; $\nu_s$ is a gauge singlet and therefore couples to
+neither $W$ nor $Z$. The charged-current potential is consequently
+unaffected by the extension, so, omitting the optional neutral-current term
+(the default, \cref{ch:core-common}), the matter potential in the extended
+basis $(e,\mu,\tau,s)$ is
+\begin{equation}
+  H_{\rm mat}=\diag(V_{CC},0,0,0),
+\end{equation}
+the same charged-current-only term as the 3-flavour case, simply padded
+with a zero sterile entry. Since $\nu_s$ also does not receive the
+neutral-current potential $V_{NC}$, optionally supplying a neutron density
+activates the relative term derived in \cref{ch:core-common},
+\begin{equation}
+  H_{\rm mat}=\diag(V_{CC},0,0,-V_{NC}),
+\end{equation}
+which does affect sterile-active oscillation probabilities (see the
+implementation box below for how this interacts with $O_4$). The $4\times4$
+mixing matrix is parametrised by adding three active--sterile rotations,
+$R_{14},R_{24},R_{34}$, to the standard structure, following the
+parametrisation convention of \textcite{KoppMachadoMaltoniSchwetz2013}:
+\begin{equation}
+  U_4 = R_{23}\,\Delta_4\,R_{24}\,R_{34}\,R_{13}\,\Delta_4^\dagger\,R_{12}\,R_{14}.
+\end{equation}
+Identifying $O_4\equiv R_{23}\,\Delta_4\,R_{24}\,R_{34}$
+(\pyfunc{PMNS\_sterile.outer\_block}) leaves a formal reduced factor
+$U_{\rm red,4}\equiv R_{13}\,\Delta_4^\dagger\,R_{12}\,R_{14}$ satisfying
+$U_4=O_4\,U_{\rm red,4}$ exactly, mirroring \cref{ch:core-sm}. As in the SM
+case, $\Delta_4$ cancels from the reduced \emph{kinetic term} specifically:
+\begin{equation}
+  \keyresult{\Delta_4^\dagger\bigl(R_{12}R_{14}\diag(k)R_{14}^\dagger R_{12}^\dagger\bigr)\Delta_4
+  = R_{12}R_{14}\diag(k)R_{14}^\dagger R_{12}^\dagger},
+\end{equation}
+valid because neither $R_{12}$ (the $e$--$\mu$ plane) nor $R_{14}$ (the
+$e$--$s$ plane) mixes with the $\tau$ index, which is the only non-trivial
+index of $\Delta_4$. This is why \pyfunc{PMNS\_sterile.reduced} returns the
+simplified, $\Delta_4$-free
+\begin{equation}
+  U_{\rm red,4}^{\rm code}=R_{13}R_{12}R_{14}
+\end{equation}
+rather than the formal $U_{\rm red,4}$ above: the two agree once contracted
+with the kinetic term (any diagonal unitary conjugating a diagonal matrix
+leaves it invariant), but $U_{\rm red,4}^{\rm code}$ is cheaper. Note that,
+consequently, $O_4\,U_{\rm red,4}^{\rm code}\neq U_4$ as bare matrices --
+only $U_{\rm red,4}$ (with $\Delta_4^\dagger$ included) satisfies the exact
+factorisation; \pyfunc{PMNS\_sterile.reduced} returns the code-optimised
+form, valid specifically for building $H_{\rm kin}$, not a literal factor
+of $U_4$ (see the limitations box below). The same commutation argument as
+\cref{ch:core-sm} applies to $O_4$ for the plain charged-current matter
+term: $R_{23},\Delta_4,R_{24},R_{34}$ all leave the $e$ index fixed, so
+$O_4\,\diag(V_{CC},0,0,0)\,O_4^\dagger=\diag(V_{CC},0,0,0)$ exactly, and the
+reduced Hamiltonian is assembled and dressed back to the flavour basis
+exactly as in \cref{ch:core-common,ch:core-sm}, now for $n=4$. As
+established in \cref{ch:core-common} (\texttt{hamiltonian.py} section),
+this commutation is specific to the charged-current-only term: $O_4$ mixes
+the $\{\mu,\tau,s\}$ block and therefore does \emph{not} leave the optional
+neutral-current term $\diag(0,0,0,V_{NC})$ invariant, so the reduction-trick
+shortcut used above breaks whenever that term is active (see the
+implementation box below).
+
+\textbf{SM limit.} When $\theta_{14}=\theta_{24}=\theta_{34}=0$, the
+$4\times4$ matrices block-diagonalise exactly into the $3\times3$ SM matrix
+\emph{embedded} in the larger space, recovering every result of
+\cref{ch:core-common,ch:core-sm} without approximation.
+
+\textbf{CP-phase counting.} For $N=4$ Dirac generations there are
+$(N-1)(N-2)/2=3$ physical phases: $\delta_{13}$ (the standard phase, in the
+$\Delta_4$ carried through $R_{13}$), $\delta_{14}$ ($e$--$s$ sector, in
+$R_{14}$), and $\delta_{24}$ ($\mu$--$s$ sector, in $R_{24}$). $R_{34}$ is
+always real: the fourth possible phase can be absorbed into a field
+redefinition, so sterile presets do not include \code{delta34\_deg}.
+\end{theorybox}
+
+\begin{theorybox}
+\subsection*{Transforming to the reduced basis: $H_{\rm kin}$ and $H_{\rm mat}$}
+Exactly as in \cref{ch:core-sm}, the reduced-basis kinetic term uses the
+code's $U_{\rm red,4}^{\rm code}=R_{13}R_{12}R_{14}$ together with its
+\emph{Hermitian conjugate} (never the plain transpose, for the same reason
+as \cref{ch:core-common,ch:core-sm}):
+\begin{equation}
+  \keyresult{H_{\rm kin,4}^{\rm red} = U_{\rm red,4}^{\rm code}\,\diag(k_1,k_2,k_3,k_4)\,\bigl(U_{\rm red,4}^{\rm code}\bigr)^\dagger}.
+\end{equation}
+Unlike the SM's $R_{13}R_{12}$, $U_{\rm red,4}^{\rm code}$ is genuinely
+complex whenever the active-sterile CP phase $\delta_{14}\neq0$ (it carries
+$R_{14}$, which -- unlike $R_{12}$/$R_{13}$ -- is built with a non-trivial
+phase); the Hermitian-conjugate convention is therefore not merely a safe
+default here, but the only correct choice.
+
+\textbf{Without NSI and without the neutral-current term} (the default),
+the matter term needs no basis change at all:
+$O_4\,\diag(V_{CC},0,0,0)\,O_4^\dagger=\diag(V_{CC},0,0,0)$ exactly (shown
+above), so
+\begin{equation}
+  H_{\rm mat,4}^{\rm red} = H_{\rm mat,4}^{\rm flavour} = \diag(V_{CC},0,0,0),
+\end{equation}
+and the reduced Hamiltonian is simply
+$H_{\rm red,4}=H_{\rm kin,4}^{\rm red}+H_{\rm mat,4}^{\rm red}$
+(\pyfunc{hamiltonian\_reduced}, \cref{ch:core-common}), dressed back to the
+flavour basis with $O_4(\cdot)O_4^\dagger$ (\pyfunc{hamiltonian\_flavour}).
+This case introduces no approximation beyond \cref{ch:core-sm}: the
+reduced-basis simplification stays exact for any $\theta_{14},\theta_{24},\theta_{34}$.
+Supplying a neutron density activates
+$H_{\rm mat,4}^{\rm flavour}=\diag(V_{CC},0,0,-V_{NC})$
+(\cref{ch:core-common}) instead: since this no longer commutes with $O_4$,
+the shortcut above is unavailable and \pyfunc{hamiltonian\_matter\_reduced}
+takes the general rotated path,
+$H_{\rm mat,4}^{\rm red}=O_4^\dagger\,H_{\rm mat,4}^{\rm flavour}\,O_4$,
+even when NSI is off.
+
+\textbf{Simultaneous NSI} is fully supported by the same code path
+(\cref{sec:nsi-presets}): \pyfunc{NSIConfig.epsilon\_tensor(n\_flavours=4)}
+embeds the $3\times3$ $\epsilon$ block into the top-left corner of a
+$4\times4$ zero matrix (the sterile row/column stay zero, since $\nu_s$ is
+an $\mathrm{SU}(2)_L\times\mathrm{U}(1)_Y$ singlet and carries no NSI
+coupling), and \pyfunc{hamiltonian\_matter\_reduced} rotates the resulting
+$H_{\rm mat,4}^{\rm NSI,\,flavour}=V\bigl(\diag(1,0,0,0)+\epsilon_4\bigr)$
+into the reduced basis with the \emph{same} $O_4^\dagger(\cdot)O_4$
+transformation as the 3-flavour case:
+\begin{equation}
+  H_{\rm mat,4}^{\rm NSI,\,red} = O_4^\dagger\,H_{\rm mat,4}^{\rm NSI,\,flavour}\,O_4,
+\end{equation}
+again exact for arbitrary $\epsilon$, since it is computed explicitly
+rather than assumed to commute with $O_4$ -- the same approximation
+trade-off as the 3-flavour NSI case applies here too (previous sections):
+the closed-form real-arithmetic shortcut is lost, and diagonalisation falls
+back to \code{torch.linalg.eigh}. Nothing in
+\pyfunc{hamiltonian\_reduced}/\pyfunc{hamiltonian\_flavour} branches
+explicitly on ``sterile or NSI or both'': the flavour count $n\in\{3,4\}$
+and the presence of \code{oscillation.nsi} are read directly off
+\pyclass{OscillationParameters}, so all four combinations (SM, SM+NSI,
+sterile, sterile+NSI) are handled by the exact same two functions.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{Limitation: $U=O\,U_{\rm red}$ holds exactly only for the
+\emph{formal} $U_{\rm red}$, not for \pyfunc{reduced}.} Both here and in
+\cref{ch:core-sm}, the abstract contract of \cref{ch:core-common} --
+$U=O\,U_{\rm red}$ for the three methods \pyfunc{pmns\_matrix},
+\pyfunc{outer\_block}, \pyfunc{reduced} -- is, strictly, a simplification
+of what the code returns: \pyfunc{reduced} always drops a $\Delta$ (or
+$\Delta_4$) factor that is provably irrelevant for building $H_{\rm kin}$
+(any diagonal unitary conjugating $\diag(k)$ leaves it invariant) but whose
+omission means \pyfunc{outer\_block}$(\,)\cdot$\pyfunc{reduced}$(\,)$ is
+\emph{not} bit-for-bit equal to \pyfunc{pmns\_matrix}$(\,)$. This is
+harmless for every use of \pyfunc{reduced} in this project (always as the
+sandwiching matrix of a kinetic term), but it means \cref{ch:core-common}'s
+statement of the contract should be read as ``$U$ and $O\,U_{\rm red}$
+agree up to a diagonal phase that leaves $\diag(k)$ invariant'', not as a
+literal matrix identity between the three named methods.
+\end{notebox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{PMNSSterileParams}: parameters for \emph{only} the sterile
+    extension ($\theta_{14},\theta_{24},\theta_{34}$ and their phases); the
+    SM sector lives in a separate \pyclass{PMNSParams} object passed
+    alongside this one to the \pyclass{PMNS\_sterile} constructor.
+    $\Delta m^2_{41}$ also does not live here: like
+    $\Delta m^2_{21}/\Delta m^2_{3\ell}$, it is stored on
+    \pyclass{OscillationParameters} because it never enters a mixing
+    rotation.
+  \item \pyclass{PMNS\_sterile}: subclass of \pyclass{core.common.pmns.PMNS}
+    with \code{n\_flavours=4}; it inherits unchanged every piece that is
+    generic in size (\pyfunc{R12}, \pyfunc{R13}, \pyfunc{R23},
+    \pyfunc{Delta}, \pyfunc{flavour\_basis}, \pyfunc{reduced\_basis},
+    \pyfunc{refresh}, \pyfunc{select\_antinu}, ...) and only adds the extra
+    constructors \pyfunc{R14}, \pyfunc{R24}, \pyfunc{R34} and the concrete
+    implementation of \pyfunc{pmns\_matrix}, \pyfunc{reduced}, and
+    \pyfunc{outer\_block}.
+  \item Direct consequence of this design: \textbf{every} piece of
+    \texttt{medium.*} code that operates on a generic \pyclass{PMNS} object
+    works without modification for 4 flavours, simply by passing a
+    \pyclass{PMNS\_sterile} instance instead of \pyclass{PMNS\_SM}; the same
+    holds for NSI (previous sections), which can be combined freely with
+    the sterile extension since \pyfunc{NSIConfig.epsilon\_tensor} embeds
+    the $3\times3$ $\epsilon$ block in the top-left corner of the
+    $4\times4$ matter matrix, leaving the sterile row/column at zero.
+  \item Named presets (e.g.\ \code{"sterile\_3p1\_bestfit\_giunti2017"}) are
+    built via \pyfunc{PropagationConfig.oscillation\_parameters\_from\_preset}
+    (\cref{ch:core-common}), which internally creates both parameter
+    objects and sets $\Delta m^2_{41}$ on the resulting
+    \pyclass{OscillationParameters}.
+\end{itemize}
+\end{implbox}
+
+\begin{refbox}
+3+1 mixing parametrisation convention: \cite{KoppMachadoMaltoniSchwetz2013}.
+Global 3+1 fit: \cite{GiuntiMarronePalazzo2017}. IceCube atmospheric
+$\nu_\mu$ disappearance search: \cite{IceCube2020SterileNumuDisappearance}.
+\end{refbox}
+
+\section{Sterile presets}
+\label{sec:sterile-presets}
+
+\modulehead{tpeanuts/config/presets.py}{\code{OSCILLATION\_PRESETS} entries
+carrying \code{theta14\_deg}: named, literature-justified 3+1 parameter
+sets, dispatched to \pyclass{PMNS\_sterile} automatically.}
+
+\begin{implbox}
+A preset is a \emph{sterile} preset purely by having a \code{theta14\_deg}
+key; \pyfunc{PropagationConfig.oscillation\_parameters\_from\_preset}
+(\cref{ch:core-common}) dispatches on that key alone to build a
+\pyclass{PMNS\_sterile} instead of a \pyclass{PMNS\_SM}, with every other
+field (the SM angles, $\Delta m^2_{21}/\Delta m^2_{3\ell}$) inherited from
+the shared NuFIT 5.2 baseline (\cref{ch:core-common}, Default Configuration
+box). As with the NSI presets (\cref{sec:nsi-presets}), these are named,
+traceable benchmark points rather than a single global best fit -- current
+3+1 data is in tension between different anomalies, so no universally
+preferred point exists.
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+Preset & Parameters and origin \\
+\midrule
+\parbox[t]{3.2cm}{\code{sterile\_\allowbreak{}3p1\_\allowbreak{}null\_\allowbreak{}mixing}} &
+  \parbox[t]{9.4cm}{$\theta_{14}=\theta_{24}=\theta_{34}=0$,
+  $\Delta m^2_{41}=1.0\ \mathrm{eV^2}$. Null-hypothesis reference: with
+  every sterile angle at zero, \pyclass{PMNS\_sterile} is numerically
+  identical to the plain 3-flavour SM (the exact SM-limit embedding proved
+  above), run through the 4-flavour machinery -- used to validate that
+  embedding in \texttt{core/BSM/test/test3\_bsm\_sterile.py}.} \\[26pt]
+\parbox[t]{3.2cm}{\code{sterile\_\allowbreak{}3p1\_\allowbreak{}bestfit\_\allowbreak{}giunti2017}} &
+  \parbox[t]{9.4cm}{$\theta_{14}=8.5^\circ$, $\theta_{24}=7.5^\circ$,
+  $\theta_{34}=0$, $\Delta m^2_{41}=1.7\ \mathrm{eV^2}$
+  ($\sin^2 2\theta_{14}=0.085$, $\sin^2 2\theta_{24}=0.068$). Global 3+1
+  fit combining the reactor and gallium anomalies with solar data
+  \parencite{GiuntiMarronePalazzo2017}; sterile CP phases fixed to zero
+  (no sensitivity in that data combination).} \\[30pt]
+\parbox[t]{3.2cm}{\code{sterile\_\allowbreak{}3p1\_\allowbreak{}benchmark\_\allowbreak{}icecube}} &
+  \parbox[t]{9.4cm}{$\theta_{14}=0$, $\theta_{24}\approx9.22^\circ$
+  ($\sin^2 2\theta_{24}=0.10$), $\theta_{34}=0$,
+  $\Delta m^2_{41}=0.3\ \mathrm{eV^2}$. IceCube atmospheric $\nu_\mu$
+  disappearance benchmark \parencite{IceCube2020SterileNumuDisappearance};
+  $\theta_{14},\theta_{34}$ set to zero since IceCube atmospheric neutrinos
+  are primarily sensitive to $\theta_{24}$.} \\[26pt]
+\parbox[t]{3.2cm}{\code{sterile\_\allowbreak{}3p1\_\allowbreak{}two\_\allowbreak{}flavour\_\allowbreak{}limit}} &
+  \parbox[t]{9.4cm}{$\theta_{12}=\theta_{13}=\theta_{23}=0$,
+  $\theta_{14}=15^\circ$, $\theta_{24}=12^\circ$, $\theta_{34}=0$,
+  $\Delta m^2_{41}=1.0\ \mathrm{eV^2}$. A mathematical construction, not a
+  data-driven benchmark: switching off every SM active angle makes the
+  $\nu_e$ disappearance channel reduce exactly to the textbook 2-flavour
+  formula $P_{ee}=1-\sin^2(2\theta_{14})\sin^2(1.267\,\Delta m^2_{41}L/E)$
+  for any $\theta_{24}$, since $\theta_{24}$ lives only in $O_4$, which
+  leaves the electron index untouched. Used to validate the 2-flavour
+  approximation against the full 4-flavour evolutor in isolation, before
+  quantifying the residual active-sector suppression present for realistic
+  presets such as \code{sterile\_3p1\_bestfit\_giunti2017} (see
+  \texttt{sterile2\_kinematics.ipynb} in
+  \texttt{notebooks/validation/physics/BSM}).} \\[42pt]
+\bottomrule
+\end{tabular}
+\end{center}
+\end{implbox}
+
+\begin{notebox}
+\textbf{Approximation exposed by \code{sterile\_3p1\_two\_flavour\_limit}.}
+The familiar 2-flavour disappearance formula is only \emph{exact} once the
+SM active angles are switched off; for realistic presets (SM angles at
+their measured values) the $\nu_\mu$ channel in particular picks up a small
+residual correction, because $R_{14}$ and $R_{24}$ both act on the sterile
+index and do not commute in general -- $|U_{\mu4}|^2=\sin^2\theta_{24}$
+holds exactly only when $\theta_{23}=\theta_{14}=0$. This is a property of
+the physics (the standard 2-flavour formula is itself an approximation once
+more than one active-sterile angle is non-zero), not a code limitation; the
+preset exists specifically to isolate and validate this effect
+numerically.
+\end{notebox}

@@ -23,23 +23,25 @@ This module evaluates Earth probabilities over a nadir-angle exposure table
 and integrates the result into an exposure-averaged probability vector. It is
 part of the observable layer of the Earth pipeline: it does not build
 Hamiltonians or evolution operators directly, but delegates those operations
-to ``medium.earth.probability.pearth``.
+to ``medium.earth.probability.earth_probability_state``.
 
 The calculation performed here is
 
-    P_int(E) = integral d eta W(eta) P_earth(E, eta),
+    P_exp(E) = integral d eta W(eta) P_earth(E, eta),
 
 where ``W(eta)`` is obtained from ``medium.earth.exposure_table`` and
 ``P_earth(E, eta)`` is computed either with the perturbative analytical
 pipeline or with the numerical pipeline. The implementation supports chunking
 over the eta grid to control memory usage when large energy-angle batches are
-evaluated.
+evaluated. This time-averages over the nadir angle and is distinct from
+``core.common.probability.probability_integrated_angular``, which performs a
+geometric solid-angle average rather than an exposure-weighted one.
 
 Module functions:
     _prepare_energy_grid(...)
         Convert scalar or vector energies into a one-dimensional tensor and
         record whether the scalar dimension must be removed at the end.
-    pearth_integrated(...)
+    earth_probability_exposure(...)
         Compute exposure-integrated Earth flavour probabilities for one or
         more neutrino energies.
 """
@@ -55,10 +57,10 @@ import torch
 
 from tpeanuts.util.type import TensorLike
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.core.numerical.geometry import OdeMethod
-from tpeanuts.medium.earth.probability import PearthMethod, pearth
+from tpeanuts.medium.earth.probability import PearthMethod, earth_probability_state
 from tpeanuts.medium.earth.exposure_table import ExposureParameters, build_nadir_exposure
 from tpeanuts.util.context import RuntimeContext
 
@@ -97,7 +99,7 @@ def _prepare_energy_grid(
 
   
 @torch.no_grad()
-def pearth_integrated(
+def earth_probability_exposure(
     nustate: Tensor,
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -113,19 +115,21 @@ def pearth_integrated(
     reunitarize: bool = default.earth_reunitarize,
     nsteps: int = default.earth_probability_nsteps,
     ode_method: OdeMethod | None = default.earth_numerical_method,
+    include_matter_nc: bool = default.earth_include_matter_nc,
 ) -> Tensor:
     """Compute Earth probabilities averaged over a nadir exposure table.
 
     The function builds or loads an exposure table ``W(eta)``, evaluates
-    ``pearth`` on the corresponding energy-angle grid, and accumulates
-    ``P_int(E) = integral d eta W(eta) P_earth(E, eta)``. Analytical mode is
-    evaluated as a batched tensor operation, while numerical mode currently
-    loops over scalar trajectories.
+    ``earth_probability_state`` on the corresponding energy-angle grid, and
+    accumulates ``P_exp(E) = integral d eta W(eta) P_earth(E, eta)``.
+    Analytical mode is evaluated as a batched tensor operation, while
+    numerical mode currently loops over scalar trajectories.
 
     Args:
-        nustate: Initial state with final dimension 3. Interpreted as
-            incoherent mass weights when ``massbasis=True`` and coherent
-            flavour amplitudes otherwise.
+        nustate: Initial state with final dimension matching
+            ``oscillation.pmns.n_flavours`` (3, or 4 for the 3+1 sterile
+            extension). Interpreted as incoherent mass weights when
+            ``massbasis=True`` and coherent flavour amplitudes otherwise.
         profile_earth: EarthProfile-compatible profile object.
         oscillation: Built pmns object plus mass splittings and antinu
             selection.
@@ -147,14 +151,23 @@ def pearth_integrated(
             to the nearest unitary matrix.
         nsteps: Number of numerical trajectory samples for numerical mode.
         ode_method: Numerical profile sampling rule for numerical mode.
+        include_matter_nc: If True, also apply the 3+1 sterile extension's
+            neutral-current matter term (see
+            ``medium.earth.probability.earth_probability_state``). Requires
+            ``profile_earth`` to have been built with neutron-density
+            coefficients; raises otherwise. False (the default) reproduces
+            the pre-existing CC-only behaviour exactly.
 
     Returns:
         Exposure-integrated final flavour probabilities with final dimension
-        3. A scalar energy input returns a single probability vector; vector
-        energy input preserves the leading energy dimension.
+        matching ``oscillation.pmns.n_flavours`` (3, or 4 for the 3+1
+        sterile extension). A scalar energy input returns a single
+        probability vector; vector energy input preserves the leading
+        energy dimension.
     """
     dev, dtype = context.device, context.dtype
     antinu = oscillation.antinu
+    n_flavours = int(oscillation.pmns.n_flavours)
 
     if method not in ("analytical", "numerical"):
         raise ValueError("method must be either 'analytical' or 'numerical'.")
@@ -187,7 +200,7 @@ def pearth_integrated(
         antinu_t = antinu.to(device=dev, dtype=torch.bool)
 
     out = torch.zeros(
-        (n_energy, 3),
+        (n_energy, n_flavours),
         device=dev,
         dtype=dtype,
     )
@@ -220,7 +233,7 @@ def pearth_integrated(
                 antinu_chunk = antinu_t
 
         if method == "analytical":
-            P_chunk = pearth(
+            P_chunk = earth_probability_state(
                 nustate=nustate,
                 profile_earth=profile_earth,
                 oscillation=dataclasses.replace(oscillation, antinu=antinu_chunk),
@@ -230,6 +243,7 @@ def pearth_integrated(
                 method="analytical",
                 massbasis=massbasis,
                 reunitarize=reunitarize,
+                include_matter_nc=include_matter_nc,
             )
         else:
             if torch.is_tensor(antinu_chunk) and antinu_chunk.numel() != 1:
@@ -245,7 +259,7 @@ def pearth_integrated(
 
                 for eta_value in eta_chunk:
                     P_eta.append(
-                        pearth(
+                        earth_probability_state(
                             nustate=nustate,
                             profile_earth=profile_earth,
                             oscillation=oscillation_scalar,
@@ -258,6 +272,7 @@ def pearth_integrated(
                             nsteps=nsteps,
                             ode_method=ode_method,
                             context=context,
+                            include_matter_nc=include_matter_nc,
                         )
                     )
 

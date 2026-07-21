@@ -124,7 +124,8 @@ def resonance_radius(
     density decreases monotonically from the solar centre outward).
 
     Args:
-        oscillation: Oscillation parameters supplying theta_12 and DeltamSq21.
+        oscillation: Oscillation parameters supplying theta_12 and
+            mass_spectrum.DeltamSq21.
         E: Neutrino energy or 1-D energy grid in MeV.
         solar_profile: SolarProfile-like object with ``radius`` and
             ``density`` 1-D tensors.
@@ -136,7 +137,7 @@ def resonance_radius(
         etc.).
     """
     th12 = oscillation.pmns.params.theta12
-    dm21 = oscillation.DeltamSq21
+    dm21 = oscillation.mass_spectrum.DeltamSq21
     cos2th12 = torch.cos(2.0 * th12)  # scalar; negative for LMA-Dark
 
     radius = solar_profile.radius    # (n_r,)
@@ -203,7 +204,8 @@ def plz(
     and antineutrinos.
 
     Args:
-        oscillation: Oscillation parameters supplying theta_12 and DeltamSq21.
+        oscillation: Oscillation parameters supplying theta_12 and
+            mass_spectrum.DeltamSq21.
         E: Neutrino energy or 1-D energy grid in MeV.
         solar_profile: SolarProfile-like object exposing ``radius`` and
             ``density``.
@@ -214,7 +216,7 @@ def plz(
         numerically indistinguishable from zero.
     """
     th12 = oscillation.pmns.params.theta12
-    dm21 = oscillation.DeltamSq21
+    dm21 = oscillation.mass_spectrum.DeltamSq21
     sin2th12 = torch.sin(2.0 * th12)
     cos2th12 = torch.cos(2.0 * th12)
 
