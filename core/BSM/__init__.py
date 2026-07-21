@@ -24,12 +24,13 @@ Submodules
 PMNS_sterile
     4-flavor PMNS matrix for the 3+1 sterile neutrino scenario. Named 3+1
     presets are built via
-    ``tpeanuts.core.common.oscillation.OscillationParameters.from_preset``;
-    the preset data lives in ``tpeanuts.core.common.presets.OSCILLATION_PRESETS``.
+    ``tpeanuts.core.common.oscillation.oscillation_parameters_from_preset``;
+    the preset data lives in ``tpeanuts.config.presets.OSCILLATION_PRESETS``.
 NSIConfig
     Frozen dataclass ``NSIConfig`` for Non-Standard Interaction parameter
     sets. The preset data lives in
-    ``tpeanuts.core.common.presets.NSI_PRESETS``.
-hamiltonian
-    BSM Hamiltonian builders for NSI and sterile-neutrino propagation.
+    ``tpeanuts.config.presets.NSI_PRESETS``.
+
+Hamiltonian assembly (kinetic/matter/reduced/flavour builders) is not
+scenario-specific and lives in ``tpeanuts.core.common.hamiltonian`` instead.
 """

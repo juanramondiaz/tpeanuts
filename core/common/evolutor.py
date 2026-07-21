@@ -36,19 +36,21 @@ def apply_evolutor_to_state(
     evolutor: torch.Tensor,
     state: torch.Tensor,
 ) -> torch.Tensor:
-    """Apply a batched evolution operator to a state with final dimension 3.
+    """Apply a batched evolution operator to a state.
 
     Args:
-        evolutor: Evolution operator shaped (..., 3, 3).
-        state: State amplitudes shaped (..., 3).
+        evolutor: Evolution operator shaped (..., N, N), N in {3, 4} (3 for
+            the Standard Model, 4 for the 3+1 sterile extension).
+        state: State amplitudes shaped (..., N).
 
     Returns:
-        Evolved state amplitudes with final dimension 3.
+        Evolved state amplitudes with final dimension N.
     """
-    if evolutor.shape[-2:] != (3, 3):
-        raise ValueError("evolutor must have final dimensions (3, 3).")
-    if state.shape[-1] != 3:
-        raise ValueError("state must have last dimension 3.")
+    N = evolutor.shape[-1]
+    if evolutor.shape[-2:] != (N, N) or N not in (3, 4):
+        raise ValueError("evolutor must have final dimensions (3, 3) or (4, 4).")
+    if state.shape[-1] != N:
+        raise ValueError(f"state must have last dimension {N} to match evolutor.")
 
     while state.ndim < evolutor.ndim - 1:
         state = state.unsqueeze(-2)

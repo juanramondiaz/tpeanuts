@@ -27,8 +27,8 @@ The shared rotation/phase builders
 
     ``R12``, ``R13``, ``R23``, ``Delta``
 
- and the flavour-count-agnostic public interface 
- ``H_flavour_basis``, ``H_mass_basis``, ``refresh``, 
+ and the flavour-count-agnostic public interface
+ ``reduced_basis``, ``refresh``,
  ``select_antinu``, ``dagger``, ...
 
  are inherited unchanged from the base;
@@ -45,7 +45,7 @@ Module contents:
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import Union
 
 import torch
 
@@ -110,6 +110,15 @@ class PMNS_SM(PMNS):
     n_sterile: int = 0
 
     @torch.no_grad()
+    def outer_block(
+        self,
+        antinu: Union[bool, torch.Tensor] = False,
+    ) -> torch.Tensor:
+        """Build the SM outer block ``R23 @ Delta``."""
+        O = self.R23() @ self.Delta()
+        return self.select_antinu(O, antinu)
+
+    @torch.no_grad()
     def reduced(
         self,
         antinu: Union[bool, torch.Tensor] = False,
@@ -159,52 +168,3 @@ class PMNS_SM(PMNS):
         U = r23 @ delt @ r13 @ delt.conj() @ r12
 
         return self.select_antinu(U, antinu)
-
-    @torch.no_grad()
-    def operator_flavour_basis(
-        self,
-        operator_reduced: torch.Tensor,
-        antinu: Union[bool, torch.Tensor] = False,
-        *,
-        device: Optional[torch.device | str] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> torch.Tensor:
-        """Transform an operator from the reduced to the flavour basis.
-
-        Applies O_flavour = R23 Delta O_reduced Delta^dagger R23^T using the
-        neutrino or antineutrino convention over broadcast batches.
-
-        Args:
-            operator_reduced: Reduced-basis operator shaped (..., 3, 3).
-            antinu: Boolean scalar or tensor mask selecting antineutrinos.
-            device: Optional output device; defaults to the operator device.
-            dtype: Optional output dtype; defaults to the operator dtype.
-
-        Returns:
-            Operator represented in the full flavour basis.
-        """
-        output_device = (
-            operator_reduced.device if device is None else torch.device(device)
-        )
-        output_dtype = operator_reduced.dtype if dtype is None else dtype
-        operator_reduced = operator_reduced.to(
-            device=output_device,
-            dtype=output_dtype,
-        )
-
-        r23 = self.select_antinu(self.R23(), antinu).to(
-            device=output_device,
-            dtype=output_dtype,
-        )
-        delta = self.select_antinu(self.Delta(), antinu).to(
-            device=output_device,
-            dtype=output_dtype,
-        )
-
-        return (
-            r23
-            @ delta
-            @ operator_reduced
-            @ torch.conj(delta).transpose(-1, -2)
-            @ r23.transpose(-1, -2)
-        )

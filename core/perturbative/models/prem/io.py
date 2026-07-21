@@ -27,8 +27,17 @@ piecewise-linear-in-r² shell representation required by
 The file has no header and nine comma-separated columns; only the first two
 (radius in metres and mass density in kg/m³) are used here.
 
+The same layer-appropriate ⟨Z/A⟩ values also give the neutron fraction
+(1 - ⟨Z/A⟩), since each shell is treated as pure nucleonic matter (electrons
++ neutrons per nucleon, ignoring binding-energy mass defects). This enables
+the 3+1 sterile extension's neutral-current matter term (see
+``core.common.hamiltonian.hamiltonian_matter_reduced``).
+
 Module functions:
-    load_prem500_profile(...): Read PREM500 CSV → ``(rj, coefficients)``.
+    load_prem500_profile(...): Read PREM500 CSV → ``(rj, coefficients)`` for
+        electron density.
+    load_prem500_neutron_profile(...): Read PREM500 CSV →
+        ``(rj, coefficients)`` for neutron density.
 """
 
 from __future__ import annotations
@@ -38,7 +47,7 @@ import os
 import numpy as np
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.torch_util import default_device
 
 
@@ -72,15 +81,41 @@ def _za_from_radius_km(radius_km: np.ndarray) -> np.ndarray:
     )
 
 
-def load_prem500_profile(
-    prem_file: str,
-    *,
-    device: torch.device | str | None = None,
-    dtype: torch.dtype = default.dtype,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """Load PREM500 CSV and build the piecewise-linear-in-r² shell profile.
+def _load_prem500_radius_density(prem_file: str) -> tuple[np.ndarray, np.ndarray]:
+    """Read the PREM500 CSV and return ``(radius_km, density_g_cm3)``.
 
-    Each shell spans consecutive tabulated radii.  Discontinuities (adjacent
+    Args:
+        prem_file: Path to the PREM500 CSV file (nine columns, no header).
+
+    Returns:
+        Tuple of 1D arrays: tabulated radius in km and mass density in
+        g/cm³, in file row order.
+
+    Raises:
+        FileNotFoundError: If ``prem_file`` does not exist.
+    """
+    if not os.path.isfile(prem_file):
+        raise FileNotFoundError(f"PREM500 file not found: {prem_file}")
+
+    data = np.loadtxt(prem_file, delimiter=",")
+    radius_m = data[:, 0]
+    density_kg_m3 = data[:, 1]
+
+    radius_km = radius_m / 1.0e3
+    density_g_cm3 = density_kg_m3 / 1.0e3
+    return radius_km, density_g_cm3
+
+
+def _fit_linear_in_r_squared_shells(
+    radius_km: np.ndarray,
+    n_mol_cm3: np.ndarray,
+    *,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Fit a piecewise-linear-in-r² molar density profile from tabulated shells.
+
+    Each shell spans consecutive tabulated radii. Discontinuities (adjacent
     rows with the same radius) are handled correctly: the zero-thickness gap
     between the two rows is skipped, so the shell ending at the interface uses
     the "below" density and the shell starting at the interface uses the
@@ -90,13 +125,16 @@ def load_prem500_profile(
 
     .. math::
 
-        n_e(r^2) = A_i + B_i \\cdot r^2,
+        n(r^2) = A_i + B_i \\cdot r^2,
 
     where :math:`A_i` and :math:`B_i` are determined by linear interpolation
-    between the electron densities at the two endpoints.
+    between the tabulated densities at the two endpoints.
 
     Args:
-        prem_file: Path to the PREM500 CSV file (nine columns, no header).
+        radius_km: Tabulated radius in km, in file row order (same length as
+            ``n_mol_cm3``).
+        n_mol_cm3: Tabulated molar density in mol/cm³, aligned with
+            ``radius_km``.
         device: Torch device for the returned tensors.
         dtype: Real dtype for the returned tensors.
 
@@ -110,22 +148,9 @@ def load_prem500_profile(
           ``[A, B]`` for the linear-in-r² density fit of each shell.
 
     Raises:
-        FileNotFoundError: If ``prem_file`` does not exist.
-        ValueError: If no valid shells can be built from the file.
+        ValueError: If no valid shells can be built from the tabulated data.
     """
-    device = default_device(device)
-
-    if not os.path.isfile(prem_file):
-        raise FileNotFoundError(f"PREM500 file not found: {prem_file}")
-
-    data = np.loadtxt(prem_file, delimiter=",")
-    radius_m = data[:, 0]
-    density_kg_m3 = data[:, 1]
-
-    radius_km = radius_m / 1.0e3
-    density_g_cm3 = density_kg_m3 / 1.0e3
-
-    ne_mol_cm3 = _za_from_radius_km(radius_km) * density_g_cm3
+    radius_m = radius_km * 1.0e3
 
     # Normalize radius by the maximum tabulated value (Earth radius).
     r_norm = radius_m / radius_m.max()
@@ -133,16 +158,16 @@ def load_prem500_profile(
     # Build one shell per pair of consecutive rows with distinct radii.
     r_inner_list: list[float] = []
     r_outer_list: list[float] = []
-    ne_inner_list: list[float] = []
-    ne_outer_list: list[float] = []
+    n_inner_list: list[float] = []
+    n_outer_list: list[float] = []
 
     for i in range(len(r_norm) - 1):
         if r_norm[i] == r_norm[i + 1]:
             continue  # skip zero-thickness gap at a PREM discontinuity
         r_inner_list.append(r_norm[i])
         r_outer_list.append(r_norm[i + 1])
-        ne_inner_list.append(ne_mol_cm3[i])
-        ne_outer_list.append(ne_mol_cm3[i + 1])
+        n_inner_list.append(n_mol_cm3[i])
+        n_outer_list.append(n_mol_cm3[i + 1])
 
     if not r_inner_list:
         raise ValueError(
@@ -152,16 +177,16 @@ def load_prem500_profile(
 
     r_inner = np.asarray(r_inner_list)
     r_outer = np.asarray(r_outer_list)
-    ne_inner = np.asarray(ne_inner_list)
-    ne_outer = np.asarray(ne_outer_list)
+    n_inner = np.asarray(n_inner_list)
+    n_outer = np.asarray(n_outer_list)
 
-    # Fit linear-in-r²: n_e(r²) = A + B·r²  for each shell.
+    # Fit linear-in-r²: n(r²) = A + B·r²  for each shell.
     r_inner_sq = r_inner ** 2
     r_outer_sq = r_outer ** 2
     dr_sq = r_outer_sq - r_inner_sq          # always > 0 for non-degenerate pairs
 
-    B = (ne_outer - ne_inner) / dr_sq
-    A = ne_inner - B * r_inner_sq
+    B = (n_outer - n_inner) / dr_sq
+    A = n_inner - B * r_inner_sq
 
     rj = torch.as_tensor(r_outer, device=device, dtype=dtype)
     coefficients = torch.as_tensor(
@@ -170,3 +195,66 @@ def load_prem500_profile(
         dtype=dtype,
     )
     return rj, coefficients
+
+
+def load_prem500_profile(
+    prem_file: str,
+    *,
+    device: torch.device | str | None = None,
+    dtype: torch.dtype = default.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Load PREM500 CSV and build the piecewise-linear-in-r² electron profile.
+
+    Args:
+        prem_file: Path to the PREM500 CSV file (nine columns, no header).
+        device: Torch device for the returned tensors.
+        dtype: Real dtype for the returned tensors.
+
+    Returns:
+        ``(rj, coefficients)``, see ``_fit_linear_in_r_squared_shells``, built
+        from the electron density n_e(r) = ⟨Z/A⟩(r) · ρ(r).
+
+    Raises:
+        FileNotFoundError: If ``prem_file`` does not exist.
+        ValueError: If no valid shells can be built from the file.
+    """
+    device = default_device(device)
+    radius_km, density_g_cm3 = _load_prem500_radius_density(prem_file)
+    ne_mol_cm3 = _za_from_radius_km(radius_km) * density_g_cm3
+    return _fit_linear_in_r_squared_shells(
+        radius_km, ne_mol_cm3, device=device, dtype=dtype
+    )
+
+
+def load_prem500_neutron_profile(
+    prem_file: str,
+    *,
+    device: torch.device | str | None = None,
+    dtype: torch.dtype = default.dtype,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Load PREM500 CSV and build the piecewise-linear-in-r² neutron profile.
+
+    Uses the complementary fraction (1 - ⟨Z/A⟩) of the same layer-appropriate
+    electron fraction used by ``load_prem500_profile``, i.e. n_n(r) =
+    (1 - ⟨Z/A⟩(r)) · ρ(r). The returned shell boundaries ``rj`` are identical
+    to those of ``load_prem500_profile`` (same tabulated radii).
+
+    Args:
+        prem_file: Path to the PREM500 CSV file (nine columns, no header).
+        device: Torch device for the returned tensors.
+        dtype: Real dtype for the returned tensors.
+
+    Returns:
+        ``(rj, coefficients)``, see ``_fit_linear_in_r_squared_shells``, built
+        from the neutron density n_n(r) = (1 - ⟨Z/A⟩(r)) · ρ(r).
+
+    Raises:
+        FileNotFoundError: If ``prem_file`` does not exist.
+        ValueError: If no valid shells can be built from the file.
+    """
+    device = default_device(device)
+    radius_km, density_g_cm3 = _load_prem500_radius_density(prem_file)
+    nn_mol_cm3 = (1.0 - _za_from_radius_km(radius_km)) * density_g_cm3
+    return _fit_linear_in_r_squared_shells(
+        radius_km, nn_mol_cm3, device=device, dtype=dtype
+    )

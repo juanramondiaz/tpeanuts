@@ -18,11 +18,11 @@
 
 """
 Pytest-compatible checks specific to the 3+1 sterile-neutrino extension:
-``tpeanuts.core.BSM.PMNS_sterile.PMNS_sterile`` and its integration with the
-BSM Hamiltonian builders and numerical evolutor.
+``tpeanuts.core.BSM.bsm_sterile.PMNS_sterile`` and its integration with the
+common Hamiltonian builders and numerical evolutor.
 
-Generic BSM Hamiltonian-builder machinery is covered in
-``test1_bsm_hamiltonian.py``; NSI-specific checks live in
+Generic Hamiltonian-builder machinery is covered in
+``core/common/test/test3_hamiltonian.py``; NSI-specific checks live in
 ``test2_bsm_nsi.py``.
 
 The vacuum-probability SM-limit test below
@@ -44,17 +44,14 @@ import math
 import pytest
 import torch
 
-from tpeanuts.core.BSM.hamiltonian import hamiltonian_flavour_bsm, hamiltonian_reduced_bsm
-from tpeanuts.core.BSM.PMNS_sterile import PMNSSterileParams, PMNS_sterile
-from tpeanuts.core.common.hamiltonian import (
-    hamiltonian_flavour as hamiltonian_flavour_sm,
-    hamiltonian_reduced as hamiltonian_reduced_sm,
-)
+from tpeanuts.core.BSM.bsm_sterile import PMNSSterileParams, PMNS_sterile
+from tpeanuts.core.common.hamiltonian import hamiltonian_flavour, hamiltonian_reduced
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.config.propagation import PropagationConfig
 from tpeanuts.core.common.pmns import PMNSParams
-from tpeanuts.core.common.presets import OSCILLATION_PRESETS
+from tpeanuts.config.presets import OSCILLATION_PRESETS
 from tpeanuts.core.numerical.evolutor import evolutor_numerical
-from tpeanuts.core.SM.pmns import PMNS_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.test_utils import assert_close
 
@@ -213,10 +210,10 @@ def test_antinu_conjugation_scalar_and_batch_mask():
 
 
 # ---------------------------------------------------------------------------
-# operator_flavour_basis structural properties
+# flavour_basis structural properties
 # ---------------------------------------------------------------------------
 
-def test_operator_flavour_basis_matches_outer_block_conjugation_formula():
+def test_flavour_basis_matches_outer_block_conjugation_formula():
     ctx = make_context()
     pmns4 = make_sterile_pmns(theta14=0.15, theta24=0.10, theta34=0.05, delta14=0.3, delta24=-0.2, context=ctx)
     op = torch.diag(torch.tensor([0.2, 1.0, 3.0, 0.7], device=DEVICE, dtype=CDTYPE))
@@ -224,17 +221,27 @@ def test_operator_flavour_basis_matches_outer_block_conjugation_formula():
     O4 = pmns4.R23() @ pmns4.Delta() @ pmns4.R24() @ pmns4.R34()
     expected = O4 @ op @ O4.conj().transpose(-2, -1)
 
-    assert_close(pmns4.operator_flavour_basis(op), expected, name="operator_flavour_basis formula")
+    assert_close(pmns4.outer_block(), O4, name="outer_block N=4 formula")
+    assert_close(pmns4.flavour_basis(op), expected, name="flavour_basis formula")
+    assert_close(
+        pmns4.reduced_basis(expected), op,
+        name="reduced_basis inverts flavour_basis",
+    )
+    assert_close(
+        pmns4.flavour_basis(op),
+        pmns4.outer_block() @ op @ pmns4.outer_block().conj().transpose(-2, -1),
+        name="flavour_basis uses outer_block internally",
+    )
 
 
-def test_operator_flavour_basis_preserves_hermiticity():
+def test_flavour_basis_preserves_hermiticity():
     ctx = make_context()
     pmns4 = make_sterile_pmns(theta14=0.15, theta24=0.10, theta34=0.05, delta14=0.3, delta24=-0.2, context=ctx)
 
     raw = torch.randn(4, 4, dtype=CDTYPE)
     hermitian_op = raw + raw.conj().transpose(-2, -1)
 
-    out = pmns4.operator_flavour_basis(hermitian_op)
+    out = pmns4.flavour_basis(hermitian_op)
     assert_close(out, out.conj().transpose(-2, -1), atol=1.0e-10, rtol=1.0e-10, name="flavour-basis operator stays Hermitian")
 
 
@@ -254,32 +261,32 @@ def test_hamiltonian_sm_limit_exact_for_null_mixing_preset():
     fully decoupled from the active sector.
     """
     ctx = make_context()
-    osc_sm = OscillationParameters.from_preset("_SM_NUFIT52_NO", context=ctx)
-    osc_sterile = OscillationParameters.from_preset("sterile_3p1_null_mixing", context=ctx)
+    osc_sm = PropagationConfig.oscillation_parameters_from_preset("_SM_NUFIT52_NO", context=ctx)
+    osc_sterile = PropagationConfig.oscillation_parameters_from_preset("sterile_3p1_null_mixing", context=ctx)
 
     for E, n_e in [(500.0, 0.5), (1000.0, 1.5), (5000.0, 2.5)]:
         E_t = torch.tensor(E, device=DEVICE, dtype=DTYPE)
         n_e_t = torch.tensor(n_e, device=DEVICE, dtype=DTYPE)
 
-        H_reduced_sm = hamiltonian_reduced_sm(osc_sm, E_t, n_e_t, context=ctx)
-        H_reduced_bsm = hamiltonian_reduced_bsm(osc_sterile, E_t, n_e_t, context=ctx, epsilon=None)
+        H_reduced_sm = hamiltonian_reduced(osc_sm, E_t, n_e_t, context=ctx)
+        H_reduced_sterile = hamiltonian_reduced(osc_sterile, E_t, n_e_t, context=ctx)
         assert_close(
-            H_reduced_bsm[:3, :3], H_reduced_sm, atol=1.0e-12, rtol=1.0e-12,
+            H_reduced_sterile[:3, :3], H_reduced_sm, atol=1.0e-12, rtol=1.0e-12,
             name=f"H_reduced active block SM-limit at E={E}, n_e={n_e}",
         )
         assert_close(
-            H_reduced_bsm[:3, 3], torch.zeros(3, device=DEVICE, dtype=CDTYPE),
+            H_reduced_sterile[:3, 3], torch.zeros(3, device=DEVICE, dtype=CDTYPE),
             atol=1.0e-12, rtol=1.0e-12, name=f"H_reduced active-sterile decoupling at E={E}, n_e={n_e}",
         )
 
-        H_flavour_sm = hamiltonian_flavour_sm(osc_sm, E_t, n_e_t, context=ctx)
-        H_flavour_bsm = hamiltonian_flavour_bsm(osc_sterile, E_t, n_e_t, context=ctx, epsilon=None)
+        H_flavour_sm = hamiltonian_flavour(osc_sm, E_t, n_e_t, context=ctx)
+        H_flavour_sterile = hamiltonian_flavour(osc_sterile, E_t, n_e_t, context=ctx)
         assert_close(
-            H_flavour_bsm[:3, :3], H_flavour_sm, atol=1.0e-12, rtol=1.0e-12,
+            H_flavour_sterile[:3, :3], H_flavour_sm, atol=1.0e-12, rtol=1.0e-12,
             name=f"H_flavour active block SM-limit at E={E}, n_e={n_e}",
         )
         assert_close(
-            H_flavour_bsm[:3, 3], torch.zeros(3, device=DEVICE, dtype=CDTYPE),
+            H_flavour_sterile[:3, 3], torch.zeros(3, device=DEVICE, dtype=CDTYPE),
             atol=1.0e-12, rtol=1.0e-12, name=f"H_flavour active-sterile decoupling at E={E}, n_e={n_e}",
         )
 
@@ -290,8 +297,8 @@ def test_hamiltonian_sm_limit_exact_for_null_mixing_preset():
 
 def test_vacuum_probability_sm_limit_exact_at_zero_sterile_angles():
     ctx = make_context()
-    osc_sm = OscillationParameters.from_preset("_SM_NUFIT52_NO", context=ctx)
-    osc_sterile = OscillationParameters.from_preset("sterile_3p1_null_mixing", context=ctx)
+    osc_sm = PropagationConfig.oscillation_parameters_from_preset("_SM_NUFIT52_NO", context=ctx)
+    osc_sterile = PropagationConfig.oscillation_parameters_from_preset("sterile_3p1_null_mixing", context=ctx)
 
     E = torch.tensor(10.0, device=DEVICE, dtype=DTYPE)
     n_e_vacuum = torch.zeros(1, device=DEVICE, dtype=DTYPE)
@@ -313,7 +320,7 @@ def test_vacuum_probability_sm_limit_exact_at_zero_sterile_angles():
 
 def test_probability_conservation_including_sterile_channel():
     ctx = make_context()
-    osc = OscillationParameters.from_preset("sterile_3p1_bestfit_giunti2017", context=ctx)
+    osc = PropagationConfig.oscillation_parameters_from_preset("sterile_3p1_bestfit_giunti2017", context=ctx)
     n_e = torch.tensor([1.0, 1.2, 1.4], device=DEVICE, dtype=DTYPE)
     dx = torch.tensor([0.02, 0.03, 0.04], device=DEVICE, dtype=DTYPE)
 
@@ -363,16 +370,16 @@ def test_sterile_presets_always_carry_zero_delta34():
 @pytest.mark.parametrize("name", STERILE_PRESET_NAMES)
 def test_all_registered_sterile_presets_build_valid_unitary_hermitian_physics(name):
     ctx = make_context()
-    osc = OscillationParameters.from_preset(name, context=ctx)
+    osc = PropagationConfig.oscillation_parameters_from_preset(name, context=ctx)
     assert osc.pmns.n_flavours == 4
-    assert osc.DeltamSq41 is not None
+    assert osc.mass_spectrum.DeltamSq41 is not None
 
     assert_unitary(osc.pmns.pmns_matrix(), name=f"U_4 [{name}]")
     assert_unitary(osc.pmns.reduced(), name=f"Ured_4 [{name}]")
 
-    H = hamiltonian_flavour_bsm(
+    H = hamiltonian_flavour(
         osc, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), torch.tensor(1.5, device=DEVICE, dtype=DTYPE),
-        context=ctx, epsilon=None,
+        context=ctx,
     )
     assert_close(H, H.conj().transpose(-2, -1), atol=1.0e-10, rtol=1.0e-10, name=f"H Hermitian [{name}]")
     eigvals = torch.linalg.eigvalsh(H)

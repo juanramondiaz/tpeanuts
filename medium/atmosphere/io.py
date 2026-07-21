@@ -74,7 +74,7 @@ from typing import Any, Dict, Optional, Union
 
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.io import (
     angle_to_filename,
     build_output_path,

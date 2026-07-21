@@ -26,5 +26,5 @@ Package modules:
         Tests for vacuum oscillation probabilities, including validation
         against the legacy peanuts implementation.
     test3_flux
-        Tests for the vacuum_flux flux pipeline.
+        Tests for the vacuum_flux_state flux pipeline.
 """

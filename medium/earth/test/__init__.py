@@ -27,13 +27,14 @@ Package modules:
     test3_evolutor
         Tests for the earth_evolutor flavour-basis evolution operator.
     test4_probabilities
-        Tests for the pearth Earth matter-regeneration probability pipeline.
+        Tests for the earth_probability_state Earth matter-regeneration
+        probability pipeline.
     test5_flux
-        Tests for the earth_flux / earth_flux_integrated flux pipeline.
+        Tests for the earth_flux_state / earth_flux_exposure flux pipeline.
     test6_exposure
         Tests for the exposure_math, exposure_table, exposure_io, and
         exposure_integration modules.
     test7_legacy_validation
-        Validation of pearth / pearth_integrated against the legacy peanuts
-        NumPy implementation.
+        Validation of earth_probability_state / earth_probability_exposure
+        against the legacy peanuts NumPy implementation.
 """

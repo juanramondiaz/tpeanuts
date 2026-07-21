@@ -158,6 +158,44 @@ def test_even_power_residual_integral_is_finite_and_diagonal_zero():
     assert_close(torch.diagonal(residual), torch.zeros(3, device=DEVICE, dtype=CDTYPE), name="even residual diagonal")
 
 
+def test_joint_even_monomial_integrals_match_individual_formulas():
+    x1 = tensor(0.15, dtype=CDTYPE).reshape(1, 1)
+    x2 = tensor(0.75, dtype=CDTYPE).reshape(1, 1)
+    frequency = tensor(
+        [[0.7 + 0.0j, 1.2 + 0.0j], [1.7 + 0.0j, 2.3 + 0.0j]],
+        dtype=CDTYPE,
+    )
+
+    joint = EvenPowerProfileSegment.oscillatory_even_monomial_integrals(3, x1, x2, frequency)
+    expected = torch.stack(
+        [
+            EvenPowerProfileSegment.oscillatory_monomial_integral(power, x1, x2, frequency)
+            for power in (0, 2, 4)
+        ],
+        dim=-3,
+    )
+    assert_close(joint, expected, name="joint oscillatory monomial recurrence")
+
+
+def test_joint_taylor_even_monomials_match_individual_formulas():
+    x1 = tensor(0.15, dtype=CDTYPE).reshape(1, 1)
+    x2 = tensor(0.75, dtype=CDTYPE).reshape(1, 1)
+    frequency = tensor(
+        [[1.0e-4 + 0.0j, 2.0e-4 + 0.0j], [3.0e-4 + 0.0j, 4.0e-4 + 0.0j]],
+        dtype=CDTYPE,
+    )
+
+    joint = EvenPowerProfileSegment.taylor_even_monomial_integrals(3, x1, x2, frequency)
+    expected = torch.stack(
+        [
+            EvenPowerProfileSegment.taylor_monomial_integral(power, x1, x2, frequency)
+            for power in (0, 2, 4)
+        ],
+        dim=-3,
+    )
+    assert_close(joint, expected, name="joint Taylor monomial recurrence")
+
+
 def test_even_power_layered_evaluate_shift_gather_and_segments():
     coefficients = tensor(
         [
@@ -214,6 +252,54 @@ def test_even_power_layered_segment_model_builds_segment_batch():
     assert segment_model.has_perturbation().shape == (2,)
     assert_close(constant_model.average, tensor(1.2), name="even constant segment model average")
     assert not bool(constant_model.has_perturbation())
+
+
+def test_even_power_layered_evaluate_neutron_raises_without_coefficients_n():
+    coefficients = tensor([[1.0, 0.1, 0.01], [2.0, 0.2, 0.02]])
+    profile = EvenPowerProfileLayered(coefficients=coefficients, device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="neutron-density coefficients"):
+        profile.evaluate_neutron(tensor(0.3))
+
+
+def test_even_power_layered_evaluate_neutron_shift_and_gather():
+    coefficients = tensor([[1.0, 0.1, 0.01], [2.0, 0.2, 0.02], [3.0, 0.3, 0.03]])
+    coefficients_n = tensor([[1.5, 0.15, 0.015], [2.5, 0.25, 0.025], [3.5, 0.35, 0.035]])
+    profile = EvenPowerProfileLayered(
+        coefficients=coefficients.unsqueeze(0),
+        coefficients_n=coefficients_n.unsqueeze(0),
+        device=DEVICE,
+        dtype=DTYPE,
+    )
+    x = tensor(2.0)
+    layer_index = torch.tensor([1], device=DEVICE)
+
+    value_n = profile.evaluate_neutron(x, layer_index=layer_index)
+    shifted = profile.shifted(tensor(0.5))
+
+    expected_value_n = coefficients_n[1, 0] + coefficients_n[1, 1] * x**2 + coefficients_n[1, 2] * x**4
+    expected_shifted_a_n = coefficients_n[:, 0] + coefficients_n[:, 1] * 0.5 + coefficients_n[:, 2] * 0.5**2
+
+    assert_close(value_n, expected_value_n.unsqueeze(0), name="even layered evaluate_neutron")
+    assert_close(shifted.coefficients_n[..., 0], expected_shifted_a_n.unsqueeze(0), name="even shifted neutron constant term")
+
+
+def test_even_power_layered_rejects_coefficients_n_shape_mismatch():
+    coefficients = tensor([[1.0, 0.1, 0.01], [2.0, 0.2, 0.02]])
+    coefficients_n = tensor([[1.5, 0.15, 0.015]])
+
+    with pytest.raises(ValueError, match="same shape as coefficients"):
+        EvenPowerProfileLayered(coefficients=coefficients, coefficients_n=coefficients_n, device=DEVICE, dtype=DTYPE)
+
+
+def test_even_power_layered_default_include_neutron_loads_matching_shells():
+    profile_e = EvenPowerProfileLayered(device=DEVICE, dtype=DTYPE)
+    profile_en = EvenPowerProfileLayered(include_neutron=True, device=DEVICE, dtype=DTYPE)
+
+    assert profile_en.coefficients_n is not None
+    assert profile_en.coefficients_n.shape == profile_e.coefficients.shape
+    assert_close(profile_en.rj, profile_e.rj, name="even_power ne/nn shells match")
+    assert_close(profile_en.coefficients, profile_e.coefficients, name="even_power include_neutron leaves ne unchanged")
 
 
 def test_prem_segment_average_and_constant_residual():

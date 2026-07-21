@@ -37,7 +37,7 @@ from typing import Optional
 
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.core.numerical.geometry import Trajectory, segment_sample_points
 from tpeanuts.medium.atmosphere.density import atmosphere_density
 from tpeanuts.medium.atmosphere.geometry import (
@@ -81,6 +81,21 @@ class AtmosphereParameters:
     evolution_scale_m:
         Physical scale, in metres, used to non-dimensionalize the
         Hamiltonian evolution coordinate along the trajectory.
+
+    perturbative_segments:
+        Number of local polynomial segments used by analytical propagation.
+
+    perturbative_degree:
+        Degree of the automatically fitted polynomial in each analytical
+        segment.
+
+    include_matter_nc:
+        If True, also sample neutron density along the trajectory and expose
+        it as ``n_n_molcm3``, enabling the 3+1 sterile extension's
+        neutral-current matter term in ``atmosphere_evolutor_numerical`` (see
+        ``core.common.hamiltonian.hamiltonian_matter_reduced``). False (the
+        default) reproduces the pre-existing CC-only behaviour exactly and
+        leaves ``n_n_molcm3`` as ``None``.
     """
 
     atmosphere_density_source: str = default.atmosphere_source_density
@@ -89,6 +104,9 @@ class AtmosphereParameters:
     method: str | None = "midpoint"
     matter: bool = True
     evolution_scale_m: TensorLike = R_E
+    perturbative_segments: int = 4
+    perturbative_degree: int = 3
+    include_matter_nc: bool = default.atmosphere_include_matter_nc
 
 
 class AtmosphereProfile:
@@ -111,6 +129,8 @@ class AtmosphereProfile:
     Attributes:
         trajectory: ``Trajectory`` consumed by ``core.numerical.evolutor``.
         n_e_molcm3: Electron-density samples in mol/cm^3.
+        n_n_molcm3: Neutron-density samples in mol/cm^3, or ``None`` when
+            ``params.include_matter_nc`` is False.
         atmosphere_density_source: Density backend name used for the profile.
         altitude_km: Altitude samples associated with ``n_e_molcm3``.
         x: Dimensionless path grid.
@@ -196,6 +216,8 @@ class AtmosphereProfile:
             dtype=dtype,
         )
 
+        self.include_matter_nc = bool(params.include_matter_nc)
+
         if self.matter:
             n_e = atmosphere_density(
                 altitude_km,
@@ -204,13 +226,28 @@ class AtmosphereProfile:
                 context=RuntimeContext(device=dev, dtype=dtype),
                 **self.atmosphere_density_kwargs,
             )
+            n_n = (
+                atmosphere_density(
+                    altitude_km,
+                    source=self.atmosphere_density_source,
+                    density_type="neutron_density",
+                    context=RuntimeContext(device=dev, dtype=dtype),
+                    **self.atmosphere_density_kwargs,
+                )
+                if self.include_matter_nc
+                else None
+            )
         else:
             n_e = torch.zeros_like(altitude_km)
+            n_n = torch.zeros_like(altitude_km) if self.include_matter_nc else None
 
         self.L_atm_km = L_atm_km
         self.L_und_km = L_und_km
         self.altitude_km = altitude_km
         self.n_e_molcm3 = as_tensor(n_e, device=dev, dtype=dtype)
+        self.n_n_molcm3 = (
+            None if n_n is None else as_tensor(n_n, device=dev, dtype=dtype)
+        )
 
         self.trajectory = Trajectory(
             x=x_grid,

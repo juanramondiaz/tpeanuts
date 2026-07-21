@@ -25,9 +25,10 @@ Module functions:
     legacy_modules(...)
         Import the legacy PMNS module and a global-model-free copy of the
         legacy solar module.
-    compare_psolar_with_legacy(...)
-        Compare torch-native ``psolar`` flavour probabilities against legacy
-        ``peanuts.solar.Psolar`` for a single source and energy.
+    compare_solar_probability_state_with_legacy(...)
+        Compare torch-native ``solar_probability_state`` flavour probabilities
+        against legacy ``peanuts.solar.Psolar`` for a single source and
+        energy.
 """
 
 
@@ -36,14 +37,17 @@ from __future__ import annotations
 
 import importlib
 import types
+from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.medium.solar.profile import SolarParameters, SolarProfile
-from tpeanuts.medium.solar.probability import psolar
+from tpeanuts.medium.solar.probability import solar_probability_state
+from tpeanuts.medium.solar.io import default_legacy_data_dir
 from tpeanuts.util.context import RuntimeContext
 
 
@@ -60,6 +64,7 @@ def ensure_legacy_importable() -> Path:
     return package_dir / "peanuts"
 
 
+@lru_cache(maxsize=1)
 def legacy_modules():
     """Import the legacy PMNS module and a global-model-free legacy solar module.
 
@@ -95,7 +100,97 @@ def legacy_modules():
     return legacy_pmns, legacy_solar
 
 
-def compare_psolar_with_legacy(
+def legacy_solar_model(
+    solar_model: Optional[object] = None,
+    *,
+    solar_model_file: Optional[str] = None,
+    solar_flux_file: Optional[str] = None,
+) -> object:
+    """Return an explicit legacy SolarModel without modifying package data."""
+    if solar_model is not None:
+        return solar_model
+    _, legacy_solar = legacy_modules()
+    data_dir = default_legacy_data_dir()
+    return legacy_solar.SolarModel(
+        solar_model_file=solar_model_file or str(data_dir / "nudistr_b16_agss09.dat"),
+        flux_file=solar_flux_file or str(data_dir / "fluxes_b16.dat"),
+    )
+
+
+def legacy_solar_mass_weights(
+    oscillation: OscillationParameters,
+    E_MeV: np.ndarray,
+    source: str,
+    *,
+    solar_model: object,
+) -> np.ndarray:
+    """Evaluate legacy incoherent mass weights over a one-dimensional energy grid."""
+    legacy_pmns_module, legacy_solar = legacy_modules()
+    pmns = legacy_pmns_module.PMNS(
+        float(oscillation.pmns.params.theta12.detach().cpu()),
+        float(oscillation.pmns.params.theta13.detach().cpu()),
+        float(oscillation.pmns.params.theta23.detach().cpu()),
+        float(oscillation.pmns.params.delta.detach().cpu()),
+    )
+    energy = np.asarray(E_MeV, dtype=np.float64).reshape(-1)
+    return np.stack(
+        [
+            np.asarray(
+                legacy_solar.solar_flux_mass(
+                    pmns.theta12,
+                    pmns.theta13,
+                    float(oscillation.mass_spectrum.DeltamSq21),
+                    float(oscillation.mass_spectrum.DeltamSq3l),
+                    float(value),
+                    solar_model.radius(),
+                    solar_model.density(),
+                    solar_model.fraction(source),
+                ),
+                dtype=np.float64,
+            )
+            for value in energy
+        ],
+        axis=0,
+    )
+
+
+def legacy_solar_flavour_probabilities(
+    oscillation: OscillationParameters,
+    E_MeV: np.ndarray,
+    source: str,
+    *,
+    solar_model: object,
+) -> np.ndarray:
+    """Evaluate legacy Psolar independently for validation diagnostics."""
+    legacy_pmns_module, legacy_solar = legacy_modules()
+    pmns = legacy_pmns_module.PMNS(
+        float(oscillation.pmns.params.theta12.detach().cpu()),
+        float(oscillation.pmns.params.theta13.detach().cpu()),
+        float(oscillation.pmns.params.theta23.detach().cpu()),
+        float(oscillation.pmns.params.delta.detach().cpu()),
+    )
+    energy = np.asarray(E_MeV, dtype=np.float64).reshape(-1)
+    return np.stack(
+        [
+            np.asarray(
+                legacy_solar.Psolar(
+                    pmns,
+                    float(oscillation.mass_spectrum.DeltamSq21),
+                    float(oscillation.mass_spectrum.DeltamSq3l),
+                    float(value),
+                    solar_model.radius(),
+                    solar_model.density(),
+                    solar_model.fraction(source),
+                ),
+                dtype=np.float64,
+            )
+            for value in energy
+        ],
+        axis=0,
+    )
+
+
+def compare_solar_probability_state_with_legacy(
     source: str,
     oscillation: OscillationParameters,
     E_MeV: float,
@@ -103,11 +198,11 @@ def compare_psolar_with_legacy(
     context: RuntimeContext = RuntimeContext.resolve("cpu", torch.float64),
     legacy_precision: bool = False,
 ) -> dict[str, np.ndarray | float]:
-    """Compare ``psolar`` with legacy ``peanuts.solar.Psolar`` for one source.
+    """Compare ``solar_probability_state`` with legacy ``peanuts.solar.Psolar`` for one source.
 
     Builds the torch-native default B16 solar profile, evaluates
-    :func:`tpeanuts.medium.solar.probability.psolar` for the requested
-    source and energy, then independently constructs the legacy
+    :func:`tpeanuts.medium.solar.probability.solar_probability_state` for the
+    requested source and energy, then independently constructs the legacy
     ``SolarModel``/``PMNS`` objects from the original (non-torch) data files
     and evaluates ``peanuts.solar.Psolar`` with the same physical inputs, so
     the two flavour-probability vectors can be compared directly.
@@ -145,7 +240,7 @@ def compare_psolar_with_legacy(
         fluxes_path=str(_solar_dir / "fluxes_b16.csv"),
     )
     profile = SolarProfile.default(params=_b16_params, context=context)
-    torch_p = psolar(
+    torch_p = solar_probability_state(
         oscillation,
         torch.tensor(E_MeV, device=profile.device, dtype=profile.dtype),
         profile,
@@ -179,8 +274,8 @@ def compare_psolar_with_legacy(
     )
     legacy_p = legacy_solar.Psolar(
         legacy_pmns,
-        float(oscillation.DeltamSq21),
-        float(oscillation.DeltamSq3l),
+        float(oscillation.mass_spectrum.DeltamSq21),
+        float(oscillation.mass_spectrum.DeltamSq3l),
         E_MeV,
         legacy_model.radius(),
         legacy_model.density(),

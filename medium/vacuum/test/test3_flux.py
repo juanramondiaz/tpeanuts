@@ -28,8 +28,11 @@ from __future__ import annotations
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.medium.vacuum.flux import vacuum_flux
-from tpeanuts.medium.vacuum.probability import pvacuum
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
+from tpeanuts.medium.vacuum.flux import vacuum_flux_state
+from tpeanuts.medium.vacuum.probability import vacuum_probability_state
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.test_utils import assert_close
 
@@ -43,10 +46,12 @@ DM3L_EV2 = 2.517e-3
 
 def _oscillation() -> OscillationParameters:
     ctx = RuntimeContext.resolve(DEVICE, DTYPE)
-    return OscillationParameters.build(
-        theta12=0.59, theta13=0.15, theta23=0.78, delta=1.20,
-        DeltamSq21=DM21_EV2, DeltamSq3l=DM3L_EV2, antinu=False, context=ctx,
+    pmns = PMNS_SM(PMNSParams(theta12=0.59, theta13=0.15, theta23=0.78, delta=1.20, context=ctx))
+    mass_spectrum = MassSpectrum_SM(
+        DeltamSq21=torch.as_tensor(DM21_EV2, device=ctx.device, dtype=ctx.dtype),
+        DeltamSq3l=torch.as_tensor(DM3L_EV2, device=ctx.device, dtype=ctx.dtype),
     )
+    return OscillationParameters(pmns=pmns, mass_spectrum=mass_spectrum, antinu=False)
 
 
 def test_vacuum_flux_matches_probability_times_flux_scalar():
@@ -55,10 +60,10 @@ def test_vacuum_flux_matches_probability_times_flux_scalar():
     E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
     L = torch.tensor(1300.0, device=DEVICE, dtype=DTYPE)
 
-    P = pvacuum(weights, oscillation, E, L, massbasis=True)
-    flux_out = vacuum_flux(weights, oscillation, E, L, flux=2.5, massbasis=True)
+    P = vacuum_probability_state(weights, oscillation, E, L, massbasis=True)
+    flux_out = vacuum_flux_state(weights, oscillation, E, L, flux=2.5, massbasis=True)
 
-    assert_close(flux_out, P * 2.5, name="vacuum_flux matches pvacuum * flux")
+    assert_close(flux_out, P * 2.5, name="vacuum_flux_state_state matches vacuum_probability_state * flux")
 
 
 def test_vacuum_flux_applies_spectrum():
@@ -67,10 +72,10 @@ def test_vacuum_flux_applies_spectrum():
     E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
     L = torch.tensor(1300.0, device=DEVICE, dtype=DTYPE)
 
-    P = pvacuum(weights, oscillation, E, L, massbasis=True)
-    flux_out = vacuum_flux(weights, oscillation, E, L, flux=2.0, spectrum=3.0, massbasis=True)
+    P = vacuum_probability_state(weights, oscillation, E, L, massbasis=True)
+    flux_out = vacuum_flux_state(weights, oscillation, E, L, flux=2.0, spectrum=3.0, massbasis=True)
 
-    assert_close(flux_out, P * 2.0 * 3.0, name="vacuum_flux applies flux and spectrum")
+    assert_close(flux_out, P * 2.0 * 3.0, name="vacuum_flux_state applies flux and spectrum")
 
 
 def test_vacuum_flux_flavourbasis_matches_probability():
@@ -79,27 +84,27 @@ def test_vacuum_flux_flavourbasis_matches_probability():
     E = torch.tensor(1200.0, device=DEVICE, dtype=DTYPE)
     L = torch.tensor(850.0, device=DEVICE, dtype=DTYPE)
 
-    P = pvacuum(psi_mu, oscillation, E, L, massbasis=False)
-    flux_out = vacuum_flux(psi_mu, oscillation, E, L, flux=1.0, massbasis=False)
+    P = vacuum_probability_state(psi_mu, oscillation, E, L, massbasis=False)
+    flux_out = vacuum_flux_state(psi_mu, oscillation, E, L, flux=1.0, massbasis=False)
 
-    assert_close(flux_out, P, name="vacuum_flux with flux=1.0 matches pvacuum")
+    assert_close(flux_out, P, name="vacuum_flux_state_state with flux=1.0 matches vacuum_probability_state")
 
 
 def test_vacuum_flux_broadcast_flux_over_leading_energy_axis():
     # flux broadcasts against the *leading* probability dimensions (here the
-    # energy axis), not the trailing flavour axis -- see flux_from_probability.
+    # energy axis), not the trailing flavour axis -- see flux_state.
     oscillation = _oscillation()
     weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
     E = torch.tensor([500.0, 1500.0, 4000.0], device=DEVICE, dtype=DTYPE)
     L = torch.tensor(1300.0, device=DEVICE, dtype=DTYPE)
     flux_per_energy = torch.tensor([10.0, 20.0, 30.0], device=DEVICE, dtype=DTYPE)
 
-    P = pvacuum(weights, oscillation, E, L, massbasis=True)
-    flux_out = vacuum_flux(weights, oscillation, E, L, flux=flux_per_energy, massbasis=True)
+    P = vacuum_probability_state(weights, oscillation, E, L, massbasis=True)
+    flux_out = vacuum_flux_state(weights, oscillation, E, L, flux=flux_per_energy, massbasis=True)
 
     assert P.shape == (3, 3)
     assert flux_out.shape == (3, 3)
-    assert_close(flux_out, P * flux_per_energy[:, None], name="vacuum_flux broadcasts per-energy flux over the leading E axis")
+    assert_close(flux_out, P * flux_per_energy[:, None], name="vacuum_flux_state broadcasts per-energy flux over the leading E axis")
 
 
 def test_vacuum_flux_massbasis_defaults_true():
@@ -108,7 +113,7 @@ def test_vacuum_flux_massbasis_defaults_true():
     E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
     L = torch.tensor(1300.0, device=DEVICE, dtype=DTYPE)
 
-    flux_default = vacuum_flux(weights, oscillation, E, L, flux=1.0)
-    flux_explicit = vacuum_flux(weights, oscillation, E, L, flux=1.0, massbasis=True)
+    flux_default = vacuum_flux_state(weights, oscillation, E, L, flux=1.0)
+    flux_explicit = vacuum_flux_state(weights, oscillation, E, L, flux=1.0, massbasis=True)
 
-    assert_close(flux_default, flux_explicit, atol=0.0, rtol=0.0, name="vacuum_flux massbasis defaults to True")
+    assert_close(flux_default, flux_explicit, atol=0.0, rtol=0.0, name="vacuum_flux_state massbasis defaults to True")

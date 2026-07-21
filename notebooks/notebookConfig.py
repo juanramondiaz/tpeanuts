@@ -71,6 +71,7 @@ import pandas as pd
 import torch
 
 from tpeanuts.util.notebooks import find_repo_root
+from tpeanuts.util.torch_util import default_device
 
 
 def default_output_root() -> Path:
@@ -160,7 +161,7 @@ class NotebookConfig:
         )
     )
 
-    device: torch.device = torch.device("cpu")
+    device: torch.device = default_device()
     dtype: torch.dtype = torch.float64
 
     figsize: tuple[float, float] = (10.0, 4.8)

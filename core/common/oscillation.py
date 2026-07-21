@@ -25,35 +25,36 @@ propagation function. It always stores an already-built PMNS-compatible
 object, so the raw mixing angles (theta12, theta13, theta23, delta) no longer
 need to be threaded past the point where the mixing matrix is constructed.
 
-Mass-squared splittings and named-preset metadata live here rather than on
-``PMNSParams``: the PMNS mixing matrix itself does not depend on
-DeltamSq21/DeltamSq3l, so keeping them on the full oscillation state avoids
-storing the same values twice.
+The mass-squared splittings live in a ``MassSpectrum`` object
+(``tpeanuts.core.common.mass_spectrum.MassSpectrum``) rather than as individual
+fields here, and rather than on ``PMNSParams``: the PMNS mixing matrix itself
+does not depend on DeltamSq21/DeltamSq3l, so keeping them off it avoids
+storing the same values twice. ``mass_spectrum`` is a
+``tpeanuts.core.SM.sm_mass_spectrum.MassSpectrum_SM`` for a plain 3-flavour
+``pmns``, or a ``tpeanuts.core.BSM.bsm_mass_spectrum.MassSpectrum_BSM`` (carrying
+``DeltamSq41``) for a 3+1 sterile ``pmns``. Both are assembled by the
+factories in ``tpeanuts.config.oscillation`` according to
+``pmns.n_flavours``.
 
 Named presets (both 3-flavour SM and 3+1 sterile) live in
-``tpeanuts.core.common.presets.OSCILLATION_PRESETS`` — this module only
-consumes that registry via ``from_preset``; it does not define preset data
-itself.
+``tpeanuts.config.presets.OSCILLATION_PRESETS``. This module neither imports
+nor consumes that registry.
 
 Module contents:
     OscillationParameters
-        Frozen container for the built pmns object, both mass-squared
-        splittings, and the antineutrino selector. ``from_preset(...)``
-        builds one directly from a named oscillation preset.
+        Frozen container for the built PMNS object, the mass spectrum, the
+        antineutrino selector, and optional NSI state.
 """
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import torch
 
-from tpeanuts.core.common.pmns import PMNSParams
-from tpeanuts.core.common.presets import OSCILLATION_PRESETS, get_preset
-from tpeanuts.util.context import RuntimeContext
-from tpeanuts.util.type import TensorLike, as_tensor
+if TYPE_CHECKING:
+    from tpeanuts.core.common.mass_spectrum import MassSpectrum
 
 
 @dataclass(frozen=True)
@@ -69,31 +70,53 @@ class OscillationParameters:
         and the CP phase delta already packed into rotation matrices, so
         downstream physics functions never need the raw angles again.
 
-    DeltamSq21:
-        Solar mass-squared splitting Delta m^2_21 in eV^2. Sets the
-        oscillation frequency of the "slow", solar-driven term.
-
-    DeltamSq3l:
-        Atmospheric mass-squared splitting Delta m^2_3l in eV^2
-        (Delta m^2_31 for normal ordering, Delta m^2_32 for inverted
-        ordering, by sign convention). Sets the oscillation frequency of the
-        "fast", atmospheric-driven term.
-
-    DeltamSq41:
-        Sterile mass-squared splitting Delta m^2_41 in eV^2, for 3+1
-        ``PMNS_sterile`` objects. Like ``DeltamSq21``/``DeltamSq3l``, it
-        does not enter any mixing-matrix rotation (only the active-sterile
-        mixing angles do), so it lives here rather than on
-        ``PMNSSterileParams``. None for plain 3-flavour ``PMNS_SM`` objects.
+    mass_spectrum:
+        Built ``MassSpectrum`` object (``MassSpectrum_SM`` for a plain
+        3-flavour ``pmns``, ``MassSpectrum_BSM`` for a 3+1 sterile ``pmns``)
+        carrying ``DeltamSq21``/``DeltamSq3l`` (and ``DeltamSq41`` for the
+        sterile case) plus the model-specific ``difference_vector()``
+        recipe consumed by ``tpeanuts.core.common.hamiltonian.
+        kinetic_eigenvalue_vector``.
 
     antinu:
         Bool or boolean tensor selecting antineutrino propagation. Where
         True, the mixing matrix and matter potential use the
         charge-conjugate convention (U -> U*, V -> -V).
 
+    nsi:
+        Optional ``NSIConfig`` instance (``tpeanuts.core.BSM.bsm_nsi``)
+        carrying the Non-Standard Interaction coupling matrix. ``None`` means
+        the plain Standard Model matter potential (no NSI). When set, the
+        epsilon coupling matrix is read as ``oscillation.nsi.epsilon`` —
+        this is the single place NSI configuration lives; ``core.BSM``,
+        ``core.numerical``, and ``core.perturbative`` all read it from here
+        rather than taking a separate ``epsilon`` argument. Build it via
+        ``PropagationConfig.oscillation_parameters_from_preset``'s
+        ``NSI_extension`` argument, or pass an explicit ``NSIConfig`` (with
+        ``epsilon`` already populated by ``NSIConfig.from_preset`` or
+        ``epsilon_tensor()``) to the constructor directly.
+
+    BSM_extension_sterile:
+        Read-only property (not a stored field): True iff ``pmns`` is a 3+1
+        ``PMNS_sterile`` object (``pmns.n_flavours == 4``). Auto-derived so
+        it can never disagree with the mixing object actually being used.
+
+    BSM_extension_NSI:
+        Read-only property (not a stored field): True iff ``nsi`` is not
+        None. Auto-derived so it can never disagree with ``nsi``.
+
+    BSM_extension:
+        Read-only property (not a stored field): True iff either
+        ``BSM_extension_NSI`` or ``BSM_extension_sterile`` is True, i.e. any
+        BSM extension is active. False means the plain Standard Model is
+        used. This is the flag ``core.BSM``/``core.numerical``/
+        ``core.perturbative`` check to route between the SM-only fast path
+        and the general BSM path.
+
     preset_name:
         Name of the named oscillation preset used to build this object via
-        ``from_preset``, or "custom" when built from explicit values.
+        ``PropagationConfig.oscillation_parameters_from_preset``, or "custom"
+        when assembled from explicit values.
 
     ordering:
         Mass ordering label carried by the preset, for example "NO" or
@@ -110,172 +133,30 @@ class OscillationParameters:
     """
 
     pmns: object
-    DeltamSq21: torch.Tensor
-    DeltamSq3l: torch.Tensor
-    DeltamSq41: Optional[torch.Tensor] = None
+    mass_spectrum: "MassSpectrum"
     antinu: Union[bool, torch.Tensor] = False
+    nsi: Optional[object] = None
     preset_name: str = "custom"
     ordering: str = ""
     label: str = ""
     description: str = ""
 
-    @classmethod
-    def build(
-        cls,
-        *,
-        pmns: Optional[object] = None,
-        theta12: Optional[TensorLike] = None,
-        theta13: Optional[TensorLike] = None,
-        theta23: Optional[TensorLike] = None,
-        delta: Optional[TensorLike] = None,
-        DeltamSq21: TensorLike,
-        DeltamSq3l: TensorLike,
-        DeltamSq41: Optional[TensorLike] = None,
-        antinu: Union[bool, torch.Tensor] = False,
-        context: RuntimeContext,
-    ) -> "OscillationParameters":
-        """Build from an existing pmns object or from raw mixing angles.
+    @property
+    def BSM_extension_sterile(self) -> bool:
+        """True iff ``pmns`` is a 3+1 sterile object (``n_flavours == 4``).
 
-        Args:
-            pmns: Existing PMNS-compatible object. If provided, the mixing
-                angles below are ignored.
-            theta12: Solar mixing angle in radians, used when ``pmns`` is
-                omitted.
-            theta13: Reactor mixing angle in radians, used when ``pmns``
-                is omitted.
-            theta23: Atmospheric mixing angle in radians, used when ``pmns``
-                is omitted.
-            delta: CP-violating phase in radians, used when ``pmns`` is
-                omitted.
-            DeltamSq21: Solar mass-squared splitting in eV^2.
-            DeltamSq3l: Atmospheric mass-squared splitting in eV^2.
-            DeltamSq41: Sterile mass-squared splitting in eV^2. Required for
-                BSM Hamiltonian construction when ``pmns`` is a 3+1
-                ``PMNS_sterile`` object; ignored for 3-flavour ``PMNS_SM``.
-            antinu: Bool or boolean tensor selecting antineutrino
-                propagation.
-            context: Runtime device/dtype used to build a new pmns object and
-                to cast the mass splittings.
-
-        Returns:
-            OscillationParameters with a built pmns object and tensor mass
-            splittings on ``context.device``/``context.dtype``.
+        Auto-derived from the mixing object itself rather than stored
+        separately, so it is always in sync with ``pmns`` and cannot be set
+        inconsistently.
         """
-        if pmns is not None:
-            pmns_obj = pmns
-        else:
-            missing = [
-                name
-                for name, value in {
-                    "theta12": theta12,
-                    "theta13": theta13,
-                    "theta23": theta23,
-                    "delta": delta,
-                }.items()
-                if value is None
-            ]
-            if missing:
-                raise ValueError(
-                    "Provide pmns or all PMNS angles: " + ", ".join(missing)
-                )
-            params = PMNSParams(
-                theta12=as_tensor(theta12, device=context.device, dtype=context.dtype),
-                theta13=as_tensor(theta13, device=context.device, dtype=context.dtype),
-                theta23=as_tensor(theta23, device=context.device, dtype=context.dtype),
-                delta=as_tensor(delta, device=context.device, dtype=context.dtype),
-                context=context,
-            )
+        return int(self.pmns.n_flavours) == 4
 
-            from tpeanuts.core.SM.pmns import PMNS_SM
+    @property
+    def BSM_extension_NSI(self) -> bool:
+        """True iff ``nsi`` is set. Auto-derived so it cannot disagree with it."""
+        return self.nsi is not None
 
-            pmns_obj = PMNS_SM(params)
-
-        return cls(
-            pmns=pmns_obj,
-            DeltamSq21=as_tensor(DeltamSq21, device=context.device, dtype=context.dtype),
-            DeltamSq3l=as_tensor(DeltamSq3l, device=context.device, dtype=context.dtype),
-            DeltamSq41=(
-                None if DeltamSq41 is None
-                else as_tensor(DeltamSq41, device=context.device, dtype=context.dtype)
-            ),
-            antinu=antinu,
-        )
-
-    @classmethod
-    def from_preset(
-        cls,
-        preset_name: str = "_SM_NUFIT52_NO",
-        *,
-        antinu: Union[bool, torch.Tensor] = False,
-        context: Optional[RuntimeContext] = None,
-    ) -> "OscillationParameters":
-        """Build oscillation parameters from a named preset.
-
-        Looks up ``preset_name`` in ``tpeanuts.core.common.presets.
-        OSCILLATION_PRESETS``. A preset is a 3+1 sterile preset iff it
-        carries a ``theta14_deg`` key, in which case a ``PMNS_sterile`` is
-        built from a ``PMNSParams`` (SM sector) and a ``PMNSSterileParams``
-        (sterile extension), imported lazily to avoid a ``common -> BSM``
-        import-time dependency; otherwise a plain 3-flavour ``PMNS_SM`` is
-        built from a ``PMNSParams``.
-
-        Args:
-            preset_name: Preset name. Defaults to ``"_SM_NUFIT52_NO"``.
-            antinu: Bool or boolean tensor selecting antineutrino
-                propagation.
-            context: Runtime context for stored tensors. If omitted, the
-                default device and ``torch.float64`` are used.
-
-        Returns:
-            OscillationParameters built from the preset registry, with
-            ``preset_name``, ``ordering``, ``label``, and ``description``
-            set from the preset.
-
-        Raises:
-            ValueError: If ``preset_name`` is unknown.
-        """
-        if context is None:
-            context = RuntimeContext.resolve(None, torch.float64)
-
-        preset = get_preset(OSCILLATION_PRESETS, preset_name, kind="oscillation preset")
-
-        sm_params = PMNSParams(
-            theta12=math.radians(float(preset["theta12_deg"])),
-            theta13=math.radians(float(preset["theta13_deg"])),
-            theta23=math.radians(float(preset["theta23_deg"])),
-            delta=math.radians(float(preset["delta13_deg"])),
-            context=context,
-        )
-
-        DeltamSq41 = None
-        if "theta14_deg" in preset:
-            from tpeanuts.core.BSM.PMNS_sterile import PMNSSterileParams, PMNS_sterile
-
-            sterile_params = PMNSSterileParams(
-                theta14=math.radians(float(preset["theta14_deg"])),
-                theta24=math.radians(float(preset["theta24_deg"])),
-                theta34=math.radians(float(preset["theta34_deg"])),
-                delta14=math.radians(float(preset["delta14_deg"])),
-                delta24=math.radians(float(preset["delta24_deg"])),
-                delta34=0.0,   # always zero: R34 is real for Dirac 3+1 neutrinos
-                context=context,
-            )
-            
-            pmns_obj = PMNS_sterile(sm_params, sterile_params)
-            DeltamSq41 = as_tensor(float(preset["DeltamSq41"]), device=context.device, dtype=context.dtype)
-        else:
-            from tpeanuts.core.SM.pmns import PMNS_SM
-
-            pmns_obj = PMNS_SM(sm_params)
-
-        return cls(
-            pmns=pmns_obj,
-            DeltamSq21=as_tensor(float(preset["DeltamSq21"]), device=context.device, dtype=context.dtype),
-            DeltamSq3l=as_tensor(float(preset["DeltamSq3l"]), device=context.device, dtype=context.dtype),
-            DeltamSq41=DeltamSq41,
-            antinu=antinu,
-            preset_name=preset_name,
-            ordering=str(preset.get("ordering", "")),
-            label=str(preset.get("label", "")),
-            description=str(preset.get("description", "")),
-        )
+    @property
+    def BSM_extension(self) -> bool:
+        """True iff any BSM extension (NSI and/or sterile) is active."""
+        return self.BSM_extension_NSI or self.BSM_extension_sterile

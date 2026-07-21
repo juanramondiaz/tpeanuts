@@ -43,10 +43,13 @@ Submodules:
     medium.solar.probability
         Adiabatic mass-basis production weights and final flavour
         probabilities built from ``matter_mixing``, with optional LZ
-        corrections dispatched via ``SolarProfile.use_LZ``.
+        corrections dispatched via ``SolarProfile.use_LZ``. This medium has
+        no transition function (no coherent evolutor exists in the adiabatic
+        solar model).
     medium.solar.flux
-        Combines ``probability.psolar`` with total source fluxes and optional
-        spectra to produce flavour-resolved solar fluxes.
+        Combines ``probability.solar_probability_state`` with total source
+        fluxes and optional spectra to produce flavour-resolved solar
+        fluxes, and integrates them over energy.
     medium.solar.validation
         Helpers comparing this package's output against the legacy peanuts
         implementation.
@@ -75,9 +78,10 @@ from tpeanuts.medium.solar.landau_zener import (
 from tpeanuts.medium.solar.probability import (
     Tei,
     solar_probability_mass,
-    psolar,
+    solar_probability_state,
+    solar_probability_integrated,
 )
-from tpeanuts.medium.solar.flux import solar_flux
+from tpeanuts.medium.solar.flux import solar_flux_state, solar_flux_integrated
 
 __all__ = [
     "default_solar_data_dir",
@@ -94,6 +98,8 @@ __all__ = [
     "plz",
     "Tei",
     "solar_probability_mass",
-    "psolar",
-    "solar_flux",
+    "solar_probability_state",
+    "solar_probability_integrated",
+    "solar_flux_state",
+    "solar_flux_integrated",
 ]

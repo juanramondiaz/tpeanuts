@@ -10,11 +10,17 @@ import pytest
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.atmosphere.evolutor import atmosphere_evolutor
 from tpeanuts.medium.atmosphere.geometry import theta_to_eta
 from tpeanuts.medium.atmosphere.profile import AtmosphereParameters
-from tpeanuts.medium.earth.validation import compare_pearth_with_legacy
-from tpeanuts.pipeline.atmosphere_flux import build_probability_matrix, propagate_flux_vector
+from tpeanuts.medium.earth.validation import compare_earth_probability_state_with_legacy
+from tpeanuts.config.propagation import PropagationConfig
+from tpeanuts.core.common.probability import probability_incoherent
+from tpeanuts.pipeline.atmosphere import propagate_atmosphere_to_surface
+from tpeanuts.pipeline.atmosphere_earth import propagate_surface_to_detector
 from tpeanuts.util.context import RuntimeContext
 
 pytest.importorskip("peanuts", reason="legacy peanuts reference package not available")
@@ -31,16 +37,12 @@ def make_context(dtype: torch.dtype = DTYPE) -> RuntimeContext:
 
 def make_oscillation(*, context: RuntimeContext | None = None) -> OscillationParameters:
     ctx = context or make_context()
-    return OscillationParameters.build(
-        theta12=0.59,
-        theta13=0.15,
-        theta23=0.78,
-        delta=1.20,
-        DeltamSq21=7.42e-5,
-        DeltamSq3l=2.517e-3,
-        antinu=False,
-        context=ctx,
+    pmns = PMNS_SM(PMNSParams(theta12=0.59, theta13=0.15, theta23=0.78, delta=1.20, context=ctx))
+    mass_spectrum = MassSpectrum_SM(
+        DeltamSq21=torch.as_tensor(7.42e-5, device=ctx.device, dtype=ctx.dtype),
+        DeltamSq3l=torch.as_tensor(2.517e-3, device=ctx.device, dtype=ctx.dtype),
     )
+    return OscillationParameters(pmns=pmns, mass_spectrum=mass_spectrum, antinu=False)
 
 
 def make_atmosphere(**overrides) -> AtmosphereParameters:
@@ -52,6 +54,26 @@ def make_atmosphere(**overrides) -> AtmosphereParameters:
     }
     values.update(overrides)
     return AtmosphereParameters(**values)
+
+
+def make_production(*, energy_GeV: float, height_km: float, theta_deg: float, particle: str) -> dict:
+    return {
+        "particle": particle,
+        "E_grid_GeV": torch.tensor([energy_GeV], device=DEVICE, dtype=DTYPE),
+        "h_grid_km": torch.tensor([height_km], device=DEVICE, dtype=DTYPE),
+        "theta_deg": theta_deg,
+        "phi_Eh": torch.ones((1, 1), device=DEVICE, dtype=DTYPE),
+    }
+
+
+def make_config(context: RuntimeContext, oscillation: OscillationParameters) -> PropagationConfig:
+    return PropagationConfig(
+        runtime=context,
+        oscillation=oscillation,
+        atmosphere=make_atmosphere(),
+        detector_depth_m=0.0,
+        reunitarize_earth=False,
+    )
 
 
 def test_zero_height_atmosphere_evolutor_is_identity_before_legacy_earth_limit():
@@ -75,22 +97,28 @@ def test_pipeline_zero_height_matches_legacy_peanuts_earth_probability_columns()
     theta_deg = 120.0
     eta = float(theta_to_eta(theta_deg, device=DEVICE, dtype=DTYPE).detach().cpu())
 
-    P_pipeline, _ = build_probability_matrix(
-        oscillation,
-        E_MeV=1000.0,
-        h_km=0.0,
-        theta_deg=theta_deg,
-        detector_depth_m=0.0,
-        atmosphere=make_atmosphere(),
-        reunitarize_earth=False,
-        context=context,
-    )
+    config = make_config(context, oscillation)
+    columns = []
+    for particle in ("nue", "numu", "nutau"):
+        surface = propagate_atmosphere_to_surface(
+            make_production(
+                energy_GeV=1.0,
+                height_km=0.0,
+                theta_deg=theta_deg,
+                particle=particle,
+            ),
+            config,
+            trajectory_steps=2,
+        )
+        detector = propagate_surface_to_detector(surface, config)
+        columns.append(detector.detector_probabilities.squeeze((0, 1)))
+    P_pipeline = torch.stack(columns, dim=-1)
 
     legacy_columns = []
     for alpha in range(3):
         state = torch.zeros(3, device=DEVICE, dtype=CDTYPE)
         state[alpha] = 1.0 + 0.0j
-        comparison = compare_pearth_with_legacy(
+        comparison = compare_earth_probability_state_with_legacy(
             state,
             oscillation,
             E_MeV=1000.0,
@@ -113,17 +141,23 @@ def test_pipeline_zero_height_flux_matches_legacy_probability_action():
     oscillation = make_oscillation(context=context)
     flux_in = torch.tensor([1.0, 2.0, 0.5], device=DEVICE, dtype=DTYPE)
 
-    flux_out, P = propagate_flux_vector(
-        flux_in,
-        oscillation,
-        E_MeV=1500.0,
-        h_km=0.0,
-        theta_deg=130.0,
-        detector_depth_m=0.0,
-        atmosphere=make_atmosphere(),
-        reunitarize_earth=False,
-        context=context,
-    )
+    config = make_config(context, oscillation)
+    columns = []
+    for particle in ("nue", "numu", "nutau"):
+        surface = propagate_atmosphere_to_surface(
+            make_production(
+                energy_GeV=1.5,
+                height_km=0.0,
+                theta_deg=130.0,
+                particle=particle,
+            ),
+            config,
+            trajectory_steps=2,
+        )
+        detector = propagate_surface_to_detector(surface, config)
+        columns.append(detector.detector_probabilities.squeeze((0, 1)))
+    P = torch.stack(columns, dim=-1)
+    flux_out = probability_incoherent(P, flux_in)
 
     expected = torch.matmul(P, flux_in[..., None]).squeeze(-1)
     torch.testing.assert_close(flux_out, expected, atol=1.0e-13, rtol=1.0e-13)

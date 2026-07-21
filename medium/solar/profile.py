@@ -144,7 +144,7 @@ class SolarProfile:
     ) -> "SolarProfile":
         """Load the default solar model and flux tables.
 
-        The default data files are controlled by ``tpeanuts.util.default``:
+        The default data files are controlled by ``tpeanuts.config.default``:
         currently the zenodo SF3-AGSS09 extended profile covering
         r ∈ [0, 1.0] R_sun. Pass an explicit ``SolarParameters`` to override.
 

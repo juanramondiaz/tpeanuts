@@ -52,9 +52,23 @@ The functions are organized as follows:
         Applies a probability matrix to incoherent weights, or projects
         mass-basis weights through a flavour-basis evolutor and PMNS matrix.
 
-    probability_from_evolutor(...)
+    probability_state(...)
         Converts a flavour-basis evolutor and either a coherent flavour state
         or incoherent mass weights into final flavour probabilities.
+
+    probability_integrated(...)
+        Averages a flavour-resolved probability over energy, weighted by an
+        explicit spectrum (no default weight -- a flat spectrum is a
+        modelling choice, not a safe default).
+
+    probability_weighted_average(...)
+        Generic weighted average over an arbitrary coordinate, used for
+        production-height and other non-energy reductions.
+
+    probability_integrated_angular(...)
+        Averages a flavour-resolved probability over the full zenith range,
+        weighted by the geometric solid-angle element sin(theta) (assuming
+        azimuthal symmetry).
 
     normalize_probability_columns(...)
         Normalizes each probability column when explicitly requested.
@@ -92,7 +106,9 @@ def probability_transition(
     probability; supplying alpha and beta selects P(alpha -> beta).
 
     Args:
-        S_or_P: Evolution operator or probability matrix shaped (..., 3, 3).
+        S_or_P: Evolution operator or probability matrix shaped (..., N, N),
+            N in {3, 4} (3 for the Standard Model, 4 for the 3+1 sterile
+            extension).
         alpha: Optional initial flavour label or index.
         beta: Optional final flavour label or index. Defaults to alpha when
             alpha is provided.
@@ -131,14 +147,15 @@ def probability_coherent_state(
     """Project flavour amplitudes into component probabilities.
 
     Args:
-        state: Complex or real state amplitudes shaped (..., 3).
+        state: Complex or real state amplitudes shaped (..., N), N in {3, 4}
+            (3 for the Standard Model, 4 for the 3+1 sterile extension).
         real_dtype: Optional real dtype for the returned probabilities.
 
     Returns:
-        Real tensor with component probabilities shaped (..., 3).
+        Real tensor with component probabilities shaped (..., N).
     """
-    if state.shape[-1] != 3:
-        raise ValueError("state must have last dimension equal to 3.")
+    if state.shape[-1] not in (3, 4):
+        raise ValueError("state must have last dimension equal to 3 or 4.")
 
     if real_dtype is None:
         real_dtype = real_dtype_from_tensor(state)
@@ -155,12 +172,12 @@ def probability_coherent(
     """Apply an evolutor to a state and return final probabilities.
 
     Args:
-        evolutor: Evolution operator shaped (..., 3, 3).
-        state: Initial state amplitudes shaped (..., 3).
+        evolutor: Evolution operator shaped (..., N, N), N in {3, 4}.
+        state: Initial state amplitudes shaped (..., N).
         real_dtype: Optional real dtype for the returned probabilities.
 
     Returns:
-        Final flavour probabilities shaped (..., 3).
+        Final flavour probabilities shaped (..., N).
     """
     return probability_coherent_state(
         apply_evolutor_to_state(evolutor, state),
@@ -193,12 +210,12 @@ def probability_incoherent(
         P_alpha = sum_i |A_{alpha i}|^2 w_i.
 
     Args:
-        P_or_evolutor: Probability matrix shaped ``(..., 3, 3)`` when
+        P_or_evolutor: Probability matrix shaped ``(..., N, N)`` when
             ``pmns`` is None, otherwise flavour-basis evolution operator
-            shaped ``(..., 3, 3)``.
-        weights_initial: Initial weights shaped (..., 3). The final dimension
-            labels the source basis represented by the columns of P, or mass
-            eigenstates when ``pmns`` is provided.
+            shaped ``(..., N, N)``, N in {3, 4}.
+        weights_initial: Initial weights shaped (..., N), N in {3, 4}. The
+            final dimension labels the source basis represented by the
+            columns of P, or mass eigenstates when ``pmns`` is provided.
         pmns: Optional PMNS object exposing ``pmns_matrix(antinu=...)`` or an
             explicit PMNS matrix. When provided, enables the mass-to-flavour
             construction.
@@ -207,10 +224,10 @@ def probability_incoherent(
         real_dtype: Optional real dtype for probability conversion and weights.
 
     Returns:
-        Final incoherent probabilities or fluxes shaped (..., 3).
+        Final incoherent probabilities or fluxes shaped (..., N).
     """
-    if weights_initial.shape[-1] != 3:
-        raise ValueError("weights_initial must have last dimension equal to 3.")
+    if weights_initial.shape[-1] not in (3, 4):
+        raise ValueError("weights_initial must have last dimension equal to 3 or 4.")
 
     if pmns is None:
         probabilities = P_or_evolutor
@@ -242,7 +259,7 @@ def probability_incoherent(
     return torch.einsum("...ba,...a->...b", probabilities, weights)
 
 
-def probability_from_evolutor(
+def probability_state(
     evolutor: torch.Tensor,
     state: torch.Tensor,
     *,
@@ -254,8 +271,9 @@ def probability_from_evolutor(
     """Convert a flavour-basis evolutor and initial state to probabilities.
 
     Args:
-        evolutor: Flavour-basis evolution operator shaped ``(..., 3, 3)``.
-        state: Initial state with final dimension 3. When ``massbasis=False``,
+        evolutor: Flavour-basis evolution operator shaped ``(..., N, N)``,
+            N in {3, 4}.
+        state: Initial state with final dimension N. When ``massbasis=False``,
             this is interpreted as coherent flavour-basis amplitudes. When
             ``massbasis=True``, this is interpreted as incoherent mass-basis
             weights.
@@ -267,7 +285,7 @@ def probability_from_evolutor(
         real_dtype: Optional real dtype for returned probabilities.
 
     Returns:
-        Final flavour probabilities shaped ``(..., 3)``.
+        Final flavour probabilities shaped ``(..., N)``.
 
     Raises:
         ValueError: If ``massbasis=True`` and ``pmns`` is omitted.
@@ -291,6 +309,168 @@ def probability_from_evolutor(
     )
 
 
+def probability_integrated(
+    P: torch.Tensor,
+    E_grid_MeV: torch.Tensor,
+    spectrum: torch.Tensor,
+    *,
+    energy_dim: int = -2,
+) -> torch.Tensor:
+    """Average a flavour-resolved probability over energy, weighted by a spectrum.
+
+    Computes the spectrum-weighted average
+
+        <P> = integral P(E) w(E) dE / integral w(E) dE,
+
+    evaluated by the trapezoidal rule. Unlike ``flux_integrated``
+    (``core.common.flux``), which integrates a flux and returns a physical
+    rate, this normalizes by the integrated weight, so the result stays a
+    probability in [0, 1].
+
+    Args:
+        P: Flavour-resolved probability (final dimension 3 or 4, 4 for the
+            3+1 sterile extension), with energy along ``energy_dim``.
+        E_grid_MeV: One-dimensional energy grid in MeV, matching
+            ``P.shape[energy_dim]``.
+        spectrum: Spectral weight w(E), broadcastable against ``E_grid_MeV``.
+            Required: there is no physically meaningful default -- a flat
+            weight over an arbitrary energy grid is a modelling choice, not
+            a safe default. Pass an explicit flat tensor if that is
+            genuinely what you want.
+        energy_dim: Axis of ``P`` holding the energy grid. Must not be the
+            final (flavour) axis.
+
+    Returns:
+        Spectrum-weighted average probability, with the energy axis removed.
+
+    Raises:
+        ValueError: If ``P`` does not have final flavour dimension 3 or 4,
+            if ``E_grid_MeV`` is not one-dimensional, if ``energy_dim``
+            selects the flavour axis, or if the two do not match in size.
+    """
+    if P.shape[-1] not in (3, 4):
+        raise ValueError("P must have final flavour dimension 3 or 4.")
+    if energy_dim % P.ndim == P.ndim - 1:
+        raise ValueError("energy_dim must not select the flavour axis.")
+
+    E = torch.as_tensor(E_grid_MeV, device=P.device, dtype=P.dtype)
+    if E.ndim != 1:
+        raise ValueError("E_grid_MeV must be one-dimensional.")
+    if P.shape[energy_dim] != E.numel():
+        raise ValueError("P.shape[energy_dim] must match E_grid_MeV.")
+
+    spectrum_t = torch.as_tensor(spectrum, device=P.device, dtype=P.dtype)
+
+    trailing = P.ndim - (energy_dim % P.ndim) - 1
+    spectrum_b = spectrum_t
+    for _ in range(trailing):
+        spectrum_b = spectrum_b.unsqueeze(-1)
+
+    numerator = torch.trapezoid(P * spectrum_b, x=E, dim=energy_dim)
+    denominator = torch.trapezoid(spectrum_t, x=E, dim=-1)
+    while denominator.ndim < numerator.ndim:
+        denominator = denominator.unsqueeze(-1)
+
+    eps = torch.finfo(P.dtype).tiny
+    return numerator / denominator.clamp_min(eps)
+
+
+def probability_weighted_average(
+    probability: torch.Tensor,
+    coordinate: torch.Tensor,
+    weight: torch.Tensor,
+    *,
+    dim: int = -2,
+) -> torch.Tensor:
+    """Average final-flavour probabilities over an arbitrary coordinate.
+
+    This is the coordinate-generic primitive behind spectrum- or
+    production-weighted probability reductions. ``weight`` must describe
+    the leading probability axes up to and including ``dim``; singleton
+    trailing axes are appended so it broadcasts over final flavour.
+    """
+    if probability.shape[-1] not in (3, 4):
+        raise ValueError("probability must have final flavour dimension 3 or 4.")
+    axis = dim % probability.ndim
+    if axis == probability.ndim - 1:
+        raise ValueError("dim must not select the flavour axis.")
+    x = torch.as_tensor(
+        coordinate, device=probability.device, dtype=probability.dtype
+    )
+    if x.ndim != 1 or probability.shape[axis] != x.numel():
+        raise ValueError("coordinate must be one-dimensional and match probability along dim.")
+    w = torch.as_tensor(weight, device=probability.device, dtype=probability.dtype)
+    while w.ndim < probability.ndim:
+        w = w.unsqueeze(-1)
+    numerator = torch.trapezoid(probability * w, x=x, dim=axis)
+    denominator = torch.trapezoid(w, x=x, dim=axis)
+    eps = torch.finfo(probability.dtype).tiny
+    return numerator / denominator.clamp_min(eps)
+
+
+def probability_integrated_angular(
+    P: torch.Tensor,
+    theta_deg: torch.Tensor,
+    *,
+    angular_dim: int = -2,
+) -> torch.Tensor:
+    """Average a flavour-resolved probability over the full zenith range.
+
+    Computes the solid-angle-weighted average, assuming azimuthal symmetry
+    (the 2*pi azimuthal factor cancels in the ratio),
+
+        <P> = integral P(theta) sin(theta) dtheta / integral sin(theta) dtheta,
+
+    i.e. the probability averaged over the full sky
+    (integral P dOmega / integral dOmega). Unlike ``probability_integrated``,
+    the weight here is the fixed geometric solid-angle element sin(theta),
+    not a physical spectrum -- there is nothing to pass in.
+
+    Args:
+        P: Flavour-resolved probability (final dimension 3 or 4, 4 for the
+            3+1 sterile extension), with the zenith angle along
+            ``angular_dim``.
+        theta_deg: One-dimensional zenith-angle grid in degrees, spanning
+            the range to be averaged over, matching ``P.shape[angular_dim]``.
+        angular_dim: Axis of ``P`` holding the angle grid. Must not be the
+            final (flavour) axis.
+
+    Returns:
+        Solid-angle-weighted average probability, with the angular axis
+        removed.
+
+    Raises:
+        ValueError: If ``P`` does not have final flavour dimension 3 or 4,
+            if ``theta_deg`` is not one-dimensional, if ``angular_dim``
+            selects the flavour axis, or if the two do not match in size.
+    """
+    if P.shape[-1] not in (3, 4):
+        raise ValueError("P must have final flavour dimension 3 or 4.")
+    if angular_dim % P.ndim == P.ndim - 1:
+        raise ValueError("angular_dim must not select the flavour axis.")
+
+    theta = torch.as_tensor(theta_deg, device=P.device, dtype=P.dtype)
+    if theta.ndim != 1:
+        raise ValueError("theta_deg must be one-dimensional.")
+    if P.shape[angular_dim] != theta.numel():
+        raise ValueError("P.shape[angular_dim] must match theta_deg.")
+
+    theta_rad = torch.deg2rad(theta)
+    sin_theta = torch.sin(theta_rad)
+
+    trailing = P.ndim - (angular_dim % P.ndim) - 1
+    sin_theta_b = sin_theta
+    for _ in range(trailing):
+        sin_theta_b = sin_theta_b.unsqueeze(-1)
+
+    numerator = torch.trapezoid(P * sin_theta_b, x=theta_rad, dim=angular_dim)
+    denominator = torch.trapezoid(sin_theta, x=theta_rad, dim=-1)
+    while denominator.ndim < numerator.ndim:
+        denominator = denominator.unsqueeze(-1)
+
+    eps = torch.finfo(P.dtype).tiny
+    return numerator / denominator.clamp_min(eps)
+
 
 def normalize_probability_columns(
     P: torch.Tensor,
@@ -301,7 +481,8 @@ def normalize_probability_columns(
     Normalize each probability column so that transition probabilities sum to one.
     
     Args:
-        P: Probability matrix shaped (..., 3, 3), with P[..., beta, alpha].
+        P: Probability matrix shaped (..., N, N), N in {3, 4}, with
+            P[..., beta, alpha].
         eps: Minimum denominator used to avoid division by zero when a column sum vanishes.
     
     Returns:
@@ -329,7 +510,8 @@ def check_probability_conservation(
     Check column-wise probability conservation within an absolute tolerance.
     
     Args:
-        P: Probability matrix shaped (..., 3, 3), with P[..., beta, alpha].
+        P: Probability matrix shaped (..., N, N), N in {3, 4}, with
+            P[..., beta, alpha].
         atol: Absolute tolerance for comparing each column sum with one.
         rtol: Relative tolerance for comparing each column sum with one.
         raise_error: If True, raise ValueError when probability conservation fails.
@@ -363,7 +545,8 @@ def check_probability_matrix(
     Validate that a probability matrix is finite, non-negative, and column-normalized.
     
     Args:
-        P: Probability matrix shaped (..., 3, 3), with P[..., beta, alpha].
+        P: Probability matrix shaped (..., N, N), N in {3, 4}, with
+            P[..., beta, alpha].
         atol: Absolute tolerance for non-negativity and column-normalization checks.
         rtol: Relative tolerance for column-normalization checks.
         raise_error: If True, raise ValueError describing the first failed validation.

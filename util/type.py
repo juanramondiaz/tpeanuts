@@ -24,7 +24,8 @@ Shared tensor/array type conversion and validation helpers.
 This module collects small, domain-neutral helpers for converting between
 Python scalars, NumPy arrays, and torch tensors, for resolving the
 real/complex dtype pairing used throughout tpeanuts, and for validating the
-shape of flavour-vector-like arrays (last dimension of length 3).
+shape of flavour-vector-like arrays (last dimension of length 3, or 4 for the
+3+1 sterile extension).
 
 Module functions:
     cdtype_from_real(...): Map a real floating dtype to its complex
@@ -38,8 +39,10 @@ Module functions:
     first_tensor(...): Return the first tensor found among several values.
     as_complex_tensor(...): Convert a value to a complex tensor derived from
         a real dtype.
-    state_tensor(...): Convert and validate a 3-flavour state vector tensor.
-    broadcast_last3(...): Broadcast a 3-component vector to a batch shape.
+    state_tensor(...): Convert and validate a 3- or 4-flavour state vector
+        tensor.
+    broadcast_flavour_vector(...): Broadcast a 3- or 4-component
+        flavour-vector-like tensor to a batch shape.
     to_numpy(...): Convert tensors and array-like values to a NumPy array.
     get_entry_tensor(...): Fetch and convert a dictionary entry to a tensor.
     as_datetime64(...): Convert a date-like value to a NumPy datetime64
@@ -209,11 +212,12 @@ def state_tensor(
     dtype: torch.dtype,
 ) -> torch.Tensor:
     """
-    Convert and validate a 3-flavour neutrino state vector tensor.
+    Convert and validate a neutrino state vector tensor.
 
     Args:
         state: Tensor-like state vector whose last dimension indexes the
-            three flavour (or mass) amplitudes.
+            flavour (or mass) amplitudes, N in {3, 4} (3 for the Standard
+            Model, 4 for the 3+1 sterile extension).
         device: Device for the returned tensor.
         dtype: Dtype for the returned tensor.
 
@@ -221,40 +225,42 @@ def state_tensor(
         Tensor representation of state on the requested device/dtype.
 
     Raises:
-        ValueError: If the last dimension of state is not length 3.
+        ValueError: If the last dimension of state is not length 3 or 4.
     """
     state = as_tensor(state, device=device, dtype=dtype)
 
-    if state.shape[-1] != 3:
-        raise ValueError("state must have last dimension equal to 3.")
+    if state.shape[-1] not in (3, 4):
+        raise ValueError("state must have last dimension equal to 3 or 4.")
 
     return state
 
 
-def broadcast_last3(vector: torch.Tensor, batch_shape: torch.Size) -> torch.Tensor:
+def broadcast_flavour_vector(vector: torch.Tensor, batch_shape: torch.Size) -> torch.Tensor:
     """
-    Broadcast a vector whose last dimension contains three components.
+    Broadcast a flavour-vector-like tensor to a batch shape.
 
     Args:
-        vector: Tensor with final dimension equal to three.
+        vector: Tensor whose final dimension is 3 (Standard Model) or 4 (3+1
+            sterile extension).
         batch_shape: Desired leading broadcast shape.
 
     Returns:
-        Tensor with shape (*batch_shape, 3).
+        Tensor with shape (*batch_shape, N), N = vector.shape[-1].
 
     Raises:
-        ValueError: If vector does not have final dimension equal to three.
+        ValueError: If vector's final dimension is not 3 or 4.
     """
-    if vector.shape[-1] != 3:
-        raise ValueError("vector must have last dimension equal to 3.")
+    n = vector.shape[-1]
+    if n not in (3, 4):
+        raise ValueError("vector must have last dimension equal to 3 or 4.")
 
     if len(batch_shape) == 0:
         return vector
 
     if vector.ndim == 1:
-        return vector.expand(*batch_shape, 3)
+        return vector.expand(*batch_shape, n)
 
-    return torch.broadcast_to(vector, (*batch_shape, 3))
+    return torch.broadcast_to(vector, (*batch_shape, n))
 
 def _as_numpy(x, dtype=np.float64, ndim=None):
     """Convert a tensor or array-like value to a NumPy array (internal helper).

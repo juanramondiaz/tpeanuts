@@ -20,8 +20,8 @@
 Validation of tpeanuts.medium.earth against the original NumPy ``peanuts``
 implementation (treated as a read-only reference in ``peanuts/``).
 
-Combines the legacy backup scripts ``test8_integration.py`` (pearth_integrated
-vs legacy) and ``test9_validation_legacy.py`` (pearth vs legacy) into a single
+Combines the legacy backup scripts ``test8_integration.py`` (earth_probability_exposure
+vs legacy) and ``test9_validation_legacy.py`` (earth_probability_state vs legacy) into a single
 sanity check, since both require the same expensive legacy-object setup and
 report on the same underlying physics (the Earth matter-regeneration
 probability). The diagnostic plots from those historical backup tests live in
@@ -32,7 +32,7 @@ Note on the exposure-integration comparison: legacy ``Pearth_integrated``
 ``sum_i Pearth(eta_i) * W(eta_i) * deta``. The legacy code hardcodes
 ``deta = pi / ns``, which does not match the actual point spacing of its own
 uniform ``eta`` grid (``pi / (ns - 1)``) -- the same quadrature bug found and
-fixed in ``tpeanuts.medium.earth.exposure_integration.pearth_integrated``
+fixed in ``tpeanuts.medium.earth.exposure_integration.earth_probability_exposure``
 while building this test suite (see test6_exposure.py). To isolate the
 *physics* comparison (does torch ``Pearth`` match legacy ``Pearth``
 pointwise?) from that shared quadrature artifact, both sides of the
@@ -40,9 +40,9 @@ integrated comparison below use the true grid spacing ``eta[1] - eta[0]``
 rather than either legacy convention.
 
 Note on matter-potential precision: legacy peanuts always uses its own
-hardcoded charged-current prefactor. ``pearth``/``pearth_analytical`` expose
+hardcoded charged-current prefactor. ``earth_probability_state``/``earth_probability_state_analytical`` expose
 this as ``legacy_precision=True``, which Part 1 below uses for a tight,
-apples-to-apples comparison. ``pearth_integrated`` has no such passthrough, so
+apples-to-apples comparison. ``earth_probability_exposure`` has no such passthrough, so
 Part 2's tolerance is widened to absorb the resulting ~1e-5 full-precision-vs-
 legacy-precision gap rather than pretending it is not there.
 """
@@ -56,9 +56,12 @@ import pytest
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.medium.earth.exposure_integration import pearth_integrated
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
+from tpeanuts.medium.earth.exposure_integration import earth_probability_exposure
 from tpeanuts.medium.earth.exposure_table import ExposureParameters
-from tpeanuts.medium.earth.probability import pearth
+from tpeanuts.medium.earth.probability import earth_probability_state
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
 from tpeanuts.util.context import RuntimeContext
 
@@ -82,18 +85,18 @@ DEPTH_SURFACE_M = 0.0
 
 FLAVOUR_NAMES = ["nu_e", "nu_mu", "nu_tau"]
 
-# Pointwise pearth-vs-Pearth comparison: Case A (through-Earth) trajectories.
+# Pointwise earth_probability_state-vs-Pearth comparison: Case A (through-Earth) trajectories.
 ENERGY_MEV = 1000.0
 ETA_VALUES = [0.10, 0.35, 0.60, 0.85, 1.10, 1.35]
 ABS_TOL_POINTWISE = 2.0e-6
 REL_TOL_POINTWISE = 2.0e-5
 SUM_TOL_RAW = 1.0e-3
 
-# Exposure-integrated pearth_integrated-vs-manual-legacy-sum comparison.
+# Exposure-integrated earth_probability_exposure-vs-manual-legacy-sum comparison.
 LATITUDE_RAD = 0.72
 D1, D2, NS_INTEGRATED = 0.0, 365.0, 51
 INTEGRATED_ENERGIES_MEV = [1000.0, 3000.0]
-# pearth_integrated has no legacy_precision passthrough (unlike pearth itself),
+# earth_probability_exposure has no legacy_precision passthrough (unlike earth_probability_state itself),
 # so this comparison inherits the ~1e-5 full-precision-vs-legacy-precision
 # matter-potential gap quantified and explained in Part 1 below.
 ABS_TOL_INTEGRATED = 3.0e-5
@@ -113,10 +116,12 @@ def _flavour_state_torch(index: int) -> torch.Tensor:
 
 def _build_torch_objects(ctx: RuntimeContext):
     profile = EarthProfile(params=EarthParameters(profile_perturbative_name="even_power"), context=ctx)
-    oscillation = OscillationParameters.build(
-        theta12=THETA12, theta13=THETA13, theta23=THETA23, delta=DELTA_CP,
-        DeltamSq21=DM21_EV2, DeltamSq3l=DM3L_EV2, antinu=False, context=ctx,
+    pmns = PMNS_SM(PMNSParams(theta12=THETA12, theta13=THETA13, theta23=THETA23, delta=DELTA_CP, context=ctx))
+    mass_spectrum = MassSpectrum_SM(
+        DeltamSq21=torch.as_tensor(DM21_EV2, device=ctx.device, dtype=ctx.dtype),
+        DeltamSq3l=torch.as_tensor(DM3L_EV2, device=ctx.device, dtype=ctx.dtype),
     )
+    oscillation = OscillationParameters(pmns=pmns, mass_spectrum=mass_spectrum, antinu=False)
     return profile, oscillation
 
 
@@ -126,7 +131,7 @@ def _build_legacy_objects():
     return density, pmns
 
 
-def test_pearth_and_pearth_integrated_match_legacy_peanuts():
+def test_earth_probability_state_and_earth_probability_exposure_match_legacy_peanuts():
     assert LEGACY_DENSITY_FILE.is_file(), f"legacy density file not found: {LEGACY_DENSITY_FILE}"
 
     ctx = RuntimeContext.resolve(DEVICE, DTYPE)
@@ -134,7 +139,7 @@ def test_pearth_and_pearth_integrated_match_legacy_peanuts():
     legacy_density, legacy_pmns = _build_legacy_objects()
 
     # ------------------------------------------------------------------
-    # Part 1: pointwise pearth (flavour basis, no reunitarize) vs legacy Pearth.
+    # Part 1: pointwise earth_probability_state (flavour basis, no reunitarize) vs legacy Pearth.
     # ------------------------------------------------------------------
     torch_probs = np.zeros((len(FLAVOUR_NAMES), len(ETA_VALUES), 3), dtype=float)
     legacy_probs = np.zeros_like(torch_probs)
@@ -149,7 +154,7 @@ def test_pearth_and_pearth_integrated_match_legacy_peanuts():
                 ENERGY_MEV, float(eta_value), DEPTH_SURFACE_M,
                 mode="analytical", massbasis=False, antinu=False,
             )
-            torch_p = pearth(
+            torch_p = earth_probability_state(
                 state_t, torch_profile, torch_oscillation,
                 torch.tensor(ENERGY_MEV, device=DEVICE, dtype=DTYPE),
                 torch.tensor(float(eta_value), device=DEVICE, dtype=DTYPE),
@@ -170,10 +175,10 @@ def test_pearth_and_pearth_integrated_match_legacy_peanuts():
     assert np.all(torch_probs >= -1.0e-12), "torch pointwise probabilities must be non-negative"
     assert np.all(legacy_probs >= -1.0e-12), "legacy pointwise probabilities must be non-negative"
     assert np.max(pointwise_abs_diff) < ABS_TOL_POINTWISE, (
-        f"pointwise pearth vs legacy Pearth exceeds absolute tolerance: {np.max(pointwise_abs_diff):.3e}"
+        f"pointwise earth_probability_state vs legacy Pearth exceeds absolute tolerance: {np.max(pointwise_abs_diff):.3e}"
     )
     assert np.max(pointwise_rel_diff) < REL_TOL_POINTWISE, (
-        f"pointwise pearth vs legacy Pearth exceeds relative tolerance: {np.max(pointwise_rel_diff):.3e}"
+        f"pointwise earth_probability_state vs legacy Pearth exceeds relative tolerance: {np.max(pointwise_rel_diff):.3e}"
     )
     assert torch_sum_error < SUM_TOL_RAW, "raw (non-reunitarized) torch normalization drift must stay small"
     assert legacy_sum_error < SUM_TOL_RAW, "raw legacy normalization drift must stay small"
@@ -182,7 +187,7 @@ def test_pearth_and_pearth_integrated_match_legacy_peanuts():
     )
 
     # ------------------------------------------------------------------
-    # Part 2: exposure-integrated pearth_integrated vs a manual legacy sum,
+    # Part 2: exposure-integrated earth_probability_exposure vs a manual legacy sum,
     # both using the true (non-buggy) grid spacing -- see module docstring.
     # ------------------------------------------------------------------
     exposure_np = legacy_time_average.NadirExposure(
@@ -216,7 +221,7 @@ def test_pearth_and_pearth_integrated_match_legacy_peanuts():
                     dtype=float,
                 ) * float(weight) * deta_true
 
-            torch_integrated = pearth_integrated(
+            torch_integrated = earth_probability_exposure(
                 state_t, torch_profile, torch_oscillation,
                 torch.tensor(energy_mev, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
                 method="analytical", massbasis=False, exposure=legacy_exposure,
@@ -228,7 +233,7 @@ def test_pearth_and_pearth_integrated_match_legacy_peanuts():
 
             assert np.all(np.isfinite(torch_integrated)), "integrated torch probabilities must be finite"
             assert diff < ABS_TOL_INTEGRATED, (
-                f"exposure-integrated pearth_integrated vs legacy exceeds tolerance "
+                f"exposure-integrated earth_probability_exposure vs legacy exceeds tolerance "
                 f"(flavour={FLAVOUR_NAMES[flavour_index]}, E={energy_mev} MeV): {diff:.3e}"
             )
 

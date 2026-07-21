@@ -38,14 +38,20 @@ Two input conventions are supported:
         ``P_alpha = |psi_final_alpha|^2``.
 
 Module functions:
-    pearth_analytical(...)
+    earth_probability_transition(...)
+        Build the full Earth flavour-transition probability matrix
+        |S_earth[beta, alpha]|^2 from the analytical Earth evolutor.
+    earth_probability_state_analytical(...)
         Compute final Earth probabilities using the perturbative analytical
         Earth evolutor.
-    pearth_numerical(...)
+    earth_probability_state_numerical(...)
         Compute final Earth probabilities using the medium-independent
         numerical evolutor sampled along an Earth trajectory.
-    pearth(...)
+    earth_probability_state(...)
         Dispatch to the analytical or numerical Earth probability pipeline.
+    earth_probability_integrated(...)
+        Average final Earth flavour probabilities over energy, weighted by an
+        explicit production spectrum.
 """
 
 
@@ -57,7 +63,7 @@ from typing import Literal, Optional, Union
 import torch
 from torch import Tensor
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 
 PearthMethod = Literal["analytical", "numerical"]
 
@@ -67,7 +73,11 @@ from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real, state_tensor
 from tpeanuts.core.common.probability import (
-    probability_from_evolutor,
+    probability_coherent,
+    probability_integrated,
+    probability_state,
+    probability_incoherent,
+    probability_transition,
 )
 from tpeanuts.core.numerical.evolutor import evolutor_numerical
 from tpeanuts.core.numerical.geometry import OdeMethod
@@ -76,7 +86,62 @@ from tpeanuts.util.constant import R_E
 
 
 @torch.no_grad()
-def pearth_analytical(
+def earth_probability_transition(
+    profile_earth: object,
+    oscillation: OscillationParameters,
+    E_MeV: TensorLike,
+    eta: TensorLike,
+    depth_m: float,
+    *,
+    reunitarize: bool = default.earth_reunitarize,
+    legacy_precision: bool = False,
+    include_matter_nc: bool = default.earth_include_matter_nc,
+) -> Tensor:
+    """Build the full Earth flavour-transition probability matrix.
+
+    Uses the analytical perturbative Earth evolutor (the only Earth evolutor
+    that produces a full flavour-basis matrix independent of an initial
+    state); the numerical segment pipeline (``earth_probability_state_numerical``)
+    only evolves an explicit initial state and has no matrix-level
+    counterpart.
+
+    Args:
+        profile_earth: EarthProfile-compatible profile object.
+        oscillation: Built pmns object plus mass splittings, antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute.
+        E_MeV: Neutrino energy in MeV.
+        eta: Detector nadir angle in radians.
+        depth_m: Detector depth in metres.
+        reunitarize: Project the Earth evolutor to the nearest unitary matrix.
+        legacy_precision: If True, use the legacy peanuts matter-potential
+            prefactor in the Earth evolutor.
+        include_matter_nc: If True, also apply the 3+1 sterile extension's
+            neutral-current matter term (see
+            ``medium.earth.evolutor.earth_evolutor``). Requires
+            ``profile_earth`` to have been built with neutron-density
+            coefficients; raises otherwise. False (the default) reproduces
+            the pre-existing CC-only behaviour exactly.
+
+    Returns:
+        Real tensor |S_earth[beta, alpha]|^2 with final two dimensions final
+        flavour and initial flavour.
+    """
+    U_earth = earth_evolutor(
+        profile_earth=profile_earth,
+        oscillation=oscillation,
+        E=E_MeV,
+        eta=eta,
+        depth_m=depth_m,
+        reunitarize=reunitarize,
+        legacy_precision=legacy_precision,
+        include_matter_nc=include_matter_nc,
+    )
+
+    return probability_transition(U_earth)
+
+
+@torch.no_grad()
+def earth_probability_state_analytical(
     nustate: Tensor,
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -87,6 +152,7 @@ def pearth_analytical(
     massbasis: bool = default.earth_massbasis,
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
+    include_matter_nc: bool = default.earth_include_matter_nc,
 ) -> Tensor:
     """Compute Earth probabilities with the analytical perturbative evolutor.
 
@@ -95,8 +161,8 @@ def pearth_analytical(
             incoherent mass weights when ``massbasis=True`` and coherent
             flavour amplitudes otherwise.
         profile_earth: EarthProfile-compatible profile object.
-        oscillation: Built pmns object plus mass splittings and antinu
-            selection.
+        oscillation: Built pmns object plus mass splittings, antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute.
         E_MeV: Neutrino energy in MeV.
         eta: Detector nadir angle in radians.
         depth_m: Detector depth in metres.
@@ -104,6 +170,11 @@ def pearth_analytical(
         reunitarize: Project the Earth evolutor to the nearest unitary matrix.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in the Earth evolutor.
+        include_matter_nc: If True, also apply the 3+1 sterile extension's
+            neutral-current matter term (see ``medium.earth.evolutor.earth_evolutor``).
+            Requires ``profile_earth`` to have been built with
+            neutron-density coefficients; raises otherwise. False (the
+            default) reproduces the pre-existing CC-only behaviour exactly.
 
     Returns:
         Final flavour probabilities with final dimension 3.
@@ -116,6 +187,7 @@ def pearth_analytical(
         depth_m=depth_m,
         reunitarize=reunitarize,
         legacy_precision=legacy_precision,
+        include_matter_nc=include_matter_nc,
     )
 
     state = state_tensor(
@@ -123,19 +195,23 @@ def pearth_analytical(
         device=U_earth.device,
         dtype=U_earth.real.dtype if massbasis else U_earth.dtype,
     )
-    probabilities = probability_from_evolutor(
+
+    if massbasis:
+        return probability_incoherent(
+            U_earth,
+            state,
+            pmns=oscillation.pmns,
+            antinu=oscillation.antinu,
+        ).real
+
+    return probability_coherent(
         U_earth,
         state,
-        pmns=oscillation.pmns,
-        massbasis=massbasis,
-        antinu=oscillation.antinu,
-    )
-
-    return probabilities.real
+    ).real
 
 
 @torch.no_grad()
-def pearth_numerical(
+def earth_probability_state_numerical(
     nustate: Tensor,
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -148,8 +224,8 @@ def pearth_numerical(
     nsteps: int = default.earth_probability_nsteps,
     ode_method: OdeMethod | None = None,
     context: RuntimeContext = RuntimeContext.resolve(default.earth_device, default.dtype),
-    epsilon: Optional[torch.Tensor] = None,
     legacy_precision: bool = False,
+    include_matter_nc: bool = default.earth_include_matter_nc,
 ) -> Tensor | None:
     """Compute Earth probabilities with the numerical segment evolutor.
 
@@ -158,8 +234,8 @@ def pearth_numerical(
             incoherent mass weights when ``massbasis=True`` and coherent
             flavour amplitudes otherwise.
         profile_earth: EarthProfile-compatible profile object.
-        oscillation: Built pmns object plus mass splittings and a scalar
-            antinu selection.
+        oscillation: Built pmns object plus mass splittings, a scalar antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute.
         E_MeV: Neutrino energy in MeV.
         eta: Detector nadir angle in radians. Numerical mode currently
             supports scalar trajectories.
@@ -170,10 +246,18 @@ def pearth_numerical(
         nsteps: Number of numerical trajectory segments.
         ode_method: Sampling rule passed to the numerical Earth profile.
         context: Runtime device/dtype used by the numerical calculation.
-        epsilon: Optional NSI matrix for the numerical Hamiltonian. The
-            analytical perturbative Earth path does not use this argument.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in numerical segment Hamiltonians.
+        include_matter_nc: If True, also sample neutron density along the
+            trajectory and forward it as ``n_n_mol_cm3``, enabling the 3+1
+            sterile extension's neutral-current matter term (only meaningful
+            when ``oscillation.pmns`` is 4-flavour). Requires
+            ``profile_earth`` to have been built with neutron-density
+            coefficients (see ``EarthProfile.density_n_x_eta``,
+            ``EvenPowerProfileLayered``/``PremTabulatedProfile``
+            ``include_neutron=True``); otherwise raises ValueError. False
+            (the default) reproduces the pre-existing CC-only behaviour
+            exactly.
 
     Returns:
         Final flavour probabilities. If ``full_oscillation=True``, returns
@@ -182,7 +266,7 @@ def pearth_numerical(
     antinu = oscillation.antinu
     if torch.is_tensor(antinu):
         if antinu.numel() != 1:
-            raise ValueError("pearth_numerical only supports scalar antinu.")
+            raise ValueError("earth_probability_state_numerical only supports scalar antinu.")
         antinu = bool(antinu.item())
         oscillation = dataclasses.replace(oscillation, antinu=antinu)
 
@@ -203,6 +287,14 @@ def pearth_numerical(
             trajectory.sample_x,
             trajectory.meta["eta_prime"],
         )
+        n_n = (
+            profile_earth.call_neutron(
+                trajectory.sample_x,
+                trajectory.meta["eta_prime"],
+            )
+            if include_matter_nc
+            else None
+        )
     else:
         r_mid = 0.5 * (1.0 + trajectory.meta["r_d"])
         n_1 = profile_earth.call(
@@ -214,17 +306,30 @@ def pearth_numerical(
             device=dev,
             dtype=dtype,
         )
+        if include_matter_nc:
+            n_1n = profile_earth.call_neutron(
+                r_mid,
+                torch.tensor(0.0, device=dev, dtype=dtype),
+            )
+            n_n = torch.ones_like(trajectory.sample_x) * as_tensor(
+                n_1n,
+                device=dev,
+                dtype=dtype,
+            )
+        else:
+            n_n = None
 
     n_e = as_tensor(n_e, device=dev, dtype=dtype)
+    n_n = None if n_n is None else as_tensor(n_n, device=dev, dtype=dtype)
     Sx = evolutor_numerical(
         oscillation,
         E_MeV=E_MeV,
         n_e_mol_cm3=n_e,
+        n_n_mol_cm3=n_n,
         dx_evolution=trajectory.dx_evolution,
         return_history=full_oscillation,
         device=dev,
         dtype=dtype,
-        epsilon=epsilon,
         legacy_precision=legacy_precision,
     )
     x = trajectory.x
@@ -234,7 +339,7 @@ def pearth_numerical(
         device=Sx.device,
         dtype=dtype if massbasis else cdtype_from_real(dtype),
     )
-    evolution = probability_from_evolutor(
+    evolution = probability_state(
         Sx,
         state,
         pmns=oscillation.pmns,
@@ -250,7 +355,7 @@ def pearth_numerical(
 
 
 @torch.no_grad()
-def pearth(
+def earth_probability_state(
     nustate: Tensor,
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -265,8 +370,8 @@ def pearth(
     ode_method: OdeMethod | None = None,
     context: Optional[RuntimeContext] = None,
     reunitarize: bool = default.earth_reunitarize,
-    epsilon: Optional[torch.Tensor] = None,
     legacy_precision: bool = False,
+    include_matter_nc: bool = default.earth_include_matter_nc,
 ) -> Tensor | tuple[Tensor, Tensor]:
     """Dispatch Earth matter-regeneration probabilities by method.
 
@@ -278,8 +383,9 @@ def pearth(
         nustate: Initial state with last dimension 3. Interpreted as mass
             weights when massbasis=True, otherwise as flavour amplitudes.
         profile_earth: EarthProfile-compatible profile object.
-        oscillation: Built pmns object plus mass splittings and antinu
-            selection.
+        oscillation: Built pmns object plus mass splittings, antinu
+            selection, and the optional ``nsi`` (NSIConfig) attribute (used
+            by both methods).
         E_MeV: Neutrino energy in MeV.
         eta: Peanuts nadir angle in radians.
         depth_m: Detector depth in meters.
@@ -295,9 +401,15 @@ def pearth(
             infers from inputs.
         reunitarize: For method="analytical", project evolution operators to
             the nearest unitary matrix.
-        epsilon: Optional NSI matrix used only with method="numerical".
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor throughout Earth propagation.
+        include_matter_nc: Also apply the 3+1 sterile extension's
+            neutral-current matter term, for either method (see
+            ``earth_probability_state_analytical``/
+            ``earth_probability_state_numerical``). Requires
+            ``profile_earth`` to have been built with neutron-density
+            coefficients; raises otherwise. False (the default) reproduces
+            the pre-existing CC-only behaviour exactly.
 
     Returns:
         Probability tensor with final dimension 3. If method="numerical" and
@@ -306,7 +418,7 @@ def pearth(
     method = str(method).lower().strip()
 
     if method == "analytical":
-        return pearth_analytical(
+        return earth_probability_state_analytical(
             nustate=nustate,
             profile_earth=profile_earth,
             oscillation=oscillation,
@@ -316,10 +428,11 @@ def pearth(
             massbasis=massbasis,
             reunitarize=reunitarize,
             legacy_precision=legacy_precision,
+            include_matter_nc=include_matter_nc,
         )
 
     if method == "numerical":
-        return pearth_numerical(
+        return earth_probability_state_numerical(
             nustate=nustate,
             profile_earth=profile_earth,
             oscillation=oscillation,
@@ -331,8 +444,93 @@ def pearth(
             nsteps=nsteps,
             ode_method=ode_method,
             context=context if context is not None else RuntimeContext.resolve(default.earth_device, default.dtype),
-            epsilon=epsilon,
             legacy_precision=legacy_precision,
+            include_matter_nc=include_matter_nc,
         )
 
     raise ValueError("method must be either 'analytical' or 'numerical'.")
+
+
+@torch.no_grad()
+def earth_probability_integrated(
+    nustate: Tensor,
+    profile_earth: object,
+    oscillation: OscillationParameters,
+    E_MeV: TensorLike,
+    eta: TensorLike,
+    depth_m: float,
+    spectrum: Tensor,
+    *,
+    method: PearthMethod = default.earth_method,
+    massbasis: bool = default.earth_massbasis,
+    nsteps: int = default.earth_probability_nsteps,
+    ode_method: OdeMethod | None = None,
+    context: Optional[RuntimeContext] = None,
+    reunitarize: bool = default.earth_reunitarize,
+    legacy_precision: bool = False,
+    energy_dim: int = -2,
+    include_matter_nc: bool = default.earth_include_matter_nc,
+) -> Tensor:
+    """Average final Earth flavour probabilities over energy.
+
+    Builds the energy-resolved probabilities with ``earth_probability_state``
+    at a fixed nadir angle ``eta`` and averages them with
+    ``core.common.probability.probability_integrated``, weighted by an
+    explicit production ``spectrum``. This is distinct from
+    ``earth_probability_exposure`` (``medium.earth.exposure_integration``),
+    which time-averages over the nadir angle instead of integrating over
+    energy.
+
+    Args:
+        nustate: Initial state passed to ``earth_probability_state``.
+        profile_earth: EarthProfile-compatible profile object.
+        oscillation: Built pmns object plus mass splittings and antinu
+            selection.
+        E_MeV: Neutrino energy grid in MeV, one-dimensional, matching
+            ``E_grid_MeV`` of ``probability_integrated``.
+        eta: Detector nadir angle in radians.
+        depth_m: Detector depth in metres.
+        spectrum: Spectral weight w(E), required (no default).
+        method: "analytical" or "numerical" Earth probability pipeline.
+        massbasis: Selects the interpretation of ``nustate``.
+        nsteps: Numerical integration steps for method="numerical".
+        ode_method: Numerical profile sampling rule.
+        context: Runtime device/dtype for method="numerical"; analytical
+            infers from inputs.
+        reunitarize: For method="analytical", project evolution operators to
+            the nearest unitary matrix.
+        legacy_precision: If True, use the legacy peanuts matter-potential
+            prefactor throughout Earth propagation.
+        energy_dim: Axis of the resulting probability tensor holding the
+            energy grid. Must not be the final (flavour) axis.
+        include_matter_nc: Also apply the 3+1 sterile extension's
+            neutral-current matter term, for either method (see
+            ``earth_probability_state``).
+
+    Returns:
+        Spectrum-weighted average probability, with the energy axis removed.
+    """
+    probabilities = earth_probability_state(
+        nustate=nustate,
+        profile_earth=profile_earth,
+        oscillation=oscillation,
+        E_MeV=E_MeV,
+        eta=eta,
+        depth_m=depth_m,
+        method=method,
+        massbasis=massbasis,
+        full_oscillation=False,
+        nsteps=nsteps,
+        ode_method=ode_method,
+        context=context,
+        reunitarize=reunitarize,
+        legacy_precision=legacy_precision,
+        include_matter_nc=include_matter_nc,
+    )
+
+    return probability_integrated(
+        probabilities,
+        E_MeV,
+        spectrum,
+        energy_dim=energy_dim,
+    )

@@ -102,7 +102,7 @@ from __future__ import annotations
 from typing import Optional, Union, Literal
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 
 
 from tpeanuts.util.math import(

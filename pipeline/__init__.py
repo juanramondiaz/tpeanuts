@@ -26,43 +26,41 @@ and ``medium``: it prepares inputs, calls the physics blocks, integrates or
 aggregates observables, and saves pipeline outputs.
 
 Module groups:
-    pipeline_common
-        Shared setup helpers for PMNS objects, profiles, exposure, and devices.
-    pipeline_incoherent, pipeline_legacypeanuts
-        Solar-to-detector workflows with incoherent and legacy peanuts
-        treatments.
-    pipeline_atmosphere, atmosphere_flux
-        Atmosphere and atmosphere-plus-Earth flux workflows.
+    solar, earth, solar_earth
+        Solar production, pure Earth propagation, and their incoherent
+        composition.
+    legacy
+        Explicit legacy validation backend, imported from
+        ``tpeanuts.pipeline.legacy`` rather than re-exported here.
+    atmosphere, atmosphere_earth
+        Production-to-surface and surface-to-detector atmosphere workflows.
 """
 
 
 
-from tpeanuts.pipeline.pipeline_atmosphere import (
-    select_particle_angle_flux,
-    build_atmosphere_trajectories,
-    propagate_atmosphere_coherent,
-    propagate_earth_coherent,
-    integrate_initial_and_surface_fluxes,
-    integrate_height_and_sum_flavours,
+from tpeanuts.pipeline.atmosphere import (
+    AtmosphereSurfaceResult,
+    propagate_atmosphere_to_surface,
+    select_production_flux,
 )
-from tpeanuts.pipeline.atmosphere_flux import (
-    build_probability_matrix,
+from tpeanuts.pipeline.atmosphere_earth import (
+    AtmosphereEarthDetectorResult,
+    AtmosphereDetectorGridResult,
+    propagate_atmosphere_grid_to_detector,
+    propagate_surface_to_detector,
+    detector_flux_from_production,
     integrate_detector_flux_over_height,
-    integrate_flux_over_height,
-    propagate_flux_E_h,
-    propagate_flux_vector,
+    sum_detected_flavours,
 )
-from tpeanuts.pipeline.pipeline_incoherent import (
-    load_incoherent_solar_detector_result,
-    propagate_solar_to_detector_incoherent,
-    run_and_save_solar_to_detector_incoherent,
-    save_incoherent_solar_detector_result,
+from tpeanuts.pipeline.solar import SolarSurfaceResult, propagate_solar_to_surface
+from tpeanuts.pipeline.earth import (
+    EarthDetectorResult,
+    propagate_earth_to_detector,
+    propagate_earth_to_detector_exposure,
 )
-from tpeanuts.pipeline.pipeline_legacypeanuts import (
-    load_legacypeanuts_solar_detector_result,
-    propagate_solar_to_detector_legacypeanuts,
-    run_and_save_solar_to_detector_legacypeanuts,
-    save_legacypeanuts_solar_detector_result,
+from tpeanuts.pipeline.solar_earth import (
+    SolarEarthDetectorResult,
+    propagate_solar_to_earth_detector,
 )
 from tpeanuts.pipeline.io import (
     aggregate_detector_conversion_by_mode,
@@ -79,25 +77,23 @@ from tpeanuts.util.math import relative_error_summary
 
 
 __all__ = [
-    "select_particle_angle_flux",
-    "build_atmosphere_trajectories",
-    "propagate_atmosphere_coherent",
-    "propagate_earth_coherent",
-    "integrate_initial_and_surface_fluxes",
-    "integrate_height_and_sum_flavours",
-    "build_probability_matrix",
+    "AtmosphereSurfaceResult",
+    "AtmosphereEarthDetectorResult",
+    "AtmosphereDetectorGridResult",
+    "select_production_flux",
+    "propagate_atmosphere_to_surface",
+    "propagate_surface_to_detector",
+    "propagate_atmosphere_grid_to_detector",
+    "detector_flux_from_production",
     "integrate_detector_flux_over_height",
-    "integrate_flux_over_height",
-    "propagate_flux_E_h",
-    "propagate_flux_vector",
-    "load_incoherent_solar_detector_result",
-    "propagate_solar_to_detector_incoherent",
-    "run_and_save_solar_to_detector_incoherent",
-    "save_incoherent_solar_detector_result",
-    "load_legacypeanuts_solar_detector_result",
-    "propagate_solar_to_detector_legacypeanuts",
-    "run_and_save_solar_to_detector_legacypeanuts",
-    "save_legacypeanuts_solar_detector_result",
+    "sum_detected_flavours",
+    "SolarSurfaceResult",
+    "EarthDetectorResult",
+    "SolarEarthDetectorResult",
+    "propagate_solar_to_surface",
+    "propagate_earth_to_detector",
+    "propagate_earth_to_detector_exposure",
+    "propagate_solar_to_earth_detector",
     "aggregate_detector_conversion_by_mode",
     "aggregate_detector_flux_by_mode",
     "build_detector_flux_filename",

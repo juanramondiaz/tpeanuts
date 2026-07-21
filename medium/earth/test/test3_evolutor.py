@@ -33,8 +33,12 @@ import torch
 
 from tpeanuts.medium.earth.evolutor import earth_evolutor, earth_evolutor_from_zenith
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
+from tpeanuts.core.BSM.bsm_mass_spectrum import MassSpectrum_BSM
+from tpeanuts.core.BSM.bsm_nsi import NSIConfig
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.util.context import RuntimeContext
+from tpeanuts.util.math import project_to_unitary
 from tpeanuts.util.test_utils import assert_close, build_pmns
 
 
@@ -50,8 +54,10 @@ DEPTH_UNDERGROUND_M = 1000.0
 def _oscillation(antinu=False) -> OscillationParameters:
     return OscillationParameters(
         pmns=build_pmns(),
-        DeltamSq21=torch.tensor(DM21_EV2, device=DEVICE, dtype=DTYPE),
-        DeltamSq3l=torch.tensor(DM3L_EV2, device=DEVICE, dtype=DTYPE),
+        mass_spectrum=MassSpectrum_SM(
+            DeltamSq21=torch.tensor(DM21_EV2, device=DEVICE, dtype=DTYPE),
+            DeltamSq3l=torch.tensor(DM3L_EV2, device=DEVICE, dtype=DTYPE),
+        ),
         antinu=antinu,
     )
 
@@ -72,9 +78,30 @@ def _two_shell_profile() -> EarthProfile:
 
 
 def _unitarity_error(U: torch.Tensor) -> torch.Tensor:
-    identity = torch.eye(3, device=U.device, dtype=U.dtype)
+    identity = torch.eye(U.shape[-1], device=U.device, dtype=U.dtype)
     left = U.conj().transpose(-1, -2) @ U
     return torch.amax(torch.abs(left - identity), dim=(-2, -1))
+
+
+def _sterile_oscillation(antinu=False) -> OscillationParameters:
+    """4-flavour (3+1 sterile) oscillation object for Fase 5 N=4 checks."""
+    from tpeanuts.core.BSM.bsm_sterile import PMNSSterileParams, PMNS_sterile
+    from tpeanuts.core.common.pmns import PMNSParams
+
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    sm_params = PMNSParams(theta12=0.5836, theta13=0.1498, theta23=0.8552, delta=3.438, context=ctx)
+    sterile_params = PMNSSterileParams(
+        theta14=0.15, theta24=0.10, theta34=0.05,
+        delta14=0.3, delta24=-0.2, delta34=0.0,
+        context=ctx,
+    )
+    pmns4 = PMNS_sterile(sm_params, sterile_params)
+    mass_spectrum = MassSpectrum_BSM(
+        DeltamSq21=torch.tensor(DM21_EV2, device=DEVICE, dtype=DTYPE),
+        DeltamSq3l=torch.tensor(DM3L_EV2, device=DEVICE, dtype=DTYPE),
+        DeltamSq41=torch.tensor(1.7, device=DEVICE, dtype=DTYPE),
+    )
+    return OscillationParameters(pmns=pmns4, mass_spectrum=mass_spectrum, antinu=antinu)
 
 
 def test_earth_evolutor_is_callable():
@@ -127,6 +154,42 @@ def test_case_b_underground_evolutor_is_finite_and_unitary():
     )
 
     assert U.shape == (3, 3)
+    assert torch.all(torch.isfinite(U.real)) and torch.all(torch.isfinite(U.imag))
+    assert torch.max(_unitarity_error(U)) < 5.0e-10
+
+
+def test_sterile_case_a_scalar_evolutor_is_finite_and_unitary():
+    profile = _two_shell_profile()
+    oscillation = _sterile_oscillation()
+
+    U = earth_evolutor(
+        profile,
+        oscillation,
+        torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
+        torch.tensor(0.40, device=DEVICE, dtype=DTYPE),
+        DEPTH_SURFACE_M,
+        reunitarize=True,
+    )
+
+    assert U.shape == (4, 4)
+    assert torch.all(torch.isfinite(U.real)) and torch.all(torch.isfinite(U.imag))
+    assert torch.max(_unitarity_error(U)) < 5.0e-10
+
+
+def test_sterile_case_b_underground_evolutor_is_finite_and_unitary():
+    profile = _two_shell_profile()
+    oscillation = _sterile_oscillation()
+
+    U = earth_evolutor(
+        profile,
+        oscillation,
+        torch.tensor(2500.0, device=DEVICE, dtype=DTYPE),
+        torch.tensor(2.40, device=DEVICE, dtype=DTYPE),
+        DEPTH_UNDERGROUND_M,
+        reunitarize=True,
+    )
+
+    assert U.shape == (4, 4)
     assert torch.all(torch.isfinite(U.real)) and torch.all(torch.isfinite(U.imag))
     assert torch.max(_unitarity_error(U)) < 5.0e-10
 

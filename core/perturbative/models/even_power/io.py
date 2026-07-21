@@ -41,7 +41,7 @@ import os
 import pandas as pd
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.torch_util import default_device
 from tpeanuts.util.type import as_tensor
 

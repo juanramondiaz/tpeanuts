@@ -30,7 +30,7 @@ Module functions:
         Import the legacy PMNS and vacuum modules.
     legacy_pmns_from_torch(...)
         Build a legacy peanuts.pmns.PMNS object from a torch PMNS object.
-    compare_pvacuum_with_legacy(...)
+    compare_vacuum_probability_state_with_legacy(...)
         Compare final vacuum probabilities against peanuts.vacuum.Pvacuum.
     compare_vacuum_evolved_state_with_legacy(...)
         Compare coherent evolved states against
@@ -50,7 +50,7 @@ import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.medium.vacuum.evolutor import vacuum_evolved_state
-from tpeanuts.medium.vacuum.probability import pvacuum
+from tpeanuts.medium.vacuum.probability import vacuum_probability_state
 from tpeanuts.util.constant import R_E
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike
@@ -119,7 +119,7 @@ def _diff_summary(torch_value: np.ndarray, legacy_value: np.ndarray) -> dict[str
     }
 
 
-def compare_pvacuum_with_legacy(
+def compare_vacuum_probability_state_with_legacy(
     nustate: TensorLike,
     oscillation: OscillationParameters,
     E_MeV: float,
@@ -129,7 +129,7 @@ def compare_pvacuum_with_legacy(
     context: RuntimeContext = RuntimeContext(device=torch.device("cpu"), dtype=torch.float64),
     evolution_scale_m: TensorLike = R_E,
 ) -> dict[str, Any]:
-    """Compare ``pvacuum`` with legacy ``peanuts.vacuum.Pvacuum``.
+    """Compare ``vacuum_probability_state`` with legacy ``peanuts.vacuum.Pvacuum``.
 
     Args:
         nustate: Initial state. Interpreted as mass weights when
@@ -156,7 +156,7 @@ def compare_pvacuum_with_legacy(
     legacy_pmns = legacy_pmns_from_torch(oscillation.pmns)
     device, dtype = context.device, context.dtype
 
-    torch_p = pvacuum(
+    torch_p = vacuum_probability_state(
         nustate,
         oscillation,
         torch.tensor(E_MeV, device=device, dtype=dtype),
@@ -169,8 +169,8 @@ def compare_pvacuum_with_legacy(
     legacy_p = legacy_vacuum.Pvacuum(
         _numpy_state(nustate, complex_state=not massbasis),
         legacy_pmns,
-        float(oscillation.DeltamSq21),
-        float(oscillation.DeltamSq3l),
+        float(oscillation.mass_spectrum.DeltamSq21),
+        float(oscillation.mass_spectrum.DeltamSq3l),
         float(E_MeV),
         float(L_km),
         antinu=bool(oscillation.antinu),
@@ -222,8 +222,8 @@ def compare_vacuum_evolved_state_with_legacy(
     legacy_state = legacy_vacuum.vacuum_evolved_state(
         _numpy_state(nustate, complex_state=True),
         legacy_pmns,
-        float(oscillation.DeltamSq21),
-        float(oscillation.DeltamSq3l),
+        float(oscillation.mass_spectrum.DeltamSq21),
+        float(oscillation.mass_spectrum.DeltamSq3l),
         float(E_MeV),
         float(L_km),
         antinu=bool(oscillation.antinu),

@@ -48,7 +48,7 @@ from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor_like, first_tensor
 
-from tpeanuts.core.common.potential import kinetic_potential, matter_potential
+from tpeanuts.core.common.potential import kinetic_potential, matter_potential_cc
 
 # ---------------------------------------------------------------------------
 # Legacy peanuts precomputed Vk prefactor (peanuts/matter_mixing.py):
@@ -120,7 +120,7 @@ def Vk(
         return sign * _VK_FACTOR_LEGACY * ne_b * E_b / dm_b
 
     context = RuntimeContext(device=E_b.device, dtype=E_b.dtype)
-    V = matter_potential(
+    V = matter_potential_cc(
         ne_b[..., None],
         antinu=antinu,
         evolution_scale_m=constant.R_E,
@@ -144,16 +144,16 @@ def DeltamSqee(oscillation: OscillationParameters) -> torch.Tensor:
         + sin^2(theta12) Delta m^2_32.
 
     Args:
-        oscillation: Oscillation parameters supplying theta12, DeltamSq21, and
-            DeltamSq3l.
+        oscillation: Oscillation parameters supplying theta12 and
+            mass_spectrum.DeltamSq21/DeltamSq3l.
 
     Returns:
         Effective Delta m^2_ee tensor, with ordering selected by the sign of
         DeltamSq3l.
     """
     th12  = oscillation.pmns.params.theta12
-    dm21  = oscillation.DeltamSq21
-    dm3l  = oscillation.DeltamSq3l
+    dm21  = oscillation.mass_spectrum.DeltamSq21
+    dm3l  = oscillation.mass_spectrum.DeltamSq3l
 
     dm31 = torch.where(dm3l > 0.0, dm3l, dm3l + dm21)
     dm32 = torch.where(dm3l < 0.0, dm3l, dm3l - dm21)
@@ -178,8 +178,8 @@ def th13_M(
         ).
 
     Args:
-        oscillation: Oscillation parameters supplying theta12, theta13,
-            DeltamSq21, and DeltamSq3l.
+        oscillation: Oscillation parameters supplying theta12, theta13, and
+            mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy in MeV.
         ne: Electron density in mol/cm^3.
         legacy_precision: If True, evaluate the internal ``Vk`` call with the
@@ -226,8 +226,8 @@ def th12_M(
         + (Delta m^2_ee / Delta m^2_21) sin^2(theta13^M - theta13).
 
     Args:
-        oscillation: Oscillation parameters supplying theta12, theta13,
-            DeltamSq21, and DeltamSq3l.
+        oscillation: Oscillation parameters supplying theta12, theta13, and
+            mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy in MeV.
         ne: Electron density in mol/cm^3.
         legacy_precision: If True, evaluate every internal ``Vk``/``th13_M``
@@ -249,7 +249,7 @@ def th12_M(
 
     if th13m is None:
         th13m = th13_M(oscillation, E_t, ne_t, legacy_precision=legacy_precision)
-    dm21  = oscillation.DeltamSq21
+    dm21  = oscillation.mass_spectrum.DeltamSq21
     dm_ee = DeltamSqee(oscillation)
 
     vk_prime = (

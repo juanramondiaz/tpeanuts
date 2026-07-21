@@ -1,0 +1,237 @@
+\chapter{General Theoretical Framework and Conventions}
+\label{ch:intro}
+
+% This chapter's Implementation-in-tpeanuts blocks use full descriptive
+% paragraphs rather than the one-line module purpose used from Chapter 2
+% onwards, so the shared \modulehead's blanket italics (meant for a short
+% phrase) reads poorly here. Locally drop it to plain upright text -- italics
+% stay available for deliberately highlighting a single term -- and restore
+% the shared definition at the end of the chapter so later chapters are
+% unaffected.
+\let\savedmoduleheadchOne\modulehead
+\renewcommand{\modulehead}[2]{%
+  \noindent\pkgpath{#1}\par
+  \noindent#2\par\medskip
+}
+
+\section{Purpose and how to read this document}
+
+\texttt{tpeanuts} is a \texttt{PyTorch} rewrite (GPU-first, with batching
+support) of the original \texttt{peanuts} code \parencite{LucentePeanuts},
+extended with BSM scenarios (NSI and a 3+1 sterile neutrino), a proprietary
+perturbative evolution scheme, and interface layers to external reference
+engines (\texttt{nuSQuIDS}, \texttt{MCEq}, Honda/HKKM tables,
+\texttt{pymsis}).
+
+Every section in the chapters that follow corresponds to \emph{one source
+file} in the repository and always follows the same structure:
+
+\begin{itemize}
+  \item \modulehead{package/module.py}{one line describing its purpose}
+    identifies the exact file.
+  \item The blue box \textbf{Theoretical Foundation} contains the physics and
+    mathematical derivations that justify what the module computes.
+  \item The green box \textbf{Implementation in \texttt{tpeanuts}} translates
+    that theory into the actual functions/classes, with their essential
+    signature and the sign, unit, or tensor-shape conventions that must be
+    respected to use them correctly.
+  \item The orange box \textbf{Approximations and Limitations} (when
+    applicable) documents the range of validity, limiting cases, and
+    numerical simplifications.
+  \item The grey box \textbf{Key References} links the specific bibliography
+    for that piece of physics.
+  \item Central results are \keyresult{highlighted}; sections that do not yet
+    have a complete derivation are explicitly flagged as pending and are
+    listed in the pending-tasks index right after the table of contents.
+\end{itemize}
+
+\section{The physics problem: neutrino oscillation in matter}
+
+A neutrino is produced and detected in a flavour eigenstate
+$\ket{\nu_\alpha}$, $\alpha \in \{e,\mu,\tau\}$ (plus $\ket{\nu_s}$ in the
+sterile sector, \cref{ch:core-bsm}), but propagates as a superposition of
+mass eigenstates $\ket{\nu_i}$. The PMNS mixing matrix
+\parencite{Pontecorvo1957,MakiNakagawaSakata1962} connects the two bases,
+\begin{equation}
+  \ket{\nu_\alpha} = \sum_i U_{\alpha i}\,\ket{\nu_i}.
+\end{equation}
+In vacuum each mass eigenstate evolves with a kinetic phase $e^{-iE_i L}$;
+when crossing matter an additional effective potential from coherent forward
+interaction appears (the MSW effect,
+\parencite{Wolfenstein1978,MikheyevSmirnov1985}). In both cases the evolution
+is summarised by an effective Hamiltonian $H(x)$ acting on the vector of
+flavour amplitudes,
+\begin{equation}
+  i \frac{d}{dx}\, \psi(x) = H(x)\, \psi(x),
+  \qquad
+  \psi = \begin{pmatrix}\psi_e\\ \psi_\mu\\ \psi_\tau\end{pmatrix},
+  \label{eq:schrodinger-flavour}
+\end{equation}
+where $x$ is the dimensionless propagation coordinate defined in
+\cref{sec:units}. This document organises \emph{all} propagation code around
+three objects that appear systematically in every module:
+
+\begin{enumerate}
+  \item the \textbf{Hamiltonian} $H = H_{\rm kin} + H_{\rm mat}$
+    (\cref{ch:core-common,ch:core-bsm}),
+  \item the \textbf{evolution operator} (evolutor) $S$ that formally solves
+    \labelcref{eq:schrodinger-flavour},
+    $\psi(x_2) = S(x_2, x_1)\,\psi(x_1)$, obtained either exactly (constant
+    density, \cref{ch:core-perturbative}) or numerically via segmented
+    exponentiation (\cref{ch:core-numerical}),
+  \item the \textbf{transition probability}
+    $P(\nu_\alpha \to \nu_\beta) = |S_{\beta\alpha}|^2$
+    (\cref{ch:core-common}), the final observable quantity.
+\end{enumerate}
+
+The \emph{Physical Media} chapters (\cref{ch:vacuum,ch:solar,ch:earth,%
+ch:atmosphere}) instantiate these three objects for each concrete
+propagation environment (vacuum, solar interior, Earth, atmosphere), and the
+\emph{External Engines} chapters document how those results are
+cross-checked against independent reference codes.
+
+\section{Notation and global conventions}
+\label{sec:units}
+
+\begin{theorybox}
+Physics is worked out in natural units $\hbar = c = 1$ unless explicitly
+converted to laboratory units. Public input quantities always use:
+\begin{itemize}
+  \item neutrino energy $E$ in $\mathrm{MeV}$,
+  \item squared mass differences $\Delta m^2$ in $\mathrm{eV}^2$,
+  \item path lengths $L$ in metres,
+  \item electron density $n_e$ in $\mathrm{mol\,cm^{-3}}$ (molar electron
+    density, not mass density).
+\end{itemize}
+The Hamiltonian is made dimensionless by introducing an \emph{evolution
+scale} $L_{\rm scale}$ (by default the Earth radius $R_\oplus$) and the
+propagation coordinate
+\begin{equation}
+  x \equiv \frac{L}{L_{\rm scale}},
+\end{equation}
+so that $H(x)$ in \labelcref{eq:schrodinger-flavour} is unitless. The two
+Hamiltonian terms are made dimensionless as
+\begin{align}
+  k_i &= L_{\rm scale}\,\frac{\Delta m^2_{i1}}{2E}\,\frac{1}{\hbar c}
+       &&\text{(kinetic term, see \cref{ch:core-common}),}\\
+  V &= \pm\sqrt{2}\,G_F\, n_e\, L_{\rm scale}
+       &&\text{(MSW matter potential, see \cref{ch:core-common}),}
+\end{align}
+with sign $+$ for neutrinos and $-$ for antineutrinos (the standard sign
+convention for the charged-current term).
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \modulehead{util/constant.py}{single source of truth for physical
+    constants: $G_F$ in $\mathrm{MeV^{-2}}$, $\hbar$, $c$, $\hbar c$, $N_A$,
+    Earth and Sun radii, the astronomical unit, the proton mass, and the
+    mass-to-nucleon-density conversion factor.}
+  \item \modulehead{util/context.py}{\pyclass{RuntimeContext} bundles
+    \code{(device, dtype)} and is passed explicitly throughout the stack
+    instead of duplicating those two arguments in every function.}
+  \item \modulehead{util/type.py}{tensor conversion and validation: resolving
+    the complex dtype paired with a real dtype
+    (\pyfunc{cdtype\_from\_real}), building/validating 3- or 4-flavour state
+    vectors (\pyfunc{state\_tensor}), and broadcasting flavour vectors to
+    batched shapes (\pyfunc{broadcast\_last3}).}
+  \item \modulehead{util/torch\_util.py}{default device/dtype resolution,
+    generic tensor broadcasting, batch flattening, and the convention
+    \pyfunc{enforce\_identity\_for\_zero\_length} (a zero-length evolutor
+    must collapse exactly to the identity, which numerical exponentials do
+    not automatically guarantee in the $x\to 0$ limit).}
+  \item \modulehead{core/common/neutrino.py}{canonical flavour-index
+    convention: $e\to0$, $\mu\to1$, $\tau\to2$ (plus $s\to3$ in the sterile
+    sector), used throughout the code to index tensors.}
+\end{itemize}
+\end{implbox}
+
+\subsection*{Probability matrix convention}
+
+\begin{theorybox}
+Given the flavour evolutor $S$, the final amplitude is
+$\psi_\beta(x_2) = \sum_\alpha S_{\beta\alpha}\,\psi_\alpha(x_1)$, so
+\begin{equation}
+  \keyresult{P(\nu_\alpha \to \nu_\beta) = \left|S_{\beta\alpha}\right|^2},
+\end{equation}
+with the \emph{initial flavour} index in the column and the \emph{final
+flavour} index in the row. This is the convention fixed, once and for the
+whole project, by \texttt{core.common.probability}.
+\end{theorybox}
+
+\begin{implbox}
+\modulehead{core/common/probability.py}{full derivation in
+\cref{ch:core-common}. Every \code{*\_probability\_state(...)} function in
+the medium modules (\code{vacuum\_probability\_state},
+\code{solar\_probability\_state}, \code{earth\_probability\_state},
+\code{atmosphere\_probability\_state}) delegates to the utilities in this
+module to keep the index convention identical across the whole project.}
+\end{implbox}
+
+\section{Coherent states versus incoherent mixtures}
+\label{sec:coherent-vs-incoherent}
+
+\begin{theorybox}
+The code systematically distinguishes two representations of the state being
+propagated, selected with the \code{massbasis} parameter:
+\begin{description}
+  \item[Coherent propagation] (\code{massbasis=False}). The state is a
+    flavour-amplitude vector $\psi_\alpha$ carrying physical relative
+    phases. The evolutor is applied directly,
+    $\psi_{\rm final} = S\,\psi_{\rm inicial}$, and
+    $P_\alpha = |\psi_{{\rm final},\alpha}|^2$. This is the correct regime
+    when trajectories are short compared to the coherence length (vacuum,
+    atmosphere, Earth in a single leg).
+  \item[Incoherent mass mixture] (\code{massbasis=True}). The state is a
+    vector of real weights $w_i \geq 0$, $\sum_i w_i = 1$, over mass
+    eigenstates \emph{without} relative-phase information. The final flavour
+    probability is
+    \begin{equation}
+      P_\alpha = \sum_i \left| \bigl(S\, U_{\rm PMNS}\bigr)_{\alpha i}\right|^2 w_i.
+    \end{equation}
+    This is the physically correct regime for solar neutrinos: the spread at
+    the production point and the enormous Sun--Earth distance completely
+    decohere the mass superposition before it reaches Earth
+    (\cref{ch:solar}), so only the populations $w_i$ survive, not the
+    phases.
+\end{description}
+\end{theorybox}
+
+\begin{notebox}
+The choice \code{massbasis=True/False} is not a numerical detail: it is a
+physical statement about whether the neutrino wave-packet's coherence length
+is larger or smaller than the scale of the problem. Using the incoherent
+mode on a short leg (e.g.\ only inside the atmosphere) would discard real
+interference; using the coherent mode for Sun--Earth propagation would
+overstate coherence and produce spurious interference patterns that are not
+observed.
+\end{notebox}
+
+\section{Named presets and parameter traceability}
+
+\begin{implbox}
+\modulehead{core/common/presets.py}{single registry
+(\pyfunc{register\_preset}/\pyfunc{get\_preset}/\pyfunc{list\_presets}) for
+every named parameter set in the project: \pyclass{OSCILLATION\_PRESETS}
+(mixing angles and $\Delta m^2$, for both the standard 3-flavour sector and
+the 3+1 sterile extension) and \pyclass{NSI\_PRESETS} (non-standard
+couplings). Each preset carries its physical justification and bibliographic
+citation (e.g.\ \cite{Esteban2020NuFit} for standard best-fit oscillation
+parameters, \cite{Esteban2018LMADark} for the \emph{LMA-Dark} preset, and
+\cite{IceCube2022NSI} for the IceCube DeepCore NSI bounds), so any numerical
+result can be traced back to its origin in the literature.}
+\end{implbox}
+
+\begin{notebox}
+Counting CP phases for the sterile extension requires care: an $N$-generation
+Dirac mixing matrix has $(N-1)(N-2)/2$ independent physical phases. For
+$N=4$ (the 3+1 case) this gives exactly \keyresult{three} Dirac phases
+($\delta_{13}$, $\delta_{14}$, $\delta_{24}$); the rotation $R_{34}$ is
+always real because the fourth phase can be absorbed into a redefinition of
+the charged-lepton fields, and hence sterile presets do not include
+\code{delta34\_deg} (see \cref{ch:core-bsm}).
+\end{notebox}
+
+% Restore the shared \modulehead (one-line italic description) for every
+% chapter from here on.
+\let\modulehead\savedmoduleheadchOne

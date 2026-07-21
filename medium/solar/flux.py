@@ -21,13 +21,17 @@ Solar source flux helpers.
 
 This module sits above the adiabatic solar-probability functions. It selects
 one or more production sources from a SolarProfile, computes their final
-flavour probabilities with ``psolar``, and delegates the generic
-probability-to-flux multiplication to ``core.common.flux``.
+flavour probabilities with ``solar_probability_state``, and delegates the
+generic probability-to-flux multiplication and energy integration to
+``core.common.flux``.
 
 Module functions:
-    solar_flux(...)
+    solar_flux_state(...)
         Weight one or several source probabilities by their total fluxes and
         optional spectra.
+    solar_flux_integrated(...)
+        Integrate the energy-resolved solar flux over energy to obtain a
+        neutrino rate.
 """
 
 
@@ -36,12 +40,12 @@ from __future__ import annotations
 
 import torch
 
-from tpeanuts.core.common.flux import flux_from_probability
+from tpeanuts.core.common.flux import flux_integrated, flux_state
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.medium.solar.probability import psolar
+from tpeanuts.medium.solar.probability import solar_probability_state
 
 
-def solar_flux(
+def solar_flux_state(
     sources: str | list[str] | tuple[str, ...],
     profile,
     oscillation: OscillationParameters,
@@ -71,7 +75,7 @@ def solar_flux(
         Flavour-resolved flux with optional leading source dimensions and final
         flavour dimension 3.
     """
-    probabilities = psolar(
+    probabilities = solar_probability_state(
         oscillation,
         E_MeV,
         profile,
@@ -90,4 +94,48 @@ def solar_flux(
             dim=0,
         )
 
-    return flux_from_probability(probabilities, fluxes, source_spectrum)
+    return flux_state(probabilities, fluxes, source_spectrum)
+
+
+def solar_flux_integrated(
+    sources: str | list[str] | tuple[str, ...],
+    profile,
+    oscillation: OscillationParameters,
+    E_MeV,
+    *,
+    legacy_precision: bool = False,
+    energy_dim: int = -2,
+) -> torch.Tensor:
+    """Integrate the energy-resolved solar flux over energy.
+
+    Builds the flavour-resolved solar flux with ``solar_flux_state`` and
+    integrates it over energy with ``core.common.flux.flux_integrated``,
+    obtaining a physical rate (unnormalized, unlike
+    ``solar_probability_integrated``).
+
+    Args:
+        sources: Solar source key or ordered source keys available in
+            ``profile``.
+        profile: SolarProfile-like object exposing source fluxes and
+            production fractions.
+        oscillation: Built pmns object plus mass splittings and antinu
+            selection.
+        E_MeV: Neutrino energy grid in MeV, one-dimensional.
+        legacy_precision: If True, evaluate the underlying matter-mixing
+            angles with the legacy peanuts ``Vk`` prefactor for
+            bit-comparable validation (see ``medium.solar.matter_mixing``).
+        energy_dim: Axis of the resulting flux tensor holding the energy
+            grid. Must not be the final (flavour) axis.
+
+    Returns:
+        Flux integrated over energy (a rate), with the energy axis removed.
+    """
+    flux_grid = solar_flux_state(
+        sources,
+        profile,
+        oscillation,
+        E_MeV,
+        legacy_precision=legacy_precision,
+    )
+
+    return flux_integrated(flux_grid, E_MeV, energy_dim=energy_dim)

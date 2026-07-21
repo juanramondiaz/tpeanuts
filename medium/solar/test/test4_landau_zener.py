@@ -25,6 +25,10 @@ from dataclasses import dataclass
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.config.propagation import PropagationConfig
+from tpeanuts.core.common.pmns import PMNSParams
+from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.solar.landau_zener import density_gradient, plz, resonance_radius
 from tpeanuts.medium.solar.matter_mixing import Vk
 from tpeanuts.medium.solar.profile import build_solar_profile
@@ -51,23 +55,20 @@ def make_oscillation(
     theta12: float = 0.59,
     dtype: torch.dtype = DTYPE,
 ) -> OscillationParameters:
-    return OscillationParameters.build(
-        theta12=theta12,
-        theta13=0.15,
-        theta23=0.78,
-        delta=1.20,
-        DeltamSq21=7.42e-5,
-        DeltamSq3l=2.517e-3,
-        antinu=antinu,
-        context=make_context(dtype),
+    ctx = make_context(dtype)
+    pmns = PMNS_SM(PMNSParams(theta12=theta12, theta13=0.15, theta23=0.78, delta=1.20, context=ctx))
+    mass_spectrum = MassSpectrum_SM(
+        DeltamSq21=torch.as_tensor(7.42e-5, device=ctx.device, dtype=ctx.dtype),
+        DeltamSq3l=torch.as_tensor(2.517e-3, device=ctx.device, dtype=ctx.dtype),
     )
+    return OscillationParameters(pmns=pmns, mass_spectrum=mass_spectrum, antinu=antinu)
 
 
 def resonance_density(oscillation: OscillationParameters, energy_mev: float) -> torch.Tensor:
     energy = torch.tensor(energy_mev, device=DEVICE, dtype=DTYPE)
     unit_density = torch.tensor(1.0, device=DEVICE, dtype=DTYPE)
     cos2theta12 = torch.cos(2.0 * oscillation.pmns.params.theta12)
-    vk_per_density = Vk(oscillation.DeltamSq21, energy, unit_density)
+    vk_per_density = Vk(oscillation.mass_spectrum.DeltamSq21, energy, unit_density)
     return cos2theta12 / vk_per_density
 
 
@@ -157,7 +158,7 @@ def test_plz_shape_bounds_and_scalar_vector_consistency():
 
 def test_standard_solar_profile_lma_is_fully_adiabatic_to_float_precision():
     context = make_context()
-    oscillation = OscillationParameters.from_preset("_SM_NUFIT52_NO", context=context)
+    oscillation = PropagationConfig.oscillation_parameters_from_preset("_SM_NUFIT52_NO", context=context)
     profile = build_solar_profile(None, context=context)
     energies = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 

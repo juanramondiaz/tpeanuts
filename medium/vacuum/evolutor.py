@@ -38,7 +38,7 @@ from typing import Optional
 import torch
 
 from tpeanuts.core.common.evolutor import apply_evolutor_to_state
-from tpeanuts.core.common.hamiltonian import kinetic_mass_vector
+from tpeanuts.core.common.hamiltonian import kinetic_eigenvalue_vector
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.util.constant import R_E
 from tpeanuts.util.context import RuntimeContext
@@ -48,7 +48,7 @@ from tpeanuts.util.type import (
     as_tensor,
     cdtype_from_real,
     state_tensor,
-    broadcast_last3,
+    broadcast_flavour_vector,
 )
 
 
@@ -84,7 +84,11 @@ def vacuum_evolutor(
 
     Args:
         oscillation: Built pmns object plus mass splittings and antinu
-            selection.
+            selection. ``oscillation.pmns.n_flavours`` (3 for the Standard
+            Model, 4 for the 3+1 sterile extension) sizes the returned
+            operator; ``kinetic_eigenvalue_vector`` already extends the
+            kinetic vector with a fourth eigenvalue derived from
+            ``DeltamSq41`` for a 4-flavour ``pmns``.
         E_MeV: Neutrino energy in MeV.
         L_km: Propagation baseline in km.
         context: Optional runtime device/dtype. If omitted, the device
@@ -96,8 +100,9 @@ def vacuum_evolutor(
             propagation. It does not alter vacuum kinetic phases.
 
     Returns:
-        Complex tensor with shape (..., 3, 3), where leading dimensions follow
-        the broadcast shape of energy, baseline, and mass splittings.
+        Complex tensor with shape (..., N, N), N in {3, 4}, where leading
+        dimensions follow the broadcast shape of energy, baseline, and mass
+        splittings.
     """
     context = _resolve_vacuum_context(context, E_MeV, L_km)
     device, dtype = context.device, context.dtype
@@ -110,17 +115,17 @@ def vacuum_evolutor(
         raise ValueError("evolution_scale_m must be positive.")
     x = L * 1.0e3 / scale
 
-    ki = kinetic_mass_vector(
-        DeltamSq21=oscillation.DeltamSq21,
-        DeltamSq3l=oscillation.DeltamSq3l,
+    ki = kinetic_eigenvalue_vector(
+        oscillation=oscillation,
         E_MeV=E,
         context=context,
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
     )
 
+    n_flavours = ki.shape[-1]
     batch_shape = torch.broadcast_shapes(ki.shape[:-1], x.shape)
-    ki = torch.broadcast_to(ki, (*batch_shape, 3))
+    ki = torch.broadcast_to(ki, (*batch_shape, n_flavours))
     x = torch.broadcast_to(x, batch_shape)
 
     phase = torch.exp(-1j * ki.to(dtype=cdtype) * x.unsqueeze(-1).to(dtype=cdtype))
@@ -145,8 +150,10 @@ def vacuum_evolved_state(
     Evolve one initial flavour-basis state through vacuum.
 
     Args:
-        nustate: Initial flavour amplitudes with final dimension 3. Leading
-            dimensions may be broadcast against the evolution operator.
+        nustate: Initial flavour amplitudes with final dimension matching
+            ``oscillation.pmns.n_flavours`` (3, or 4 for the 3+1 sterile
+            extension). Leading dimensions may be broadcast against the
+            evolution operator.
         oscillation: Built pmns object plus mass splittings and antinu
             selection.
         E_MeV: Neutrino energy in MeV.
@@ -157,7 +164,8 @@ def vacuum_evolved_state(
             propagation. It does not alter vacuum kinetic phases.
 
     Returns:
-        Complex evolved flavour amplitudes with final dimension 3.
+        Complex evolved flavour amplitudes with final dimension matching
+        ``oscillation.pmns.n_flavours``.
     """
     context = _resolve_vacuum_context(context, E_MeV, L_km)
     device, dtype = context.device, context.dtype
@@ -173,6 +181,6 @@ def vacuum_evolved_state(
     )
 
     state = state_tensor(nustate, device=device, dtype=cdtype)
-    state = broadcast_last3(state, S.shape[:-2])
+    state = broadcast_flavour_vector(state, S.shape[:-2])
 
     return apply_evolutor_to_state(S, state)

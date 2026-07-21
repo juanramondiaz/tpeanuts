@@ -66,9 +66,9 @@ Reduction to SM limit
 ---------------------
 When θ14 = θ24 = θ34 = 0 the 4-flavor matrices block-diagonalize:
 
-    U_red_4 → embed(U_red_SM, 4×4)
-    O_4     → embed(O_SM, 4×4)
-    U_4     → embed(U_SM, 4×4)
+    U_red_4 → embed(U_red_SM, 4x4)
+    O_4     → embed(O_SM, 4x4)
+    U_4     → embed(U_SM, 4x4)
 
 so the 3-flavor SM results are recovered exactly.
 
@@ -94,8 +94,8 @@ PMNS_sterile
     implementing the 4×4 mixing matrix and the peanuts-compatible basis
     transformations.
 
-    ``R12``/``R13``/``R23``/``Delta``, ``H_flavour_basis``,
-    ``H_mass_basis``, ``refresh``, ``select_antinu``
+    ``R12``/``R13``/``R23``/``Delta``,
+    ``reduced_basis``, ``refresh``, ``select_antinu``
 
     and the other flavour-count-agnostic methods are inherited unchanged from
     the base (sized automatically by ``n_flavours = 4``);
@@ -104,12 +104,13 @@ PMNS_sterile
     Key public interface (same contract as ``PMNS``):
         ``reduced(antinu)``               → U_red_4 shaped (..., 4, 4)
         ``pmns_matrix(antinu)``           → U_4 shaped (..., 4, 4)
-        ``operator_flavour_basis(...)``   → O_4 · op · O_4†
+        ``flavour_basis(...)``            → O_4 · op · O_4†
 
-    The 4×4 matter Hamiltonian ``diag(V, 0, 0, 0)`` is built by the free
-    function ``hamiltonian_matter_sterile`` in
-    ``tpeanuts.core.BSM.hamiltonian`` (this module only builds mixing
-    matrices and basis transformations, like its SM counterpart).
+    The 4×4 matter Hamiltonian ``diag(V, 0, 0, 0)`` is assembled by
+    ``hamiltonian_reduced``/``hamiltonian_flavour`` in
+    ``tpeanuts.core.common.hamiltonian`` (the no-NSI branch; this module
+    only builds mixing matrices and basis transformations, like its SM
+    counterpart).
 
     Additional 4×4 rotation builders (not in parent):
         ``R14()``, ``R24()``, ``R34()``
@@ -119,7 +120,7 @@ PMNS_sterile
     extension), then pass both to the constructor::
 
         from tpeanuts.core.common.pmns import PMNSParams
-        from tpeanuts.core.BSM.PMNS_sterile import PMNSSterileParams, PMNS_sterile
+        from tpeanuts.core.BSM.bsm_sterile import PMNSSterileParams, PMNS_sterile
 
         sm_params = PMNSParams(theta12, theta13, theta23, delta, context=context)
         sterile_params = PMNSSterileParams(
@@ -133,7 +134,7 @@ PMNS_sterile
     ``DeltamSq3l``), not as part of either params object.
 
     Named presets (e.g. ``"sterile_3p1_bestfit_giunti2017"``) are built via
-    ``tpeanuts.core.common.oscillation.OscillationParameters.from_preset``,
+    ``tpeanuts.core.common.oscillation.oscillation_parameters_from_preset``,
     which constructs both params objects internally and returns the
     ``PMNS_sterile`` instance as ``oscillation.pmns``, with ``DeltamSq41``
     set on the returned ``OscillationParameters``.
@@ -142,7 +143,7 @@ PMNS_sterile
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Union
 
 import torch
 
@@ -217,7 +218,7 @@ class PMNS_sterile(PMNS):
     Inherits the 3-flavor Standard Model sector from ``PMNS`` and extends it
     with one sterile neutrino. ``n_flavours = 4`` automatically sizes the
     inherited ``R12``/``R13``/``R23``/``Delta`` builders; ``pmns_matrix``,
-    ``reduced``, and ``operator_flavour_basis`` are overridden here with the
+    ``reduced``, and ``flavour_basis`` are overridden here with the
     3+1 product structure so that ``PMNS_sterile`` can be passed directly to
     the existing Hamiltonian and evolutor functions.
 
@@ -322,10 +323,20 @@ class PMNS_sterile(PMNS):
         """
         return self._rot(2, 3, self.sterile_params.theta34, phase=self.sterile_params.delta34)
 
+
     # ------------------------------------------------------------------
     # Mixing matrices (override PMNS)
     # ------------------------------------------------------------------
 
+    @torch.no_grad()
+    def outer_block(
+        self,
+        antinu: Union[bool, torch.Tensor] = False,
+    ) -> torch.Tensor:
+        """Build the 3+1 outer block ``R23 @ Delta @ R24 @ R34``."""
+        O4 = self.R23() @ self.Delta() @ self.R24() @ self.R34()
+        return self.select_antinu(O4, antinu)
+    
     @torch.no_grad()
     def reduced(
         self,
@@ -339,7 +350,7 @@ class PMNS_sterile(PMNS):
         NOT commute with H_mat = diag(V, 0, 0, 0).
 
         The corresponding ``outer`` block O_4 = R23_4 · Δ_4 · R24 · R34
-        commutes with H_mat and is applied by ``operator_flavour_basis``.
+        commutes with H_mat and is applied by ``flavour_basis``.
 
         Args:
             antinu: Bool or boolean tensor. ``True`` returns U_red_4*.
@@ -382,67 +393,3 @@ class PMNS_sterile(PMNS):
             @ self.R14()
         )
         return self.select_antinu(U4, antinu)
-
-    # ------------------------------------------------------------------
-    # Basis transformations (override PMNS)
-    # ------------------------------------------------------------------
-
-    @torch.no_grad()
-    def operator_flavour_basis(
-        self,
-        operator_reduced: torch.Tensor,
-        antinu: Union[bool, torch.Tensor] = False,
-        *,
-        device: Optional[torch.device | str] = None,
-        dtype: Optional[torch.dtype] = None,
-    ) -> torch.Tensor:
-        """Transform a 4×4 reduced-basis operator to the flavour basis.
-
-        Applies
-
-            O_full = O_4 · operator_reduced · O_4†
-
-        where O_4 = R23_4 · Δ_4 · R24 · R34 is the ``outer`` block that
-        commutes with H_mat = diag(V, 0, 0, 0).
-
-        Args:
-            operator_reduced: Reduced-basis operator shaped (..., 4, 4).
-            antinu: Bool or boolean tensor selecting the antineutrino
-                convention (conjugates R and Δ).
-            device: Optional output device.
-            dtype: Optional output dtype.
-
-        Returns:
-            Operator in the full flavour basis shaped (..., 4, 4).
-        """
-        out_device = (
-            operator_reduced.device if device is None else torch.device(device)
-        )
-        out_dtype = operator_reduced.dtype if dtype is None else dtype
-
-        op = operator_reduced.to(device=out_device, dtype=out_dtype)
-
-        r23  = self.select_antinu(self.R23(),  antinu).to(device=out_device, dtype=out_dtype)
-        delt = self.select_antinu(self.Delta(), antinu).to(device=out_device, dtype=out_dtype)
-        r24  = self.select_antinu(self.R24(),  antinu).to(device=out_device, dtype=out_dtype)
-        r34  = self.select_antinu(self.R34(),  antinu).to(device=out_device, dtype=out_dtype)
-
-        # O_4 = R23 · Δ · R24 · R34
-        O4 = r23 @ delt @ r24 @ r34
-
-        return O4 @ op @ O4.conj().transpose(-1, -2)
-
-    # H_flavour_basis and H_mass_basis are inherited unchanged from PMNS:
-    # H_flavour_basis delegates to operator_flavour_basis (already 4×4-aware
-    # via the override above), and H_mass_basis's shape check is sized by
-    # self.n_flavours = 4 automatically.
-
-    # refresh() is inherited unchanged from PMNS (recomputes self.pmns/self.U
-    # via the polymorphic pmns_matrix()/reduced() above).
-    #
-    # The 4x4 matter Hamiltonian H_mat = diag(V, 0, 0, 0) is built by the
-    # free function ``hamiltonian_matter_sterile`` in
-    # ``tpeanuts.core.BSM.hamiltonian``, mirroring how the 3-flavour SM
-    # matter Hamiltonian is built by ``hamiltonian_matter_reduced`` in
-    # ``tpeanuts.core.common.hamiltonian`` rather than as a PMNS method:
-    # this module only builds mixing matrices and basis transformations.

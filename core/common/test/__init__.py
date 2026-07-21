@@ -20,10 +20,14 @@
 Tests for tpeanuts.core.common.
 
 Package modules:
-    test0_potential
-        Tests for matter and kinetic potential utilities.
-    test1_PMNS
+    test1_potential
+        Tests for matter/kinetic potential utilities and the dimension-
+        agnostic mass-squared/kinetic mass vector builders.
+    test2_pmns
         Tests for the PMNS mixing-matrix module.
-    test2_hamiltonian
-        Tests for the Standard Model Hamiltonian builders.
+    test3_hamiltonian
+        Tests for the kinetic/matter/reduced/flavour Hamiltonian builders,
+        covering the 3-flavour Standard Model, NSI, the 3+1 sterile
+        extension, and combinations thereof -- all handled by the same
+        functions, dispatching only on the ``oscillation`` object passed in.
 """

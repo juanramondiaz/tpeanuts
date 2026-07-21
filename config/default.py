@@ -64,6 +64,11 @@ solar_sun_earth_distance_filename = "sun_earth_distance.csv"
 earth_density_dir = "data/density"
 # Filename of the default Earth density profile table.
 earth_density_filename = "earth_density.csv"
+# Filename of the neutron-density companion table for the even-power Earth
+# model, read when EvenPowerProfileLayered is built with
+# include_neutron=True. Same rj shells and column format (rj, alpha, beta,
+# gamma) as earth_density_filename, fitted to n_n(r) instead of n_e(r).
+earth_density_filename_nn = "earth_density_nn.csv"
 
 # Default directory containing Honda/HKKM atmosphere-neutrino tables.
 honda_dataset = r"G:\Mi unidad\04.Datasets\Honda"
@@ -99,6 +104,11 @@ atmosphere_rho0_gcm3 = 1.225e-3
 atmosphere_scale_height_km = 8.4
 # Electron fraction Ye (electrons per nucleon) of air, dimensionless.
 atmosphere_Ye = 0.5
+# Whether the numerical atmosphere evolutor also samples and applies the
+# neutron-density neutral-current (NC) matter term (3+1 sterile only; see
+# core.common.hamiltonian.hamiltonian_matter_reduced). False (the default)
+# reproduces the pre-existing CC-only behaviour exactly.
+atmosphere_include_matter_nc = False
 # Sea-level atmospheric mass density used by the nuSQuIDS reference
 # comparison profile, in g/cm^3.
 atmosphere_nusquids_rho0_gcm3 = 0.0012
@@ -186,6 +196,14 @@ earth_full_oscillation = False
 # Whether to re-unitarize evolution operators after numerical integration to
 # correct accumulated round-off error.
 earth_reunitarize = False
+# Whether method="numerical" Earth propagation also samples and applies the
+# neutron-density neutral-current (NC) matter term (3+1 sterile only; see
+# core.common.hamiltonian.hamiltonian_matter_reduced). False (the default)
+# reproduces the pre-existing CC-only behaviour exactly. Requires the Earth
+# profile model to be built with include_neutron=True (both
+# EvenPowerProfileLayered and PremTabulatedProfile support this); the
+# default construction (include_neutron=False) does not.
+earth_include_matter_nc = False
 # Default torch device string requested for Earth propagation
 # ("cuda" falls back to CPU when unavailable via the resolution helpers).
 earth_device = "cuda"

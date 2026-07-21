@@ -37,7 +37,7 @@ from typing import Union
 
 import torch
 
-import tpeanuts.util.default as default
+import tpeanuts.config.default as default
 from tpeanuts.util.math import binom
 from tpeanuts.util.type import TensorLike, as_tensor
 from tpeanuts.core.perturbative.models.even_power.profile_segment import (
@@ -65,6 +65,21 @@ class EvenPowerProfileLayered:
             ``rj`` and coefficients from the file.
         tabulated_density: If True, keep only the constant density term when
             loading from ``density_file``.
+        include_neutron: If True and ``coefficients`` is not pre-built, also
+            load neutron-density coefficients from ``density_file_n`` (or the
+            default ``earth_density_filename_nn`` table), enabling the 3+1
+            sterile extension's neutral-current matter term (see
+            ``evaluate_neutron`` and
+            ``core.common.hamiltonian.hamiltonian_matter_reduced``). Ignored
+            when ``coefficients`` is supplied directly; pass
+            ``coefficients_n`` explicitly in that case instead.
+        density_file_n: Optional CSV file with the neutron-density companion
+            table (same ``rj`` shells and column format as ``density_file``).
+            Defaults to ``earth_density_dir/earth_density_filename_nn`` when
+            ``include_neutron`` is True and neither this nor
+            ``coefficients_n`` is supplied.
+        coefficients_n: Optional pre-built neutron-density coefficient
+            tensor, same shape and layer convention as ``coefficients``.
         device: Torch device used when loading from ``density_file``.
         dtype: Real dtype used when loading from ``density_file``.
     """
@@ -72,6 +87,9 @@ class EvenPowerProfileLayered:
     coefficients: torch.Tensor | None = None
     density_file: str | None = None
     tabulated_density: bool = default.earth_tabulated_density
+    include_neutron: bool = False
+    density_file_n: str | None = None
+    coefficients_n: torch.Tensor | None = None
     device: Union[str, torch.device, None] = None
     dtype: torch.dtype = default.dtype
     rj: torch.Tensor | None = None
@@ -92,6 +110,24 @@ class EvenPowerProfileLayered:
                 dtype=self.dtype,
             )
 
+            if self.include_neutron and self.coefficients_n is None:
+                if self.density_file_n is None:
+                    self.density_file_n = os.path.join(
+                        default.earth_density_dir,
+                        default.earth_density_filename_nn,
+                    )
+                rj_n, self.coefficients_n = load_earth_density_from_csv(
+                    self.density_file_n,
+                    tabulated_density=self.tabulated_density,
+                    device=self.device,
+                    dtype=self.dtype,
+                )
+                if rj_n.shape != self.rj.shape or not torch.allclose(rj_n, self.rj):
+                    raise ValueError(
+                        "Neutron-density table shell boundaries (rj) must "
+                        "match the electron-density table exactly."
+                    )
+
         self.coefficients = torch.as_tensor(
             self.coefficients,
             device=self.device,
@@ -109,6 +145,18 @@ class EvenPowerProfileLayered:
             raise ValueError("coefficients must have shape (..., n_layers, n_coefficients).")
         if self.coefficients.shape[-1] < 3:
             raise ValueError("coefficients must include at least a, b, c terms.")
+
+        if self.coefficients_n is not None:
+            self.coefficients_n = torch.as_tensor(
+                self.coefficients_n,
+                device=self.coefficients.device,
+                dtype=self.coefficients.dtype,
+            )
+            if self.coefficients_n.shape != self.coefficients.shape:
+                raise ValueError(
+                    "coefficients_n must have the same shape as coefficients."
+                )
+
         self.device = self.coefficients.device
         self.dtype = self.coefficients.dtype
 
@@ -137,6 +185,11 @@ class EvenPowerProfileLayered:
                 device=output_device,
                 dtype=output_dtype,
             ),
+            coefficients_n=(
+                self.coefficients_n.to(device=output_device, dtype=output_dtype)
+                if self.coefficients_n is not None
+                else None
+            ),
             device=output_device,
             dtype=output_dtype,
         )
@@ -155,6 +208,11 @@ class EvenPowerProfileLayered:
         if self.coefficients.ndim == 4 and self.coefficients.shape[0] == 1:
             profile = type(self)(
                 coefficients=self.coefficients.squeeze(0),
+                coefficients_n=(
+                    self.coefficients_n.squeeze(0)
+                    if self.coefficients_n is not None
+                    else None
+                ),
                 device=self.device,
                 dtype=self.dtype,
             )
@@ -267,7 +325,26 @@ class EvenPowerProfileLayered:
             New layered profile in the shifted coordinate ``x``.
         """
         offset = as_tensor(offset, device=self.device, dtype=self.dtype)
-        coefficients = self.coefficients
+        shifted_coefficients = self._shift_coefficients(self.coefficients, offset)
+        shifted_coefficients_n = (
+            self._shift_coefficients(self.coefficients_n, offset)
+            if self.coefficients_n is not None
+            else None
+        )
+
+        return type(self)(
+            coefficients=shifted_coefficients,
+            coefficients_n=shifted_coefficients_n,
+            device=self.device,
+            dtype=self.dtype,
+        )
+
+    def _shift_coefficients(
+        self,
+        coefficients: torch.Tensor,
+        offset: torch.Tensor,
+    ) -> torch.Tensor:
+        """Apply the ``r**2 = x**2 + offset`` binomial shift to ``coefficients``."""
         n_terms = coefficients.shape[-1]
         leading_shape = torch.broadcast_shapes(
             coefficients.shape[:-2],
@@ -301,11 +378,7 @@ class EvenPowerProfileLayered:
                 )
             shifted_terms.append(term)
 
-        return type(self)(
-            coefficients=torch.stack(shifted_terms, dim=-1),
-            device=self.device,
-            dtype=self.dtype,
-        )
+        return torch.stack(shifted_terms, dim=-1)
 
     def evaluate(
         self,
@@ -336,6 +409,65 @@ class EvenPowerProfileLayered:
         )
         return torch.sum(coefficients * x2[..., None] ** powers, dim=-1)
 
+    def evaluate_neutron(
+        self,
+        x: TensorLike,
+        *,
+        layer_index: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Evaluate the even-power neutron-density polynomial (see ``evaluate``).
+
+        Requires neutron-density coefficients, built via
+        ``EvenPowerProfileLayered(..., include_neutron=True)`` or supplied
+        directly as ``coefficients_n``.
+
+        Args:
+            x: Coordinate value.
+            layer_index: Optional index selecting one layer per leading batch
+                element. When omitted, all layers are evaluated.
+
+        Returns:
+            Neutron-density value with the selected/broadcast shape.
+
+        Raises:
+            ValueError: If neutron-density coefficients were not loaded.
+        """
+        if self.coefficients_n is None:
+            raise ValueError(
+                "This EvenPowerProfileLayered has no neutron-density "
+                "coefficients. Build it with include_neutron=True (or pass "
+                "coefficients_n explicitly) to enable the 3+1 sterile "
+                "extension's neutral-current matter term."
+            )
+        x = as_tensor(x, device=self.device, dtype=self.dtype)
+        coefficients = self.coefficients_n
+        if layer_index is not None:
+            coefficients = self._gather_layers(self.coefficients_n, layer_index)
+
+        x2 = x * x
+        powers = torch.arange(
+            coefficients.shape[-1],
+            device=self.device,
+            dtype=self.dtype,
+        )
+        return torch.sum(coefficients * x2[..., None] ** powers, dim=-1)
+
+    def _gather_layers(
+        self,
+        coefficients: torch.Tensor,
+        layer_index: torch.Tensor,
+    ) -> torch.Tensor:
+        """Gather one layer coefficient vector per batch item from ``coefficients``."""
+        layer_index = layer_index.to(device=self.device, dtype=torch.long)
+        n_layers = coefficients.shape[-2]
+        layer_index = layer_index.clamp(min=0, max=n_layers - 1)
+        gather_index = layer_index[..., None, None].expand(
+            *layer_index.shape,
+            1,
+            coefficients.shape[-1],
+        )
+        return torch.gather(coefficients, dim=-2, index=gather_index).squeeze(-2)
+
     def gather_layers(
         self,
         layer_index: torch.Tensor,
@@ -351,15 +483,7 @@ class EvenPowerProfileLayered:
             Coefficient vectors shaped ``(..., n_coefficients)``, one per
             batch element, taken from the selected layer.
         """
-        layer_index = layer_index.to(device=self.device, dtype=torch.long)
-        n_layers = self.coefficients.shape[-2]
-        layer_index = layer_index.clamp(min=0, max=n_layers - 1)
-        gather_index = layer_index[..., None, None].expand(
-            *layer_index.shape,
-            1,
-            self.coefficients.shape[-1],
-        )
-        return torch.gather(self.coefficients, dim=-2, index=gather_index).squeeze(-2)
+        return self._gather_layers(self.coefficients, layer_index)
 
     def outermost_segment(
         self,
@@ -383,8 +507,10 @@ class EvenPowerProfileLayered:
                 layers actually crossed by each trajectory.
 
         Returns:
-            ``PerturbativeOuterSegment`` with the outermost layer's
-            coefficients as ``model_data``, the starting coordinate
+            ``PerturbativeOuterSegment`` whose ``model_data`` is a
+            ``(coefficients, coefficients_n)`` tuple for the outermost
+            layer (``coefficients_n`` is None unless this profile was built
+            with ``include_neutron=True``), the starting coordinate
             ``x_start``, and boolean/index metadata (``has_any``, ``has_two``,
             ``last_pos``, ``second_last_pos``) describing the crossing.
         """
@@ -417,8 +543,15 @@ class EvenPowerProfileLayered:
             x_start,
         )
 
+        last_pos_long = last_pos.to(torch.long)
+        coefficients_n = (
+            self._gather_layers(self.coefficients_n, last_pos_long)
+            if self.coefficients_n is not None
+            else None
+        )
+
         return PerturbativeOuterSegment(
-            model_data=self.gather_layers(last_pos.to(torch.long)),
+            model_data=(self.gather_layers(last_pos_long), coefficients_n),
             x_start=x_start,
             has_any=has_any,
             has_two=has_two,
@@ -446,11 +579,18 @@ class EvenPowerProfileLayered:
 
         Returns:
             ``PerturbativeSegmentBatch`` with reversed-order segment
-            boundaries ``x1``/``x2``, the reversed ``crossed`` mask, and the
-            reversed per-layer coefficients as ``model_data``.
+            boundaries ``x1``/``x2``, the reversed ``crossed`` mask, and
+            ``model_data`` set to a ``(coefficients, coefficients_n)`` tuple
+            of reversed per-layer coefficients (``coefficients_n`` is None
+            unless this profile was built with ``include_neutron=True``).
         """
         xs = torch.flip(xj_all, dims=(-1,))
         coefficients = torch.flip(self.coefficients, dims=(-2,))
+        coefficients_n = (
+            torch.flip(self.coefficients_n, dims=(-2,))
+            if self.coefficients_n is not None
+            else None
+        )
         crossed_flipped = torch.flip(crossed, dims=(-1,))
         x_lo = torch.zeros_like(xs)
         x_lo[..., :-1] = xs[..., 1:]
@@ -460,7 +600,7 @@ class EvenPowerProfileLayered:
             x1=x_lo,
             x2=xs,
             crossed=crossed_flipped,
-            model_data=coefficients,
+            model_data=(coefficients, coefficients_n),
         )
 
     def segment_model(
@@ -474,8 +614,9 @@ class EvenPowerProfileLayered:
 
         Args:
             segments: ``PerturbativeSegmentBatch`` produced by
-                ``ordered_segments``, whose ``model_data`` holds even-power
-                coefficients for this model.
+                ``ordered_segments``/``outermost_segment``, whose
+                ``model_data`` holds a ``(coefficients, coefficients_n)``
+                tuple for this model (``coefficients_n`` may be None).
             coordinate_ratio: Optional ratio used to rescale the coefficients
                 (see ``rescale_coefficients``) into the evolution coordinate
                 before constructing the segment, e.g. when the segment
@@ -489,14 +630,17 @@ class EvenPowerProfileLayered:
             ``EvenPowerProfileSegment`` built from ``segments.x1``,
             ``segments.x2``, and the (optionally rescaled) coefficients.
         """
-        coefficients = segments.model_data
+        coefficients, coefficients_n = segments.model_data
         if coordinate_ratio is not None:
             coefficients = self.rescale_coefficients(coefficients, coordinate_ratio)
+            if coefficients_n is not None:
+                coefficients_n = self.rescale_coefficients(coefficients_n, coordinate_ratio)
 
         return EvenPowerProfileSegment.from_coefficients(
             x1=segments.x1,
             x2=segments.x2,
             coefficients=coefficients,
+            coefficients_n=coefficients_n,
             **kwargs,
         )
 
@@ -506,6 +650,7 @@ class EvenPowerProfileLayered:
         x1: TensorLike,
         x2: TensorLike,
         density: TensorLike,
+        density_n: TensorLike | None = None,
         **kwargs,
     ) -> EvenPowerProfileSegment:
         """Build a constant-density perturbative segment object.
@@ -514,7 +659,9 @@ class EvenPowerProfileLayered:
             x1: Initial segment coordinate.
             x2: Final segment coordinate.
             density: Constant electron density over the segment, in mol/cm^3
-                (or the convention expected by ``matter_potential``).
+                (or the convention expected by ``matter_potential_cc``).
+            density_n: Optional constant neutron density, enabling the 3+1
+                sterile extension's neutral-current matter term.
             **kwargs: Additional keyword arguments forwarded to
                 ``EvenPowerProfileSegment.constant`` (e.g. ``antinu``,
                 ``evolution_scale_m``).
@@ -527,5 +674,6 @@ class EvenPowerProfileLayered:
             x1=x1,
             x2=x2,
             density=density,
+            density_n=density_n,
             **kwargs,
         )

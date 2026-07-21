@@ -36,19 +36,29 @@ correction efficiently.
 
 Package exports:
     PremTabulatedProfile
-        Layered PREM profile with piecewise-linear-in-r² electron density.
+        Layered PREM profile with piecewise-linear-in-r² electron density,
+        with optional neutron-density coefficients for the 3+1 sterile
+        extension's neutral-current matter term.
     PremProfileSegment
         Perturbative-evolutor-compatible segment for a single PREM shell.
     load_prem500_profile
-        I/O helper: read PREM500 CSV and build (rj, coefficients).
+        I/O helper: read PREM500 CSV and build (rj, coefficients) for
+        electron density.
+    load_prem500_neutron_profile
+        I/O helper: read PREM500 CSV and build (rj, coefficients) for
+        neutron density.
 """
 
 from tpeanuts.core.perturbative.models.prem.profile_layered import PremTabulatedProfile
 from tpeanuts.core.perturbative.models.prem.profile_segment import PremProfileSegment
-from tpeanuts.core.perturbative.models.prem.io import load_prem500_profile
+from tpeanuts.core.perturbative.models.prem.io import (
+    load_prem500_profile,
+    load_prem500_neutron_profile,
+)
 
 __all__ = [
     "PremTabulatedProfile",
     "PremProfileSegment",
     "load_prem500_profile",
+    "load_prem500_neutron_profile",
 ]

@@ -1,0 +1,91 @@
+% =============================================================================
+%  main.tex
+%  Theoretical Foundations of tpeanuts
+%  Fast Simulation of Neutrino Oscillations in Matter (MSc Thesis)
+% =============================================================================
+\documentclass[11pt,a4paper,openany]{report}
+
+\usepackage[a4paper,margin=2.6cm,marginparwidth=2.1cm,marginparsep=4mm]{geometry}
+\usepackage{tpeanuts-theory}
+
+\addbibresource{references.bib}
+
+\title{\Huge Theoretical Foundations of \texttt{tpeanuts}\\[4pt]
+  \Large Fast Simulation of Neutrino Oscillations in Matter}
+\author{Juan Ramon Diaz Santos}
+\date{July 2026 --- living document, generated from the source code}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries\color{coreColor} Theoretical Foundations\\[4pt] of \texttt{tpeanuts}\par}
+  \vspace{0.8cm}
+  {\Large Fast Simulation of Neutrino Oscillations in Matter\par}
+  \vspace{1.5cm}
+  {\large MSc Thesis (Trabajo Fin de M\'aster)\par}
+  \vspace{0.3cm}
+  {\large Juan Ramon Diaz Santos \\ \texttt{diazjuan@alumni.uv.es}\par}
+  \vspace{0.6cm}
+  {\normalsize Supervisors: Roberto Ruiz de Austri Bazan \quad\&\quad Michele Lucente\par}
+  \vfill
+  {\normalsize July 2026\par}
+  \vspace{0.5cm}
+  \begin{tcolorbox}[colback=coreColor!5,colframe=coreColor,width=0.85\textwidth,sharp corners=all,rounded corners=all,arc=1mm]
+    \small
+    This document accompanies the \texttt{tpeanuts} code repository and aims
+    to connect, package by package and module by module, the physics of
+    neutrino oscillations with its concrete implementation. Blue boxes
+    (\textbf{Theoretical Foundation}) contain the derivations; green boxes
+    (\textbf{Implementation}) link that theory to actual functions and
+    classes in the code; orange boxes collect approximations and ranges of
+    validity; text highlighted in \keyresult{yellow} marks key results.
+    Sections flagged as \textcolor{pendingColor}{\textbf{pending}} are
+    scaffolding ready to be completed incrementally.
+  \end{tcolorbox}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\listoftodos[Pending sections and notes]
+\clearpage
+\pagenumbering{arabic}
+
+% =============================================================================
+\part{General Framework}
+\input{chapters/00_introduccion}
+
+% =============================================================================
+\part{Propagation Core --- \texttt{core/}}
+\input{chapters/01_core_common}
+\input{chapters/02_core_sm}
+\input{chapters/03_core_bsm}
+\input{chapters/04_core_numerical}
+\input{chapters/05_core_perturbative}
+
+% =============================================================================
+\part{Physical Propagation Media --- \texttt{medium/}}
+\input{chapters/06_medium_vacuum}
+\input{chapters/07_medium_solar}
+\input{chapters/08_medium_earth}
+\input{chapters/09_medium_atmosphere}
+
+% =============================================================================
+% \part{External Engines and Data --- \texttt{external/}}
+% \input{chapters/10_external}            % TODO
+
+% =============================================================================
+% \part{Infrastructure, Orchestration, and Legacy Code}
+% \input{chapters/11_peanuts_legacy}      % TODO
+% \input{chapters/12_pipeline}            % TODO
+% \input{chapters/13_util}                % TODO
+
+% =============================================================================
+% \appendix
+% \input{chapters/99_apendices}           % TODO
+
+\clearpage
+\printbibliography[title={References}]
+
+\end{document}
