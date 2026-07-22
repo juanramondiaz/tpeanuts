@@ -1,0 +1,5 @@
+source,energy_MeV,probability,uncertainty_minus,uncertainty_plus
+pp,0.267,0.566,0.092,0.092
+7Be,0.862,0.532,0.054,0.054
+pep,1.44,0.428,0.114,0.114
+8B,7.4,0.39,0.09,0.09

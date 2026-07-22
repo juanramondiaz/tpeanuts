@@ -46,12 +46,12 @@ Module functions:
 
 from __future__ import annotations
 
-from typing import Union
+from typing import Optional, Union
 
 import torch
 
 import tpeanuts.config.default as default
-from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real
 from tpeanuts.util.math import project_to_unitary
 from tpeanuts.util.torch_util import (
@@ -429,12 +429,12 @@ def _earth_evolutor_case_b_batched(
     h = float(depth_m) / float(R_E)
     r_mid = 1.0 - h / 2.0
 
-    n1 = profile_earth.call(
+    n1 = profile_earth.density_x_eta(
         torch.tensor(r_mid, device=device, dtype=rdtype),
         torch.tensor(0.0, device=device, dtype=rdtype),
     )
     n1_n = (
-        profile_earth.call_neutron(
+        profile_earth.density_n_x_eta(
             torch.tensor(r_mid, device=device, dtype=rdtype),
             torch.tensor(0.0, device=device, dtype=rdtype),
         )
@@ -500,7 +500,7 @@ def earth_evolutor(
     profile_scale_m: TensorLike = R_E,
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> torch.Tensor:
     """
     Compute the full Earth matter evolution operator in flavour basis.
@@ -531,14 +531,19 @@ def earth_evolutor(
             Hamiltonian and propagation coordinate.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in Earth matter propagation.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term using ``profile_earth``'s
-            neutron-density data (only meaningful when
-            ``oscillation.pmns`` is 4-flavour). Requires ``profile_earth``
-            to have been built with neutron-density coefficients (e.g.
-            ``EvenPowerProfileLayered``/``PremTabulatedProfile`` with
-            ``include_neutron=True``); raises otherwise. False (the
-            default) reproduces the pre-existing CC-only behaviour exactly.
+        include_matter_nc: If True/False, applied/not applied using
+            ``profile_earth``'s neutron-density data (only meaningful when
+            ``oscillation.pmns`` is 4-flavour); an explicit ``True`` still
+            raises if ``profile_earth`` lacks neutron-density coefficients
+            (e.g. ``EvenPowerProfileLayered``/``PremTabulatedProfile`` built
+            without ``include_neutron=True``). If ``None`` (the default),
+            auto-resolved per-call by ``core.common.oscillation.
+            resolve_include_matter_nc``: ``True`` when ``oscillation`` is
+            the 3+1 sterile extension and ``profile_earth.
+            has_neutron_density`` is True, ``False`` otherwise (with a
+            ``RuntimeWarning`` if sterile was requested but the profile
+            lacks neutron-density data). Always ``False`` for the plain
+            3-flavour case.
     Returns:
         Complex tensor with shape `(*broadcast_shape(E, eta), N, N)`, N in
         {3, 4}. Entries above the Earth horizon remain the identity operator;
@@ -554,6 +559,12 @@ def earth_evolutor(
     """
     antinu = oscillation.antinu
     n_flavours = int(oscillation.pmns.n_flavours)
+    include_matter_nc = resolve_include_matter_nc(
+        include_matter_nc,
+        oscillation,
+        has_neutron_data=getattr(profile_earth, "has_neutron_density", False),
+        context_name="earth_evolutor",
+    )
 
     # Build a common E/eta grid. For independent 1D grids this creates the
     # outer-product shape, so the final result can preserve `(n_E, n_eta, 3, 3)`.
@@ -675,7 +686,7 @@ def earth_evolutor_from_zenith(
     profile_scale_m: TensorLike = R_E,
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> torch.Tensor:
     """Build the Earth evolutor from zenith angles with configurable scales.
 

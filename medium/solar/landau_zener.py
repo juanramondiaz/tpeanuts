@@ -25,7 +25,8 @@ outward through the decreasing electron density.  At finite adiabaticity the
 Landau-Zener (LZ) mechanism allows a sudden jump between the two matter
 mass-eigenstates as the neutrino traverses the MSW resonance radius.
 
-The exponential approximation (Parke 1986, Phys. Rev. Lett. 57, 1275) gives:
+The locally linear Landau-Zener approximation used in the Parke treatment
+(Parke 1986, Phys. Rev. Lett. 57, 1275) gives:
 
     P_LZ = exp(-pi/2 * gamma_res)
 
@@ -35,17 +36,34 @@ with the adiabaticity parameter evaluated at the resonance:
                 * L_n(r_res)
 
 where L_n = |n_e / (dn_e/dl)|_res is the density scale height at the MSW
-resonance in metres. The resonance radius r_res(E) is defined by the condition
+resonance in metres. The resonance radius r_res(E) is defined by the same
+theta_12^M = pi/4 condition used by ``matter_mixing.th12_M`` -- i.e. the full
+effective potential V'_k (which already folds in the theta_13-sector
+correction), not the bare two-flavour V_k:
 
-    V_k(Delta_m^2_21, E, n_e(r_res)) = cos(2 theta_12),
+    V'_k(Delta_m^2_21, E, n_e(r_res)) = cos(2 theta_12),
+    V'_k = V_k(Delta_m^2_21) cos^2(theta_13^M) + (Delta m^2_ee / Delta m^2_21)
+           sin^2(theta_13^M - theta_13)
 
-i.e. the radius where the solar matter mixing angle theta_12^M = pi/4.
+so the resonance located here is the same one ``th12_M`` actually crosses,
+rather than a bare-two-flavour approximation to it (the theta_13 correction
+to V'_k is itself typically small, so this mostly matters for precision
+studies or non-standard parameters where the difference is not negligible).
+The adiabaticity parameter ``gamma_res`` itself is left in its standard
+two-level (1-2 sector) form: only the resonance *location* picks up the
+theta_13 correction, matching the level of approximation of the Parke
+treatment this module implements.
+
+The search for r_res(E) (and the density profile used for gamma_res) is
+performed on the solar profile's full structural ``radius``/``density`` grid,
+not on the independent production grid.
 
 Scope and limitations
 ---------------------
-- Only the theta_12 sector resonance is tracked. The theta_13 resonance lies
-  deep in the solar core at very high density and is negligible for all solar
-  sources in the standard MSW picture.
+- Only the theta_12 sector resonance is tracked. At standard solar-neutrino
+  energies, the density required for the theta_13 resonance exceeds the
+  maximum density reached inside the Sun, so no physical 1--3 resonance is
+  crossed in the standard MSW picture.
 - P_LZ = 0 is returned where no resonance exists in the solar volume: energies
   below the resonance threshold, antineutrinos (no MSW resonance in the solar
   interior for standard parameters), and LMA-Dark parameters (theta_12 > pi/4,
@@ -55,11 +73,12 @@ Scope and limitations
   approximation is excellent. This module becomes relevant for non-standard
   parameter explorations or precision studies near 1-3 MeV.
 - Solar NSI is NOT included: the resonance condition is based on the standard
-  MSW potential V_k computed in matter_mixing.Vk.
+  (theta_13-corrected) MSW potential V'_k, with no off-diagonal NSI terms.
 
 Module functions:
     density_gradient(solar_profile)
-        Numerical derivative dn_e/d(r/R_sun) on the profile grid.
+        Numerical derivative dn_e/d(r/R_sun) on the profile's full density
+        grid.
     resonance_radius(oscillation, E, solar_profile)
         Radius r_res(E) in solar-radius units where the MSW resonance occurs.
     plz(oscillation, E, solar_profile)
@@ -74,27 +93,32 @@ import torch
 
 import tpeanuts.util.constant as constant
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.medium.solar.matter_mixing import Vk
+from tpeanuts.medium.solar.matter_mixing import DeltamSqee, Vk, th13_M
 from tpeanuts.util.math import interp1d_linear
 from tpeanuts.util.type import TensorLike
 
 
+def _full_density_grid(solar_profile: object) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return the profile's full structural radius/density grid."""
+    return solar_profile.radius, solar_profile.density
+
+
 def density_gradient(solar_profile: object) -> torch.Tensor:
-    """Compute dn_e/d(r_hat) on the solar profile grid.
+    """Compute dn_e/d(r_hat) on the solar profile's full density grid.
 
     Uses central differences at interior points and one-sided differences
     at the two boundary points. The coordinate r_hat = r/R_sun is the
-    dimensionless solar radius stored in ``solar_profile.radius``.
+    dimensionless solar radius (see ``_full_density_grid``).
 
     Args:
-        solar_profile: SolarProfile-like object exposing ``radius`` and
-            ``density`` 1-D tensors of the same length.
+        solar_profile: SolarProfile-like object exposing ``radius``/
+            ``density`` 1-D tensors of matching length.
 
     Returns:
-        Tensor of shape ``(n_r,)`` with dn_e/dr_hat in mol/cm^3 per R_sun.
+        Tensor of shape ``(n_r,)`` with dn_e/dr_hat in mol/cm^3 per R_sun,
+        on the same grid returned by ``_full_density_grid``.
     """
-    r = solar_profile.radius    # (n_r,)
-    ne = solar_profile.density  # (n_r,)
+    r, ne = _full_density_grid(solar_profile)  # (n_r,), (n_r,)
 
     # Central differences at interior nodes
     interior = (ne[2:] - ne[:-2]) / (r[2:] - r[:-2])  # (n_r - 2,)
@@ -110,25 +134,35 @@ def resonance_radius(
     oscillation: OscillationParameters,
     E: TensorLike,
     solar_profile: object,
+    *,
+    legacy_precision: bool = False,
 ) -> torch.Tensor:
     """Locate the MSW resonance radius for each neutrino energy.
 
     The theta_12 resonance occurs at the solar radius r_res(E) where the
-    dimensionless matter-potential ratio V_k equals cos(2 theta_12):
+    full effective potential V'_k (the same one ``matter_mixing.th12_M``
+    uses, folding in the theta_13-sector correction) equals cos(2 theta_12):
 
-        V_k(Delta_m^2_21, E, n_e(r_res)) = cos(2 theta_12)
+        V'_k(Delta_m^2_21, E, n_e(r_res)) = cos(2 theta_12),
+        V'_k = V_k(Delta_m^2_21) cos^2(theta_13^M)
+               + (Delta m^2_ee / Delta m^2_21) sin^2(theta_13^M - theta_13)
 
     The function performs a linear interpolation between adjacent grid points
-    where the sign of V_k - cos(2 theta_12) changes from positive to negative
-    (the condition for a crossing in the standard LMA scenario where the
-    density decreases monotonically from the solar centre outward).
+    where the sign of V'_k - cos(2 theta_12) changes from positive to
+    negative (the condition for a crossing in the standard LMA scenario where
+    the density decreases monotonically from the solar centre outward), on
+    the profile's full density grid (see ``_full_density_grid``) so a
+    resonance located beyond the production-restricted core is not missed.
 
     Args:
-        oscillation: Oscillation parameters supplying theta_12 and
-            mass_spectrum.DeltamSq21.
+        oscillation: Oscillation parameters supplying theta_12, theta_13, and
+            mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy or 1-D energy grid in MeV.
-        solar_profile: SolarProfile-like object with ``radius`` and
-            ``density`` 1-D tensors.
+        solar_profile: SolarProfile-like object with ``radius``/``density``
+            1-D tensors.
+        legacy_precision: If True, evaluate the internal ``Vk``/``th13_M``
+            calls with the legacy peanuts combined prefactor for
+            bit-comparable validation (see ``matter_mixing.Vk``).
 
     Returns:
         Tensor matching the shape of ``E`` with the resonance radius in solar
@@ -137,22 +171,29 @@ def resonance_radius(
         etc.).
     """
     th12 = oscillation.pmns.params.theta12
+    th13 = oscillation.pmns.params.theta13
     dm21 = oscillation.mass_spectrum.DeltamSq21
+    dm_ee = DeltamSqee(oscillation)
     cos2th12 = torch.cos(2.0 * th12)  # scalar; negative for LMA-Dark
 
-    radius = solar_profile.radius    # (n_r,)
-    density = solar_profile.density  # (n_r,)
+    radius, density = _full_density_grid(solar_profile)  # (n_r,), (n_r,)
 
     E_t = torch.as_tensor(E, device=radius.device, dtype=radius.dtype)
     scalar_in = E_t.ndim == 0
     E_1d = E_t.reshape(-1)   # (n_E,)
     n_E = E_1d.shape[0]
 
-    # Vk at all (energy, radius) combinations
-    vk = Vk(dm21, E_1d[:, None], density[None, :], antinu=oscillation.antinu)  # (n_E, n_r)
+    energy_grid = E_1d[:, None]    # (n_E, 1)
+    density_grid = density[None, :]  # (1, n_r)
+
+    # Full effective potential V'_k, matching th12_M's resonance condition
+    # (broadcasts to (n_E, n_r)).
+    th13m = th13_M(oscillation, energy_grid, density_grid, legacy_precision=legacy_precision)
+    vk = Vk(dm21, energy_grid, density_grid, antinu=oscillation.antinu, legacy_precision=legacy_precision)
+    vk_prime = vk * torch.cos(th13m) ** 2 + dm_ee / dm21 * torch.sin(th13m - th13) ** 2
 
     # Distance from resonance condition (positive inside resonance, negative outside)
-    diff = vk - cos2th12  # (n_E, n_r)
+    diff = vk_prime - cos2th12  # (n_E, n_r)
 
     # Detect the first sign change from + to - along the radius axis
     crossing = (diff[:, :-1] > 0) & (diff[:, 1:] <= 0)  # (n_E, n_r-1)
@@ -183,10 +224,13 @@ def plz(
     oscillation: OscillationParameters,
     E: TensorLike,
     solar_profile: object,
+    *,
+    legacy_precision: bool = False,
 ) -> torch.Tensor:
     """Compute the Landau-Zener transition probability P_LZ(E).
 
-    Uses the exponential approximation of Parke (1986):
+    Uses the locally linear Landau-Zener approximation employed in the Parke
+    treatment:
 
         P_LZ = exp(-pi/2 * gamma_res)
 
@@ -197,18 +241,28 @@ def plz(
                     * L_n(r_res)
 
     and L_n = |n_e / (dn_e / dl)|_res is the electron-density scale height
-    in metres evaluated at the resonance radius.
+    in metres evaluated at the resonance radius, on the profile's full
+    density grid (see ``resonance_radius``/``_full_density_grid``).
+
+    This local expression is not the exact jump probability for an arbitrary
+    density profile. Exponential or otherwise non-linear profiles require the
+    corresponding profile correction when non-adiabatic effects are relevant.
+    For standard LMA solar parameters the evolution is so adiabatic that this
+    distinction is numerically negligible.
 
     P_LZ is set to 0 (fully adiabatic) wherever no resonance exists in the
     solar volume — including below-threshold energies, LMA-Dark parameters,
     and antineutrinos.
 
     Args:
-        oscillation: Oscillation parameters supplying theta_12 and
-            mass_spectrum.DeltamSq21.
+        oscillation: Oscillation parameters supplying theta_12, theta_13, and
+            mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy or 1-D energy grid in MeV.
-        solar_profile: SolarProfile-like object exposing ``radius`` and
+        solar_profile: SolarProfile-like object exposing ``radius``/
             ``density``.
+        legacy_precision: If True, evaluate the internal ``resonance_radius``
+            call (and its ``Vk``/``th13_M`` evaluations) with the legacy
+            peanuts combined prefactor for bit-comparable validation.
 
     Returns:
         Tensor matching the shape of ``E`` with P_LZ in [0, 1]. For standard
@@ -220,15 +274,16 @@ def plz(
     sin2th12 = torch.sin(2.0 * th12)
     cos2th12 = torch.cos(2.0 * th12)
 
-    radius = solar_profile.radius
-    density = solar_profile.density
+    radius, density = _full_density_grid(solar_profile)
 
     E_t = torch.as_tensor(E, device=radius.device, dtype=radius.dtype)
     scalar_in = E_t.ndim == 0
     E_1d = E_t.reshape(-1)  # (n_E,)
 
     dne_dr = density_gradient(solar_profile)                       # (n_r,)
-    r_res = resonance_radius(oscillation, E_1d, solar_profile)     # (n_E,), NaN if absent
+    r_res = resonance_radius(
+        oscillation, E_1d, solar_profile, legacy_precision=legacy_precision,
+    )  # (n_E,), NaN if absent
     has_res = torch.isfinite(r_res)                                # (n_E,)
 
     # Replace NaN with a safe interior index so that interp1d does not produce

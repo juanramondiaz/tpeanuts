@@ -1,0 +1,6 @@
+{
+  "provider": "Bahcall Solar Neutrino Software and Data",
+  "url": "https://www.sns.ias.edu/~jnb/SNdata/sndata.html",
+  "default": false,
+  "note": "TPeanuts can combine BP2000 densities with BP2004 production and fluxes; the configured default is Zenodo SF-III AGSS09."
+}

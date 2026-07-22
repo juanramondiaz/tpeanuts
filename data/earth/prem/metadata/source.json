@@ -1,0 +1,9 @@
+{
+  "provider": "PREM",
+  "reference": "Dziewonski and Anderson, Phys. Earth Planet. Inter. 25, 297-356 (1981)",
+  "doi": "10.1016/0031-9201(81)90046-7",
+  "source_url": "https://www.ondrejsramek.net/wp-content/uploads/prem_table_full.txt",
+  "earth_radius_km": 6371.0,
+  "composition_extension": {"Ye_core": 0.467, "Ye_mantle_crust": 0.495, "Ye_water": 0.5556},
+  "warning": "PREM determines mass density, not Ye. Electron and neutron densities are explicitly model-dependent derived columns."
+}

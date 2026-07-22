@@ -75,7 +75,7 @@ def earth_flux_state(
     ode_method: OdeMethod | None = None,
     context: Optional[RuntimeContext] = None,
     reunitarize: bool = default.earth_reunitarize,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor | tuple[Tensor, Tensor]:
     """Compute final flavour-resolved Earth flux.
 
@@ -104,12 +104,9 @@ def earth_flux_state(
             infers from inputs.
         reunitarize: For method="analytical", project evolution operators to
             the nearest unitary matrix.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term (see
-            ``medium.earth.probability.earth_probability_state``). Requires
-            ``profile_earth`` to have been built with neutron-density
-            coefficients; raises otherwise. False (the default) reproduces
-            the pre-existing CC-only behaviour exactly.
+        include_matter_nc: If True/False, applied/not applied (see
+            ``medium.earth.probability.earth_probability_state``). If
+            ``None`` (the default), auto-resolved per-call.
 
     Returns:
         Flavour-resolved Earth flux. If ``full_oscillation=True`` in numerical
@@ -159,7 +156,7 @@ def earth_flux_integrated(
     context: Optional[RuntimeContext] = None,
     reunitarize: bool = default.earth_reunitarize,
     energy_dim: int = -2,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor:
     """Integrate the energy-resolved Earth flux over energy.
 
@@ -192,8 +189,9 @@ def earth_flux_integrated(
             the nearest unitary matrix.
         energy_dim: Axis of the resulting flux tensor holding the energy
             grid. Must not be the final (flavour) axis.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term (see ``earth_flux_state``).
+        include_matter_nc: If True/False, applied/not applied (see
+            ``earth_flux_state``). If ``None`` (the default), auto-resolved
+            per-call.
 
     Returns:
         Flux integrated over energy (a rate), with the energy axis removed.
@@ -239,7 +237,7 @@ def earth_flux_exposure(
     reunitarize: bool = default.earth_reunitarize,
     nsteps: int = default.earth_probability_nsteps,
     ode_method: OdeMethod | None = default.earth_numerical_method,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor:
     """Compute exposure-integrated final flavour-resolved Earth flux.
 
@@ -274,9 +272,9 @@ def earth_flux_exposure(
             to the nearest unitary matrix.
         nsteps: Number of numerical trajectory samples for numerical mode.
         ode_method: Numerical profile sampling rule for numerical mode.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term (see
+        include_matter_nc: If True/False, applied/not applied (see
             ``medium.earth.exposure_integration.earth_probability_exposure``).
+            If ``None`` (the default), auto-resolved per-call.
 
     Returns:
         Exposure-integrated flavour-resolved Earth flux.

@@ -44,10 +44,15 @@ Module contents:
     OscillationParameters
         Frozen container for the built PMNS object, the mass spectrum, the
         antineutrino selector, and optional NSI state.
+    resolve_include_matter_nc(...)
+        Shared tri-state (True/False/None) policy for the 3+1 sterile
+        neutral-current matter term, used identically by
+        ``medium.solar``/``medium.earth``/``medium.atmosphere``.
 """
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -160,3 +165,87 @@ class OscillationParameters:
     def BSM_extension(self) -> bool:
         """True iff any BSM extension (NSI and/or sterile) is active."""
         return self.BSM_extension_NSI or self.BSM_extension_sterile
+
+
+def resolve_include_matter_nc(
+    include_matter_nc: Optional[bool],
+    oscillation: "OscillationParameters",
+    *,
+    has_neutron_data: bool,
+    context_name: str,
+) -> bool:
+    """Resolve the tri-state ``include_matter_nc`` policy to a concrete bool.
+
+    The 3+1 sterile extension's neutral-current term is *not* an optional
+    refinement the way it is sometimes treated: once the common V_NC phase
+    is subtracted, a genuine relative potential survives on the sterile
+    diagonal entry, with magnitude comparable to V_CC itself (see
+    ``core.common.hamiltonian``'s module docstring). Silently defaulting to
+    the CC-only Hamiltonian whenever a caller selects a sterile oscillation
+    but says nothing about ``include_matter_nc`` is therefore a silent
+    physical incompleteness, not a harmless simplification -- unlike the
+    3-flavour case, where V_NC truly is an unobservable common phase and
+    omitting it is exact, not approximate.
+
+    This function is the single place that policy is decided, shared
+    identically by ``medium.solar``, ``medium.earth``, and
+    ``medium.atmosphere``:
+
+        - ``include_matter_nc`` given explicitly (``True`` or ``False``):
+          returned unchanged. This always wins, and is how any existing
+          CC-only benchmark, cross-validation test, or comparison to
+          earlier project phases keeps working exactly as before.
+        - ``include_matter_nc=None`` (the caller did not say): resolves to
+          ``True`` when ``oscillation`` is the 3+1 sterile extension *and*
+          ``has_neutron_data`` is True (the caller has already checked that
+          the profile/model in hand can actually supply n_n); ``False``
+          otherwise. When sterile is active but ``has_neutron_data`` is
+          False, this still resolves to ``False`` (reproducing the CC-only
+          Hamiltonian, not raising), but emits an explicit ``RuntimeWarning``
+          instead of resolving silently, since that fallback is exactly the
+          kind of physical incompleteness this function exists to avoid
+          hiding.
+        - For the plain 3-flavour case, ``include_matter_nc=None`` always
+          resolves to ``False`` regardless of ``has_neutron_data``: V_NC is
+          an unobservable common phase there, so there is nothing
+          incomplete about omitting it, and no warning is warranted.
+
+    Args:
+        include_matter_nc: The caller-supplied tri-state value.
+        oscillation: Built oscillation parameters (only
+            ``BSM_extension_sterile`` is read).
+        has_neutron_data: Whether the medium-specific profile/model in hand
+            can actually supply a neutron density for the sterile diagonal
+            term (e.g. ``profile.density_n is not None`` for solar,
+            ``EarthProfile.has_neutron_density`` for Earth). Irrelevant
+            (never evaluated for its truthiness in a way that matters) when
+            ``include_matter_nc`` is given explicitly or when ``oscillation``
+            is not the sterile extension.
+        context_name: Short, human-readable identifier for the calling
+            function (e.g. ``"solar_probability_mass"``), used only in the
+            fallback warning message.
+
+    Returns:
+        The concrete boolean to use for this call.
+    """
+    if include_matter_nc is not None:
+        return bool(include_matter_nc)
+
+    if not oscillation.BSM_extension_sterile:
+        return False
+
+    if not has_neutron_data:
+        warnings.warn(
+            f"{context_name}: the 3+1 sterile extension is active but no "
+            "neutron-density data is available for this profile/model, so "
+            "the neutral-current matter term cannot be included. Falling "
+            "back to the CC-only sterile Hamiltonian (include_matter_nc="
+            "False) -- pass include_matter_nc=False explicitly to silence "
+            "this warning, or build the profile with neutron-density "
+            "support to get the physically complete 3+1 Hamiltonian.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return False
+
+    return True

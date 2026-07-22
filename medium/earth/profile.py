@@ -30,8 +30,9 @@ EarthProfile methods:
     trajectory_profile(...): Build the perturbative profile in trajectory coordinates.
     density_x_eta(...): Evaluate pointwise trajectory electron density.
     density_n_x_eta(...): Evaluate pointwise trajectory neutron density.
-    call(...) and __call__(...): Pointwise compatibility interfaces.
-    call_neutron(...): Pointwise neutron-density compatibility interface.
+    has_neutron_density: Cheap, non-raising property checking whether
+        density_n_x_eta would succeed, used by
+        core.common.oscillation.resolve_include_matter_nc.
 
 density_n_x_eta / call_neutron require a perturbative profile model built
 with neutron-density coefficients (EvenPowerProfileLayered and
@@ -56,6 +57,7 @@ import tpeanuts.util.constant as constant
 import tpeanuts.config.default as default
 from tpeanuts.core.numerical.geometry import OdeMethod
 from tpeanuts.medium.earth.probability import PearthMethod
+from tpeanuts.medium.earth.io import earth_provider_fit_paths, earth_provider_path
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor
 from tpeanuts.core.perturbative.models import perturbative_profile_selection
@@ -128,6 +130,7 @@ class EarthParameters:
         sampled trajectory plus the x grid instead of only the final point.
     """
 
+    density_provider: str = default.earth_density_provider
     profile_perturbative_name: str = default.earth_profile_perturbative_name
     profile_perturbative_kwargs: dict[str, Any] | None = None
     profile_scale_m: TensorLike = constant.R_E
@@ -172,6 +175,17 @@ class EarthProfile:
         )
         profile_kwargs.setdefault("device", device)
         profile_kwargs.setdefault("dtype", dtype)
+        normalized_name = self.params.profile_perturbative_name.lower().replace("-", "_")
+        if normalized_name.startswith("even_power"):
+            density_file, density_file_n = earth_provider_fit_paths(
+                self.params.density_provider
+            )
+            profile_kwargs.setdefault("density_file", str(density_file))
+            profile_kwargs.setdefault("density_file_n", str(density_file_n))
+        elif normalized_name in {"prem", "prem500", "prem_tabulated", "premtabulatedprofile", "prem_tabulated_profile"}:
+            profile_kwargs.setdefault(
+                "density_path", str(earth_provider_path(self.params.density_provider))
+            )
         self.profile_perturbative_kwargs = profile_kwargs
         self.profile_perturbative_name = self.params.profile_perturbative_name
         self.dtype = dtype
@@ -330,6 +344,30 @@ class EarthProfile:
 
         return n_e
 
+    @property
+    def has_neutron_density(self) -> bool:
+        """Whether this profile can supply the 3+1 sterile neutral-current term.
+
+        Cheap, non-raising capability check, used by ``core.common.
+        oscillation.resolve_include_matter_nc`` (and directly by callers) to
+        decide whether to auto-enable ``include_matter_nc`` for a sterile
+        oscillation before ever reaching ``density_n_x_eta``. ``hasattr(...,
+        "evaluate_neutron")`` alone is not enough here: both perturbative
+        profile models that support neutron density (``EvenPowerProfileLayered``,
+        ``PremTabulatedProfile``) always define that method, whether or not
+        they were actually built with ``include_neutron=True``, and it
+        raises internally rather than returning a sentinel when the
+        underlying ``coefficients_n`` were never populated. The real,
+        non-raising gate is that populated ``coefficients_n`` attribute
+        itself.
+
+        Returns:
+            True iff the selected perturbative profile model was built with
+            neutron-density coefficients (``include_neutron=True`` or an
+            explicit ``coefficients_n``).
+        """
+        return getattr(self._profile_perturbative, "coefficients_n", None) is not None
+
     @torch.no_grad()
     def density_n_x_eta(
         self,
@@ -390,27 +428,6 @@ class EarthProfile:
         n_n = torch.where(outside, torch.zeros_like(n_n), n_n)
 
         return n_n
-
-    def call(
-        self,
-        r: Tensor,
-        eta: Tensor,
-    ) -> Tensor:
-        return self.density_x_eta(r, eta)
-
-    def call_neutron(
-        self,
-        r: Tensor,
-        eta: Tensor,
-    ) -> Tensor:
-        return self.density_n_x_eta(r, eta)
-
-    def __call__(
-        self,
-        r: Tensor,
-        eta: Tensor,
-    ) -> Tensor:
-        return self.call(r, eta)
 
     def __str__(self) -> str:
         """Return a compact summary of the Earth profile configuration."""

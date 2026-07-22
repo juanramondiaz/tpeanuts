@@ -194,13 +194,18 @@ class NotebookConfig:
 
     @property
     def earth_density_file(self) -> Path:
-        """Bundled Earth density table used by Earth-profile notebooks."""
-        return self.data_dir / "density" / "earth_density.csv"
+        """Bundled five-layer even-power electron-density fit."""
+        return self.data_dir / "earth" / "prem" / "fit" / "even_power_electron.csv"
 
     @property
-    def prem500_file(self) -> Path:
-        """Downloaded PREM500 Earth model CSV table."""
-        return self.external_data_dir / "PREM500.csv"
+    def earth_neutron_density_file(self) -> Path:
+        """Bundled five-layer even-power neutron-density fit."""
+        return self.data_dir / "earth" / "prem" / "fit" / "even_power_neutron.csv"
+
+    @property
+    def prem_density_file(self) -> Path:
+        """Canonical PREM radial-density table."""
+        return self.data_dir / "earth" / "prem" / "density" / "prem_density.csv"
 
     @property
     def output_data_root(self) -> Path:

@@ -1,0 +1,9 @@
+{
+  "provider": "B23 / SF-III",
+  "doi": "10.5281/zenodo.10822316",
+  "version": "v1.2",
+  "default": true,
+  "default_model": "SF3_AGSS09",
+  "energy_spectra_available": false,
+  "probabilities_available": false
+}

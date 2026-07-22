@@ -115,7 +115,7 @@ def earth_probability_exposure(
     reunitarize: bool = default.earth_reunitarize,
     nsteps: int = default.earth_probability_nsteps,
     ode_method: OdeMethod | None = default.earth_numerical_method,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor:
     """Compute Earth probabilities averaged over a nadir exposure table.
 
@@ -151,12 +151,9 @@ def earth_probability_exposure(
             to the nearest unitary matrix.
         nsteps: Number of numerical trajectory samples for numerical mode.
         ode_method: Numerical profile sampling rule for numerical mode.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term (see
-            ``medium.earth.probability.earth_probability_state``). Requires
-            ``profile_earth`` to have been built with neutron-density
-            coefficients; raises otherwise. False (the default) reproduces
-            the pre-existing CC-only behaviour exactly.
+        include_matter_nc: If True/False, applied/not applied (see
+            ``medium.earth.probability.earth_probability_state``). If
+            ``None`` (the default), auto-resolved per-call.
 
     Returns:
         Exposure-integrated final flavour probabilities with final dimension

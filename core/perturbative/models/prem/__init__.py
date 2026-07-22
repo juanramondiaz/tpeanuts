@@ -41,24 +41,24 @@ Package exports:
         extension's neutral-current matter term.
     PremProfileSegment
         Perturbative-evolutor-compatible segment for a single PREM shell.
-    load_prem500_profile
-        I/O helper: read PREM500 CSV and build (rj, coefficients) for
+    load_prem_profile
+        I/O helper: read canonical PREM CSV and build (rj, coefficients) for
         electron density.
-    load_prem500_neutron_profile
-        I/O helper: read PREM500 CSV and build (rj, coefficients) for
+    load_prem_neutron_profile
+        I/O helper: read canonical PREM CSV and build (rj, coefficients) for
         neutron density.
 """
 
 from tpeanuts.core.perturbative.models.prem.profile_layered import PremTabulatedProfile
 from tpeanuts.core.perturbative.models.prem.profile_segment import PremProfileSegment
 from tpeanuts.core.perturbative.models.prem.io import (
-    load_prem500_profile,
-    load_prem500_neutron_profile,
+    load_prem_profile,
+    load_prem_neutron_profile,
 )
 
 __all__ = [
     "PremTabulatedProfile",
     "PremProfileSegment",
-    "load_prem500_profile",
-    "load_prem500_neutron_profile",
+    "load_prem_profile",
+    "load_prem_neutron_profile",
 ]

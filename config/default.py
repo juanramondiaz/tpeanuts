@@ -51,27 +51,49 @@ solar_data_dir = "data/solar"
 legacy_data_dir = "data/peanuts"
 # Filename of the solar neutrino production-point distribution table.
 # Path is relative to solar_data_dir (i.e. data/solar/).
-# Default: zenodo SF3-AGSS09 extended profile (r ∈ [0, 1.0] R_sun, 2001 rows).
-solar_model_filename = "flux/nudistr_zenodo_SF3_AGSS09.csv"
+# Default provider/model: the SF-III AGSS09 model published on Zenodo.
+solar_provider = "zenodo"
+solar_spectrum_provider = "legacy"
+solar_density_filename = "zenodo/density/density_SF3_AGSS09.csv"
+solar_production_filename = "zenodo/production/production_SF3_AGSS09.csv"
 # Filename of the solar neutrino flux normalization table.
 # Path is relative to solar_data_dir (i.e. data/solar/).
-# Default: zenodo SF3-AGSS09 flux table.
-solar_fluxes_filename = "flux/fluxes_zenodo_SF3_AGSS09.csv"
+# Default: SF-III AGSS09 total-flux table.
+solar_fluxes_filename = "zenodo/flux/fluxes_SF3_AGSS09.csv"
+# Filename of the solar structure+composition table used to derive the
+# neutron-density profile n_n(r) for the 3+1 sterile neutral-current term
+# (see medium.solar.io.load_solar_composition). Path is relative to
+# solar_data_dir. This Zenodo table remains available as an explicit fallback
+# when a selected density table does not already contain neutron density.
+solar_composition_filename = "zenodo/raw/struct+nu_SF3_AGSS09.dat"
 # Filename of the tabulated Sun-Earth distance vs. day-of-year table.
-solar_sun_earth_distance_filename = "sun_earth_distance.csv"
+solar_sun_earth_distance_filename = "geometry/sun_earth_distance.csv"
 
-# Directory containing Earth density profile tables (e.g. PREM).
-earth_density_dir = "data/density"
+# Canonical provider selections for tabulated input data.
+atmosphere_flux_provider = "honda"
+atmosphere_flux_dir = "data/atmosphere"
+atmosphere_flux_filename = "honda/flux/honda_flux.csv"
+earth_density_provider = "prem"
+earth_reference_data_dir = "data/earth"
+earth_reference_density_filename = "prem/density/prem_density.csv"
+
+# Perturbative fits derived from the canonical PREM provider data.
+earth_density_dir = "data/earth/prem/fit"
 # Filename of the default Earth density profile table.
-earth_density_filename = "earth_density.csv"
+earth_density_filename = "even_power_electron.csv"
 # Filename of the neutron-density companion table for the even-power Earth
 # model, read when EvenPowerProfileLayered is built with
 # include_neutron=True. Same rj shells and column format (rj, alpha, beta,
 # gamma) as earth_density_filename, fitted to n_n(r) instead of n_e(r).
-earth_density_filename_nn = "earth_density_nn.csv"
+earth_density_filename_nn = "even_power_neutron.csv"
 
-# Default directory containing Honda/HKKM atmosphere-neutrino tables.
-honda_dataset = r"G:\Mi unidad\04.Datasets\Honda"
+# Canonical MCEq atmospheric mass-density table.
+atmosphere_density_file = (
+    "data/atmosphere/mceq/density/atmosphere_density_profile.csv"
+)
+
+# Default directory containing canonical Honda/HKKM tables.
+honda_dataset = "data/atmosphere/honda"
 
 # Default file extension used when saving torch tensors to disk.
 torch_default_extension = ".pt"

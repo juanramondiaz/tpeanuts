@@ -33,7 +33,7 @@ consume it, selected by \code{EarthParameters.profile\_perturbative\_name}
     $n_e(r)=\alpha+\beta r^2+\gamma r^4+\dots$, read from
     \code{data/density/earth\_density.csv}. This is what every perturbative
     Earth evolutor formula in this chapter uses unless overridden.
-  \item \code{"prem"}: the PREM500 table's own native piecewise-linear-in-$r^2$
+  \item \code{"prem"}: the canonical PREM table's piecewise-linear-in-$r^2$
     parametrisation per shell, consumed directly (converting tabulated mass
     density to electron density via layer-appropriate $\langle Z/A\rangle$
     ratios) rather than through a polynomial fit
@@ -75,7 +75,7 @@ term.} Both the \code{"even\_power"} and \code{"prem"} layered profile
 models optionally expose a neutron-density companion table alongside their
 default electron-density one, built with \code{include\_neutron=True}:
 \begin{itemize}
-  \item \textbf{\code{"prem"}}: the PREM500 loader already computes a
+  \item \textbf{\code{"prem"}}: the canonical PREM loader computes a
     layer-appropriate $\langle Z/A\rangle$ to convert tabulated mass density
     to $n_e$ (implbox above); the complementary neutron fraction
     $1-\langle Z/A\rangle$ gives $n_n$ from the very same tabulated mass

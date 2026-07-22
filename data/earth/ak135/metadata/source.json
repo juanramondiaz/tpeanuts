@@ -1,0 +1,9 @@
+{
+  "provider": "ak135-f",
+  "reference": "Kennett, Engdahl and Buland, Geophys. J. Int. 122, 108-124 (1995)",
+  "doi": "10.17611/DP/9991801",
+  "source_url": "https://ds.iris.edu/files/products/emc/data/AK135F/AK135F_AVG.csv",
+  "earth_radius_km": 6371.0,
+  "composition_extension": {"Ye_core": 0.467, "Ye_mantle_crust": 0.495, "Ye_water": 0.5556},
+  "warning": "ak135-f determines seismic mass density, not Ye. Electron and neutron densities are derived assumptions."
+}

@@ -1,0 +1,17 @@
+pp 			
+Energy [MeV]	Pee	Err Up	Err Down
+0.267		0.566	0.092	0.092
+			
+Be7			
+Energy [MeV]	Pee	Err Up	Err Down
+0.862		0.532	0.054	0.054
+			
+pep			
+Energy [MeV]	Pee	Err Up	Err Down
+1.44		0.428	0.114	0.114
+			
+B8			
+Energy [MeV]	Pee	Err Up	Err Down
+7.4		0.39	0.09	0.09
+8.1		0.37	0.08	0.08
+9.7		0.35	0.09	0.09

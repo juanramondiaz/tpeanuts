@@ -1,0 +1,9 @@
+{
+  "provider": "SNO",
+  "url": "https://sno.phy.queensu.ca/sno/prlwebpage/",
+  "products": [
+    "detector observations",
+    "zenith exposure"
+  ],
+  "not_production_spectra": true
+}

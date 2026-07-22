@@ -586,7 +586,6 @@ def _solar_profile_for(device):
         return solar_profile
     if device not in _SOLAR_PROFILE_CACHE:
         _SOLAR_PROFILE_CACHE[device] = SolarProfile.default(
-            params=SolarParameters(model_path=SOLAR_MODEL_CSV_FILE, fluxes_path=SOLAR_FLUX_CSV_FILE),
             context=_context_for(device),
         )
     return _SOLAR_PROFILE_CACHE[device]
@@ -988,7 +987,7 @@ def _tpeanuts_solar_detector_device(E_1d, eta_1d, device):
     earth_dev = EarthProfile(
         params=EarthParameters(
             profile_perturbative_kwargs={
-                "density_file": str(config.data_dir / "density" / "earth_density.csv"),
+                "density_file": str(config.earth_density_file),
                 "tabulated_density": False,
             }
         ),

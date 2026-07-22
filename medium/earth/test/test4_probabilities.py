@@ -29,6 +29,7 @@ automatically.
 from __future__ import annotations
 
 import math
+import warnings
 
 import pytest
 import torch
@@ -386,6 +387,51 @@ def test_numerical_include_matter_nc_raises_for_even_power_without_include_neutr
             nsteps=NSTEPS_COMPARE, context=RuntimeContext.resolve(DEVICE, DTYPE),
             include_matter_nc=True,
         )
+
+
+def test_numerical_include_matter_nc_default_auto_resolves_true_with_neutron_data():
+    profile = _two_shell_prem_profile()
+    oscillation = _sterile_oscillation(deltamsq41=DM3L_EV2 * 2.0)
+    state = torch.tensor([1.0, 0.0, 0.0, 0.0], device=DEVICE, dtype=torch.complex128)
+    E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.60, device=DEVICE, dtype=DTYPE)
+    kwargs = dict(
+        massbasis=False, nsteps=NSTEPS_COMPARE, ode_method="midpoint",
+        context=RuntimeContext.resolve(DEVICE, DTYPE),
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        P_default = earth_probability_state_numerical(
+            state, profile, oscillation, E, eta, DEPTH_SURFACE_M, **kwargs,
+        )
+    P_true = earth_probability_state_numerical(
+        state, profile, oscillation, E, eta, DEPTH_SURFACE_M, include_matter_nc=True, **kwargs,
+    )
+
+    assert_close(P_default, P_true, atol=1.0e-13, rtol=1.0e-13, name="default auto-resolves to include_matter_nc=True")
+
+
+def test_numerical_include_matter_nc_default_falls_back_false_without_neutron_data():
+    profile = _two_shell_profile()
+    oscillation = _sterile_oscillation(deltamsq41=DM3L_EV2 * 2.0)
+    state = torch.tensor([1.0, 0.0, 0.0, 0.0], device=DEVICE, dtype=torch.complex128)
+    E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.60, device=DEVICE, dtype=DTYPE)
+    kwargs = dict(
+        massbasis=False, nsteps=NSTEPS_COMPARE, ode_method="midpoint",
+        context=RuntimeContext.resolve(DEVICE, DTYPE),
+    )
+
+    with pytest.warns(RuntimeWarning, match="neutron-density"):
+        P_default = earth_probability_state_numerical(
+            state, profile, oscillation, E, eta, DEPTH_SURFACE_M, **kwargs,
+        )
+    P_false = earth_probability_state_numerical(
+        state, profile, oscillation, E, eta, DEPTH_SURFACE_M, include_matter_nc=False, **kwargs,
+    )
+
+    assert_close(P_default, P_false, atol=1.0e-13, rtol=1.0e-13, name="default falls back to include_matter_nc=False")
 
 
 def test_analytical_include_matter_nc_changes_sterile_result_case_a():

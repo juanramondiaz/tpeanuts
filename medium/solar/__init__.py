@@ -28,7 +28,7 @@ mixture of vacuum mass eigenstates.
 
 Submodules:
     medium.solar.io
-        CSV loaders for the tabulated B16 solar model, source fluxes,
+        CSV loaders for the configured solar model, source fluxes,
         production spectra, and Sun-Earth distance table.
     medium.solar.profile
         SolarProfile container and interpolation helpers built on top of
@@ -58,12 +58,16 @@ Submodules:
 
 
 from tpeanuts.medium.solar.io import (
-    default_solar_data_dir,
-    load_b16_fluxes,
-    load_b16_solar_model,
+    load_solar_density,
+    load_solar_fluxes,
+    load_solar_probability,
+    load_solar_production,
     load_spectrum_csv,
+    load_solar_spectrum,
+    solar_spectrum_path,
+    solar_provider_path,
 )
-from tpeanuts.medium.solar.profile import SolarProfile
+from tpeanuts.medium.solar.profile import SolarProfile, SolarSpectrum
 from tpeanuts.medium.solar.matter_mixing import (
     Vk,
     DeltamSqee,
@@ -84,11 +88,16 @@ from tpeanuts.medium.solar.probability import (
 from tpeanuts.medium.solar.flux import solar_flux_state, solar_flux_integrated
 
 __all__ = [
-    "default_solar_data_dir",
-    "load_b16_fluxes",
-    "load_b16_solar_model",
+    "load_solar_density",
+    "load_solar_fluxes",
+    "load_solar_probability",
+    "load_solar_production",
     "load_spectrum_csv",
+    "load_solar_spectrum",
+    "solar_spectrum_path",
+    "solar_provider_path",
     "SolarProfile",
+    "SolarSpectrum",
     "Vk",
     "DeltamSqee",
     "th13_M",

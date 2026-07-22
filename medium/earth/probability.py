@@ -69,7 +69,7 @@ PearthMethod = Literal["analytical", "numerical"]
 
 from tpeanuts.medium.earth.evolutor import earth_evolutor
 
-from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real, state_tensor
 from tpeanuts.core.common.probability import (
@@ -95,7 +95,7 @@ def earth_probability_transition(
     *,
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor:
     """Build the full Earth flavour-transition probability matrix.
 
@@ -115,12 +115,12 @@ def earth_probability_transition(
         reunitarize: Project the Earth evolutor to the nearest unitary matrix.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in the Earth evolutor.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term (see
-            ``medium.earth.evolutor.earth_evolutor``). Requires
-            ``profile_earth`` to have been built with neutron-density
-            coefficients; raises otherwise. False (the default) reproduces
-            the pre-existing CC-only behaviour exactly.
+        include_matter_nc: If True/False, applied/not applied (see
+            ``medium.earth.evolutor.earth_evolutor``; an explicit ``True``
+            still raises if ``profile_earth`` lacks neutron-density
+            coefficients). If ``None`` (the default), auto-resolved
+            per-call (see ``core.common.oscillation.
+            resolve_include_matter_nc``).
 
     Returns:
         Real tensor |S_earth[beta, alpha]|^2 with final two dimensions final
@@ -152,7 +152,7 @@ def earth_probability_state_analytical(
     massbasis: bool = default.earth_massbasis,
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor:
     """Compute Earth probabilities with the analytical perturbative evolutor.
 
@@ -170,11 +170,11 @@ def earth_probability_state_analytical(
         reunitarize: Project the Earth evolutor to the nearest unitary matrix.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in the Earth evolutor.
-        include_matter_nc: If True, also apply the 3+1 sterile extension's
-            neutral-current matter term (see ``medium.earth.evolutor.earth_evolutor``).
-            Requires ``profile_earth`` to have been built with
-            neutron-density coefficients; raises otherwise. False (the
-            default) reproduces the pre-existing CC-only behaviour exactly.
+        include_matter_nc: If True/False, applied/not applied (see
+            ``medium.earth.evolutor.earth_evolutor``; an explicit ``True``
+            still raises if ``profile_earth`` lacks neutron-density
+            coefficients). If ``None`` (the default), auto-resolved
+            per-call.
 
     Returns:
         Final flavour probabilities with final dimension 3.
@@ -225,7 +225,7 @@ def earth_probability_state_numerical(
     ode_method: OdeMethod | None = None,
     context: RuntimeContext = RuntimeContext.resolve(default.earth_device, default.dtype),
     legacy_precision: bool = False,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor | None:
     """Compute Earth probabilities with the numerical segment evolutor.
 
@@ -251,13 +251,19 @@ def earth_probability_state_numerical(
         include_matter_nc: If True, also sample neutron density along the
             trajectory and forward it as ``n_n_mol_cm3``, enabling the 3+1
             sterile extension's neutral-current matter term (only meaningful
-            when ``oscillation.pmns`` is 4-flavour). Requires
-            ``profile_earth`` to have been built with neutron-density
-            coefficients (see ``EarthProfile.density_n_x_eta``,
+            when ``oscillation.pmns`` is 4-flavour); an explicit ``True``
+            still raises ValueError if ``profile_earth`` lacks
+            neutron-density coefficients (see
+            ``EarthProfile.density_n_x_eta``,
             ``EvenPowerProfileLayered``/``PremTabulatedProfile``
-            ``include_neutron=True``); otherwise raises ValueError. False
-            (the default) reproduces the pre-existing CC-only behaviour
-            exactly.
+            ``include_neutron=True``). If ``None`` (the default),
+            auto-resolved per-call by ``core.common.oscillation.
+            resolve_include_matter_nc``: ``True`` when ``oscillation`` is
+            the 3+1 sterile extension and
+            ``profile_earth.has_neutron_density`` is True, ``False``
+            otherwise (with a ``RuntimeWarning`` if sterile was requested
+            but the profile lacks neutron-density data). Always ``False``
+            for the plain 3-flavour case.
 
     Returns:
         Final flavour probabilities. If ``full_oscillation=True``, returns
@@ -269,6 +275,13 @@ def earth_probability_state_numerical(
             raise ValueError("earth_probability_state_numerical only supports scalar antinu.")
         antinu = bool(antinu.item())
         oscillation = dataclasses.replace(oscillation, antinu=antinu)
+
+    include_matter_nc = resolve_include_matter_nc(
+        include_matter_nc,
+        oscillation,
+        has_neutron_data=getattr(profile_earth, "has_neutron_density", False),
+        context_name="earth_probability_state_numerical",
+    )
 
     dev, dtype = context.device, context.dtype
     trajectory = build_earth_trajectory(
@@ -283,12 +296,12 @@ def earth_probability_state_numerical(
     )
 
     if trajectory.meta["mode"] == "earth_crossing":
-        n_e = profile_earth.call(
+        n_e = profile_earth.density_x_eta(
             trajectory.sample_x,
             trajectory.meta["eta_prime"],
         )
         n_n = (
-            profile_earth.call_neutron(
+            profile_earth.density_n_x_eta(
                 trajectory.sample_x,
                 trajectory.meta["eta_prime"],
             )
@@ -297,7 +310,7 @@ def earth_probability_state_numerical(
         )
     else:
         r_mid = 0.5 * (1.0 + trajectory.meta["r_d"])
-        n_1 = profile_earth.call(
+        n_1 = profile_earth.density_x_eta(
             r_mid,
             torch.tensor(0.0, device=dev, dtype=dtype),
         )
@@ -307,7 +320,7 @@ def earth_probability_state_numerical(
             dtype=dtype,
         )
         if include_matter_nc:
-            n_1n = profile_earth.call_neutron(
+            n_1n = profile_earth.density_n_x_eta(
                 r_mid,
                 torch.tensor(0.0, device=dev, dtype=dtype),
             )
@@ -371,7 +384,7 @@ def earth_probability_state(
     context: Optional[RuntimeContext] = None,
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor | tuple[Tensor, Tensor]:
     """Dispatch Earth matter-regeneration probabilities by method.
 
@@ -403,13 +416,10 @@ def earth_probability_state(
             the nearest unitary matrix.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor throughout Earth propagation.
-        include_matter_nc: Also apply the 3+1 sterile extension's
-            neutral-current matter term, for either method (see
-            ``earth_probability_state_analytical``/
-            ``earth_probability_state_numerical``). Requires
-            ``profile_earth`` to have been built with neutron-density
-            coefficients; raises otherwise. False (the default) reproduces
-            the pre-existing CC-only behaviour exactly.
+        include_matter_nc: If True/False, applied/not applied for either
+            method (see ``earth_probability_state_analytical``/
+            ``earth_probability_state_numerical``). If ``None`` (the
+            default), auto-resolved per-call.
 
     Returns:
         Probability tensor with final dimension 3. If method="numerical" and
@@ -469,7 +479,7 @@ def earth_probability_integrated(
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
     energy_dim: int = -2,
-    include_matter_nc: bool = default.earth_include_matter_nc,
+    include_matter_nc: Optional[bool] = None,
 ) -> Tensor:
     """Average final Earth flavour probabilities over energy.
 
@@ -503,9 +513,9 @@ def earth_probability_integrated(
             prefactor throughout Earth propagation.
         energy_dim: Axis of the resulting probability tensor holding the
             energy grid. Must not be the final (flavour) axis.
-        include_matter_nc: Also apply the 3+1 sterile extension's
-            neutral-current matter term, for either method (see
-            ``earth_probability_state``).
+        include_matter_nc: If True/False, applied/not applied for either
+            method (see ``earth_probability_state``). If ``None`` (the
+            default), auto-resolved per-call.
 
     Returns:
         Spectrum-weighted average probability, with the energy axis removed.
