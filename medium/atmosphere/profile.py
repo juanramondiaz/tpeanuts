@@ -93,9 +93,13 @@ class AtmosphereParameters:
         If True, also sample neutron density along the trajectory and expose
         it as ``n_n_molcm3``, enabling the 3+1 sterile extension's
         neutral-current matter term in ``atmosphere_evolutor_numerical`` (see
-        ``core.common.hamiltonian.hamiltonian_matter_reduced``). False (the
-        default) reproduces the pre-existing CC-only behaviour exactly and
-        leaves ``n_n_molcm3`` as ``None``.
+        ``core.common.hamiltonian.hamiltonian_matter_reduced``). If False,
+        reproduces the pre-existing CC-only behaviour exactly and leaves
+        ``n_n_molcm3`` as ``None``. If ``None`` (the default), auto-resolved
+        by ``atmosphere_evolutor_numerical``/``atmosphere_evolutor_analytical``
+        via ``core.common.oscillation.resolve_include_matter_nc``: ``True``
+        when ``oscillation.BSM_extension_sterile`` is set, ``False``
+        otherwise.
     """
 
     atmosphere_density_source: str = default.atmosphere_source_density
@@ -106,7 +110,7 @@ class AtmosphereParameters:
     evolution_scale_m: TensorLike = R_E
     perturbative_segments: int = 4
     perturbative_degree: int = 3
-    include_matter_nc: bool = default.atmosphere_include_matter_nc
+    include_matter_nc: Optional[bool] = None
 
 
 class AtmosphereProfile:

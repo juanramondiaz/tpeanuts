@@ -47,8 +47,9 @@ import torch
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.medium.solar.profile import SolarParameters, SolarProfile
 from tpeanuts.medium.solar.probability import solar_probability_state
-from tpeanuts.medium.solar.io import default_legacy_data_dir
+import tpeanuts.config.default as default
 from tpeanuts.util.context import RuntimeContext
+from tpeanuts.util.io import package_dir
 
 
 def ensure_legacy_importable() -> Path:
@@ -59,9 +60,7 @@ def ensure_legacy_importable() -> Path:
         validation. Importing is delegated to Python's normal import
         machinery; this helper only centralizes the expected location.
     """
-    package_dir = Path(__file__).resolve().parents[2]
-
-    return package_dir / "peanuts"
+    return package_dir() / "peanuts"
 
 
 @lru_cache(maxsize=1)
@@ -86,8 +85,7 @@ def legacy_modules():
     importlib.import_module("peanuts.matter_mixing")
     importlib.import_module("peanuts.files")
 
-    package_dir = Path(__file__).resolve().parents[2]
-    solar_path = package_dir / "peanuts" / "solar.py"
+    solar_path = package_dir() / "peanuts" / "solar.py"
 
     source = solar_path.read_text(encoding="utf-8")
     source = source.replace("\nmodel = SolarModel()\n", "\n")
@@ -110,7 +108,7 @@ def legacy_solar_model(
     if solar_model is not None:
         return solar_model
     _, legacy_solar = legacy_modules()
-    data_dir = default_legacy_data_dir()
+    data_dir = package_dir() / default.legacy_data_dir
     return legacy_solar.SolarModel(
         solar_model_file=solar_model_file or str(data_dir / "nudistr_b16_agss09.dat"),
         flux_file=solar_flux_file or str(data_dir / "fluxes_b16.dat"),
@@ -200,7 +198,7 @@ def compare_solar_probability_state_with_legacy(
 ) -> dict[str, np.ndarray | float]:
     """Compare ``solar_probability_state`` with legacy ``peanuts.solar.Psolar`` for one source.
 
-    Builds the torch-native default B16 solar profile, evaluates
+    Builds an explicit torch-native B16 solar profile, evaluates
     :func:`tpeanuts.medium.solar.probability.solar_probability_state` for the
     requested source and energy, then independently constructs the legacy
     ``SolarModel``/``PMNS`` objects from the original (non-torch) data files
@@ -234,10 +232,14 @@ def compare_solar_probability_state_with_legacy(
     # Always use the B16 AGSS09 profile here: the legacy peanuts reference
     # was generated with B16, so the comparison must use the same model
     # regardless of what the package-wide default profile is.
-    _solar_dir = Path(__file__).resolve().parents[2] / "data" / "solar"
+    _solar_dir = package_dir() / default.solar_data_dir
+    _zenodo_dir = _solar_dir / "zenodo"
     _b16_params = SolarParameters(
-        model_path=str(_solar_dir / "nudistr_b16_agss09.csv"),
-        fluxes_path=str(_solar_dir / "fluxes_b16.csv"),
+        density_path=str(_zenodo_dir / "density" / "density_SF3_AGSS09.csv"),
+        production_path=str(
+            _zenodo_dir / "production" / "production_SF3_AGSS09.csv"
+        ),
+        fluxes_path=str(_zenodo_dir / "flux" / "fluxes_SF3_AGSS09.csv"),
     )
     profile = SolarProfile.default(params=_b16_params, context=context)
     torch_p = solar_probability_state(
@@ -248,8 +250,7 @@ def compare_solar_probability_state_with_legacy(
         legacy_precision=legacy_precision,
     )
 
-    package_dir = Path(__file__).resolve().parents[2]
-    legacy_data = package_dir / "data" / "peanuts"
+    legacy_data = package_dir() / default.legacy_data_dir
 
     legacy_model = legacy_solar.SolarModel(
         solar_model_file=str(legacy_data / "nudistr_b16_agss09.dat"),

@@ -29,9 +29,6 @@ Module groups:
     solar, earth, solar_earth
         Solar production, pure Earth propagation, and their incoherent
         composition.
-    legacy
-        Explicit legacy validation backend, imported from
-        ``tpeanuts.pipeline.legacy`` rather than re-exported here.
     atmosphere, atmosphere_earth
         Production-to-surface and surface-to-detector atmosphere workflows.
 """

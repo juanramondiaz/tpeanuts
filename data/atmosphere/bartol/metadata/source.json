@@ -1,0 +1,8 @@
+{
+  "provider": "Bartol/BGLRS",
+  "reference": "Barr et al., Phys. Rev. D 70, 023006 (2004)",
+  "source_url": "https://www-pnp.physics.ox.ac.uk/~barr/fluxfiles/",
+  "raw_available_in_repository": false,
+  "native_flux_unit": "dN/dlnE m^-2 s^-1 sr^-1",
+  "notes": "The historical public endpoint is currently unavailable. The generator requires a user-supplied original Bartol table and never substitutes Honda data."
+}

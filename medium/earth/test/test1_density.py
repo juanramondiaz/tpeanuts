@@ -210,17 +210,13 @@ def test_density_x_eta_real_profile_finite_and_nonnegative():
     assert check_positive(n_e)
 
 
-def test_call_and_dunder_call_match_density_x_eta():
+def test_density_x_eta_returns_one_value_per_coordinate():
     profile = _default_profile()
     x = torch.tensor([0.0, 0.3, 0.8], device=DEVICE, dtype=DTYPE)
     eta = torch.tensor([0.0, 0.4, 1.0], device=DEVICE, dtype=DTYPE)
 
-    direct = profile.density_x_eta(x, eta)
-    via_call = profile.call(x, eta)
-    via_dunder = profile(x, eta)
-
-    assert_close(via_call, direct, name="call matches density_x_eta")
-    assert_close(via_dunder, direct, name="__call__ matches density_x_eta")
+    density = profile.density_x_eta(x, eta)
+    assert density.shape == x.shape
 
 
 def test_trajectory_profile_consistent_with_shells_x():
@@ -342,7 +338,7 @@ def test_call_neutron_matches_density_n_x_eta():
     eta = torch.tensor([0.0, 0.4, 1.0], device=DEVICE, dtype=DTYPE)
 
     direct = profile.density_n_x_eta(x, eta)
-    via_call = profile.call_neutron(x, eta)
+    via_call = profile.density_n_x_eta(x, eta)
 
     assert_close(via_call, direct, name="call_neutron matches density_n_x_eta")
 

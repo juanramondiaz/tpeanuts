@@ -38,15 +38,12 @@ save_phi_Eh_theta_result(...)
     Saves one Atmosphere height-differential flux result to a torch file.
 load_phi_Eh_theta_result(...)
     Loads one saved torch file and returns its data dictionary.
-load_phi_Eh_alpha_theta_from_config(...)
+load_phi_Eh_from_config(...)
     Convenience loader that reconstructs the expected path from OutputConfig,
     particle, alpha, and theta before calling load_phi_Eh_theta_result.
 load_directory(...)
     Loads all torch files in a directory and stacks them by particle or
     flavour, producing batched theta-dependent tensors.
-load_phi_E_h_flavours_for_theta(...)
-    Thin compatibility wrapper over load_directory for callers that need the
-    old tuple format at one selected theta.
 
 Private helpers
 ---------------
@@ -60,8 +57,6 @@ _assert_same_grid(...)
     Checks that loaded files share the same energy or height grid.
 _angle_sort_key(...)
     Provides a stable sorting key for theta-only and alpha+theta payloads.
-_theta_index(...)
-    Selects the nearest theta entry within a tolerance.
 """
 
 from __future__ import annotations
@@ -70,8 +65,10 @@ import json
 import os
 from dataclasses import dataclass
 from os import PathLike
+from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+import pandas as pd
 import torch
 
 import tpeanuts.config.default as default
@@ -85,8 +82,65 @@ from tpeanuts.util.io import (
     scalar_float_or_none,
     tensor_shape_dict,
     torch_load_file,
+    package_dir,
 )
 from tpeanuts.util.torch_util import cast_tensor_tree
+from tpeanuts.util.type import as_tensor
+
+
+@dataclass(frozen=True)
+class AtmosphericFluxTable:
+    """Canonical long-form atmospheric-neutrino flux table."""
+
+    energy_GeV: torch.Tensor
+    cos_zenith: torch.Tensor
+    flux: torch.Tensor
+    particle: tuple[str, ...]
+    azimuth_deg: torch.Tensor | None = None
+    altitude_km: torch.Tensor | None = None
+
+
+def load_atmospheric_flux(
+    path: str | PathLike[str] | None = None,
+    *,
+    device: str | torch.device | None = None,
+    dtype: torch.dtype = torch.float64,
+) -> AtmosphericFluxTable:
+    """Load a canonical provider-neutral atmospheric flux CSV.
+
+    Required columns are ``energy_GeV``, ``cos_zenith``, ``particle`` and
+    ``flux``. Optional azimuth and production-altitude axes are preserved.
+    The differential-flux unit belongs in the provider metadata because some
+    original tables publish ``dN/dE`` while Bartol publishes ``dN/dlnE``.
+    """
+    if path is None:
+        path = package_dir() / default.atmosphere_flux_dir / default.atmosphere_flux_filename
+    table = pd.read_csv(path)
+    required = {"energy_GeV", "cos_zenith", "particle", "flux"}
+    missing = required.difference(table.columns)
+    if missing:
+        raise ValueError(
+            "Atmospheric flux table is missing required columns: "
+            + ", ".join(sorted(missing))
+        )
+    if not table["cos_zenith"].between(-1.0, 1.0).all():
+        raise ValueError("cos_zenith values must lie in [-1, 1].")
+    if (table["energy_GeV"] <= 0).any() or (table["flux"] < 0).any():
+        raise ValueError("Atmospheric energies must be positive and fluxes non-negative.")
+
+    def optional(name: str) -> torch.Tensor | None:
+        if name not in table:
+            return None
+        return as_tensor(table[name].to_numpy(), device=device, dtype=dtype)
+
+    return AtmosphericFluxTable(
+        energy_GeV=as_tensor(table["energy_GeV"].to_numpy(), device=device, dtype=dtype),
+        cos_zenith=as_tensor(table["cos_zenith"].to_numpy(), device=device, dtype=dtype),
+        flux=as_tensor(table["flux"].to_numpy(), device=device, dtype=dtype),
+        particle=tuple(table["particle"].astype(str)),
+        azimuth_deg=optional("azimuth_deg"),
+        altitude_km=optional("altitude_km"),
+    )
 
 @dataclass
 class OutputConfig:
@@ -382,11 +436,10 @@ def save_phi_Eh_theta_result(
     return output_path
 
 
-def load_phi_Eh_alpha_theta_from_config(
+def load_phi_Eh_from_config(
     output_config: OutputConfig,
     particle: str,
     alpha_deg: float,
-    theta_deg: float,
     *,
     flavour_name: Optional[str] = None,
     map_location: str | torch.device = "cpu",
@@ -404,8 +457,6 @@ def load_phi_Eh_alpha_theta_from_config(
         output_config: Output settings used when the file was saved.
         particle: Physical particle label embedded in the filename.
         alpha_deg: Surface zenith angle in degrees embedded in the filename.
-        theta_deg: Detector theta angle in degrees. Kept for compatibility and
-            metadata matching, but not embedded in the filename.
         flavour_name: Optional flavour label embedded in the filename.
         map_location: Torch map_location used while reading.
         dtype: Optional dtype applied to floating tensors after loading.
@@ -439,9 +490,8 @@ def load_phi_Eh_theta_result(
     """
     Load one Atmosphere height-differential flux torch file.
 
-    This is the canonical single-file reader. It expects the format written by
-    save_phi_Eh_theta_result, but it also accepts older files where the payload
-    was saved directly rather than under a "data" key.
+    This reader accepts only the canonical payload written by
+    ``save_phi_Eh_theta_result``.
 
     Args:
         input_path: Path to one .pt or .pth file.
@@ -468,10 +518,14 @@ def load_phi_Eh_theta_result(
             "Loaded object must be a dictionary."
         )
 
-    if "data" in loaded:
-        data = loaded["data"]
-    else:
-        data = loaded
+    required = {"data", "metadata"}
+    missing = required.difference(loaded)
+    if missing:
+        raise ValueError(
+            "Atmosphere tensor payload is not canonical; missing keys: "
+            + ", ".join(sorted(missing))
+        )
+    data = loaded["data"]
 
     if device is None:
         device = map_location
@@ -482,11 +536,7 @@ def load_phi_Eh_theta_result(
         device=device,
     )
 
-    if "metadata" in loaded:
-        data["metadata"] = loaded["metadata"]
-
-    elif "metadata_json" in loaded:
-        data["metadata"] = json.loads(loaded["metadata_json"])
+    data["metadata"] = loaded["metadata"]
 
     if "metadata_json" in loaded:
         data["metadata_json"] = loaded["metadata_json"]
@@ -802,148 +852,3 @@ def load_directory(
     return data
 
 
-def _theta_index(
-    theta_grid_deg: torch.Tensor,
-    theta_deg: float,
-    theta_tolerance_deg: float,
-    *,
-    group_name: str,
-) -> int:
-    """
-    Find the theta entry closest to a requested angle.
-
-    Args:
-        theta_grid_deg: 1D tensor of available theta angles.
-        theta_deg: Requested theta angle in degrees.
-        theta_tolerance_deg: Maximum accepted absolute mismatch.
-        group_name: Group name used in error messages.
-
-    Returns:
-        Integer index of the selected theta entry.
-    """
-    theta_target = torch.as_tensor(
-        theta_deg,
-        device=theta_grid_deg.device,
-        dtype=theta_grid_deg.dtype,
-    )
-    delta = torch.abs(theta_grid_deg - theta_target)
-    index = int(torch.argmin(delta).item())
-
-    if float(delta[index].detach().cpu()) > theta_tolerance_deg:
-        raise FileNotFoundError(
-            f"No entry for {group_name} at theta={theta_deg} deg "
-            f"within tolerance {theta_tolerance_deg} deg."
-        )
-
-    return index
-
-
-@torch.no_grad()
-def load_phi_E_h_flavours_for_theta(
-    data_dir: str,
-    theta_deg: float,
-    required_flavours=("nue", "numu", "nutau"),
-    theta_tolerance_deg: float = 1e-6,
-    verbose: bool = True,
-    *,
-    device: Optional[Union[str, torch.device]] = None,
-    dtype: torch.dtype = torch.float64,
-):
-    """
-    Load flavour-resolved height-differential flux tensors at one theta.
-
-    This compatibility wrapper delegates to load_directory and converts the
-    stacked dictionary format into the older tuple format expected by some
-    Atmosphere propagation code. Use load_directory for new code that needs
-    the full theta grid.
-
-    Args:
-        data_dir: Directory containing Atmosphere torch files.
-        theta_deg: Requested theta angle in degrees.
-        required_flavours: Ordered flavour names that must be present.
-        theta_tolerance_deg: Maximum accepted absolute theta mismatch.
-        verbose: If True, print one line per selected flavour.
-        device: Optional final tensor device.
-        dtype: Optional dtype applied to floating tensors.
-
-    Returns:
-        Tuple (E_grid, h_grid_km, phi_E_h_flavours, metadata_dict), where
-        phi_E_h_flavours maps each required flavour to one Phi(E,h) tensor.
-    """
-    dataset = load_directory(
-        data_dir,
-        map_location="cpu",
-        dtype=dtype,
-        device=device,
-        group_by="particle",
-        verbose=False,
-    )
-
-    phi_E_h_flavours = {}
-    metadata_dict = {}
-
-    E_ref = None
-    h_ref = None
-    missing = []
-
-    for flavour in required_flavours:
-        if flavour not in dataset:
-            missing.append(flavour)
-            continue
-
-        group = dataset[flavour]
-        index = _theta_index(
-            group["theta_grid_deg"],
-            theta_deg,
-            theta_tolerance_deg,
-            group_name=str(flavour),
-        )
-
-        E_grid = group["E_grid_GeV"]
-        h_grid_km = group["h_grid_km"]
-        phi_E_h = group["phi_E_theta_h"][index]
-
-        if E_ref is None:
-            E_ref = E_grid
-        else:
-            _assert_same_grid(
-                E_ref,
-                E_grid,
-                group_name=str(flavour),
-                grid_name="E_grid_GeV",
-            )
-
-        if h_ref is None:
-            h_ref = h_grid_km
-        else:
-            _assert_same_grid(
-                h_ref,
-                h_grid_km,
-                group_name=str(flavour),
-                grid_name="h_grid_km",
-            )
-
-        phi_E_h_flavours[flavour] = phi_E_h
-        metadata_dict[flavour] = group["metadata"][index]
-
-        if verbose:
-            theta_file = float(group["theta_grid_deg"][index].detach().cpu())
-            print(
-                f"Loaded {flavour:8s} | "
-                f"theta = {theta_file:7.3f} deg | "
-                f"shape = {tuple(phi_E_h.shape)} | "
-                f"device = {phi_E_h.device} | "
-                f"{group['paths'][index]}"
-            )
-
-    if len(missing) > 0:
-        raise FileNotFoundError(
-            f"Missing flavours for theta={theta_deg} deg: {missing}"
-        )
-
-    return (
-        E_ref,
-        h_ref,
-        phi_E_h_flavours,
-        metadata_dict,
-    )

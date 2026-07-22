@@ -22,7 +22,7 @@ Within each shell the electron density is a first-degree polynomial in r²:
 
     n_e(r²) = A + B · r²,
 
-fit by linear interpolation between consecutive PREM500 tabulated points.
+fit by linear interpolation between consecutive canonical PREM points.
 This representation is exact at both endpoints of every sub-interval, and the
 coordinate shift r² = x² + sin²η required for a nadir-angle trajectory maps
 the density to an equally simple polynomial in x²:
@@ -54,14 +54,16 @@ from tpeanuts.core.perturbative.models.interface import (
     PerturbativeSegmentBatch,
 )
 from tpeanuts.core.perturbative.models.prem.io import (
-    load_prem500_profile,
-    load_prem500_neutron_profile,
+    load_prem_profile,
+    load_prem_neutron_profile,
 )
 from tpeanuts.core.perturbative.models.prem.profile_segment import PremProfileSegment
 
 
-# Default PREM500 CSV path relative to the project working directory.
-_DEFAULT_PREM_FILE: str = os.path.join("data", "external", "PREM500.csv")
+# Default canonical PREM table.
+_DEFAULT_PREM_FILE: str = os.path.join(
+    default.earth_reference_data_dir, default.earth_reference_density_filename
+)
 
 
 @dataclass
@@ -73,8 +75,7 @@ class PremTabulatedProfile:
     modification.
 
     Args:
-        prem_file: Path to the PREM500 CSV file (nine columns, no header).
-            Defaults to ``data/external/PREM500.csv``.  Ignored when both
+        density_path: Path to the canonical PREM density CSV. Ignored when both
             ``rj`` and ``coefficients`` are supplied.
         rj: Optional pre-built shell outer boundaries, normalized by R_E,
             strictly increasing in ``(0, 1]``.  Must be paired with
@@ -83,7 +84,7 @@ class PremTabulatedProfile:
             ``(..., n_shells, 2)`` with columns ``[A, B]`` for
             n_e(r²) = A + B·r² in each shell.  Must be paired with ``rj``.
         include_neutron: If True and ``coefficients`` is not pre-built, also
-            load neutron-density coefficients from the same PREM500 CSV
+            load neutron-density coefficients from the same canonical PREM CSV
             (``coefficients_n``), enabling the 3+1 sterile extension's
             neutral-current matter term (see ``evaluate_neutron`` and
             ``core.common.hamiltonian.hamiltonian_matter_reduced``). Ignored
@@ -95,7 +96,7 @@ class PremTabulatedProfile:
         dtype: Real dtype for all tensors.
     """
 
-    prem_file: str | None = None
+    density_path: str | None = None
     rj: torch.Tensor | None = None
     coefficients: torch.Tensor | None = None
     include_neutron: bool = False
@@ -107,17 +108,16 @@ class PremTabulatedProfile:
         self.device = default_device(self.device)
 
         if self.coefficients is None:
-            # Load from PREM500 CSV.
-            if self.prem_file is None:
-                self.prem_file = _DEFAULT_PREM_FILE
-            self.rj, self.coefficients = load_prem500_profile(
-                self.prem_file,
+            if self.density_path is None:
+                self.density_path = _DEFAULT_PREM_FILE
+            self.rj, self.coefficients = load_prem_profile(
+                self.density_path,
                 device=self.device,
                 dtype=self.dtype,
             )
             if self.include_neutron and self.coefficients_n is None:
-                _, self.coefficients_n = load_prem500_neutron_profile(
-                    self.prem_file,
+                _, self.coefficients_n = load_prem_neutron_profile(
+                    self.density_path,
                     device=self.device,
                     dtype=self.dtype,
                 )

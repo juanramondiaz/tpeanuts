@@ -42,6 +42,7 @@ Re-exported names:
 """
 
 from tpeanuts.medium.earth.profile import EarthProfile, build_earth_profile
+from tpeanuts.medium.earth.io import EarthDensityTable, load_earth_density, earth_provider_path
 from tpeanuts.medium.earth.geometry import build_atmosphere_trajectories
 from tpeanuts.medium.earth.validation import (
     compare_earth_probability_exposure_with_legacy,
@@ -50,6 +51,9 @@ from tpeanuts.medium.earth.validation import (
 
 __all__ = [
     "EarthProfile",
+    "EarthDensityTable",
+    "load_earth_density",
+    "earth_provider_path",
     "build_earth_profile",
     "build_atmosphere_trajectories",
     "compare_earth_probability_state_with_legacy",

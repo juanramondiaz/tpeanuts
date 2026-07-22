@@ -41,10 +41,11 @@ Module functions:
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Literal, Optional
 import torch
 
-from tpeanuts.core.common.oscillation import OscillationParameters
+from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, cdtype_from_real
 from tpeanuts.core.numerical.evolutor import evolutor_numerical
@@ -119,6 +120,13 @@ def atmosphere_evolutor_numerical(
 
     if atmosphere.nsteps < 1:
         raise ValueError("atmosphere.nsteps must be at least one segment.")
+
+    include_matter_nc = resolve_include_matter_nc(
+        atmosphere.include_matter_nc, oscillation,
+        has_neutron_data=True,
+        context_name="atmosphere_evolutor_numerical",
+    )
+    atmosphere = dataclasses.replace(atmosphere, include_matter_nc=include_matter_nc)
 
     profile_atmosphere = AtmosphereProfile(
         h_km=h_km,
@@ -197,6 +205,12 @@ def atmosphere_evolutor_analytical(
     if n_segments < 1 or degree < 0:
         raise ValueError("perturbative_segments must be positive and perturbative_degree non-negative.")
 
+    include_matter_nc = resolve_include_matter_nc(
+        atmosphere.include_matter_nc, oscillation,
+        has_neutron_data=True,
+        context_name="atmosphere_evolutor_analytical",
+    )
+
     h = as_tensor(h_km, device=dev, dtype=dtype)
     theta = as_tensor(theta_deg, device=dev, dtype=dtype)
     depth = as_tensor(depth_km, device=dev, dtype=dtype)
@@ -235,12 +249,12 @@ def atmosphere_evolutor_analytical(
                 context=resolved_context,
                 **dict(atmosphere.atmosphere_density_kwargs or {}),
             )
-            if atmosphere.include_matter_nc
+            if include_matter_nc
             else None
         )
     else:
         density = torch.zeros_like(altitude)
-        density_n = torch.zeros_like(altitude) if atmosphere.include_matter_nc else None
+        density_n = torch.zeros_like(altitude) if include_matter_nc else None
 
     fitted = AtmospherePolynomialProfile(boundaries, density)
     coefficients_n = (
@@ -263,7 +277,7 @@ def atmosphere_evolutor_analytical(
         profile_model=model,
         evolution_scale_m=atmosphere.evolution_scale_m,
         legacy_precision=legacy_precision,
-        include_matter_nc=atmosphere.include_matter_nc,
+        include_matter_nc=include_matter_nc,
     )
     U_red = compose_segment_evolutors(U_segments, segment_dim=-3, multiply="left")
     S = oscillation.pmns.flavour_basis(

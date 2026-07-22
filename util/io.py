@@ -20,6 +20,7 @@
 Common I/O helpers shared by several TPeanuts domains.
 
 Module functions:
+    package_dir(...): Return the TPeanuts package/repository root.
     load_datafile_2column(...): Load, sort, and return the first two numeric
         columns of a whitespace/comma-delimited text file.
     safe_filename_name(...): Sanitize a string into a filesystem-safe name.
@@ -40,12 +41,22 @@ Module functions:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import torch
 
 import tpeanuts.config.default as default
 from tpeanuts.util.torch_util import default_device
+
+
+def package_dir() -> Path:
+    """Return the TPeanuts package/repository root containing ``data/``.
+
+    Returns:
+        Directory one level above ``util/``.
+    """
+    return Path(__file__).resolve().parents[1]
 
 
 @torch.no_grad()

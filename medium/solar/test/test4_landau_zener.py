@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 import torch
 
@@ -30,7 +31,7 @@ from tpeanuts.core.common.pmns import PMNSParams
 from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.solar.landau_zener import density_gradient, plz, resonance_radius
-from tpeanuts.medium.solar.matter_mixing import Vk
+from tpeanuts.medium.solar.matter_mixing import DeltamSqee, Vk, th13_M
 from tpeanuts.medium.solar.profile import build_solar_profile
 from tpeanuts.util.context import RuntimeContext
 
@@ -64,12 +65,47 @@ def make_oscillation(
     return OscillationParameters(pmns=pmns, mass_spectrum=mass_spectrum, antinu=antinu)
 
 
-def resonance_density(oscillation: OscillationParameters, energy_mev: float) -> torch.Tensor:
+def resonance_density(
+    oscillation: OscillationParameters,
+    energy_mev: float,
+    *,
+    lo: float = 1.0e-8,
+    hi: float = 1.0e4,
+    iterations: int = 100,
+) -> torch.Tensor:
+    """Electron density where the full V'_k resonance condition holds.
+
+    Matches ``landau_zener.resonance_radius``'s own condition
+    (``V'_k = cos(2 theta_12)``, with ``V'_k`` the theta_13-corrected
+    effective potential used by ``matter_mixing.th12_M``) exactly, by
+    bisection -- unlike the bare two-flavour ``Vk``, ``V'_k`` is not linear
+    in the density, so it has no closed-form inverse here.
+    """
     energy = torch.tensor(energy_mev, device=DEVICE, dtype=DTYPE)
-    unit_density = torch.tensor(1.0, device=DEVICE, dtype=DTYPE)
-    cos2theta12 = torch.cos(2.0 * oscillation.pmns.params.theta12)
-    vk_per_density = Vk(oscillation.mass_spectrum.DeltamSq21, energy, unit_density)
-    return cos2theta12 / vk_per_density
+    dm21 = oscillation.mass_spectrum.DeltamSq21
+    dm_ee = DeltamSqee(oscillation)
+    th13 = oscillation.pmns.params.theta13
+    cos2theta12 = float(torch.cos(2.0 * oscillation.pmns.params.theta12))
+
+    def resonance_diff(ne: float) -> float:
+        ne_t = torch.tensor(ne, device=DEVICE, dtype=DTYPE)
+        th13m = th13_M(oscillation, energy, ne_t)
+        vk = Vk(dm21, energy, ne_t)
+        vk_prime = vk * torch.cos(th13m) ** 2 + dm_ee / dm21 * torch.sin(th13m - th13) ** 2
+        return float(vk_prime) - cos2theta12
+
+    # V'_k grows monotonically with density (from ~0 in vacuum), so
+    # resonance_diff is increasing in ne: negative at lo, positive at hi.
+    lo_diff, hi_diff = resonance_diff(lo), resonance_diff(hi)
+    assert lo_diff < 0.0 < hi_diff, "expected a bracketing sign change over [lo, hi]"
+    for _ in range(iterations):
+        mid = 0.5 * (lo + hi)
+        if resonance_diff(mid) < 0.0:
+            lo = mid
+        else:
+            hi = mid
+
+    return torch.tensor(0.5 * (lo + hi), device=DEVICE, dtype=DTYPE)
 
 
 def make_linear_resonance_profile(
@@ -98,17 +134,32 @@ def test_density_gradient_matches_linear_profile_derivative():
 
 def test_resonance_radius_recovers_known_linear_crossing_for_scalar_and_grid():
     oscillation = make_oscillation()
-    profile = make_linear_resonance_profile(oscillation, energy_mev=10.0, resonance_r=0.4)
+    base_energy = 10.0
+    resonance_r = 0.4
+    profile = make_linear_resonance_profile(oscillation, energy_mev=base_energy, resonance_r=resonance_r)
+    ne_res_base = float(resonance_density(oscillation, base_energy))
 
-    scalar_radius = resonance_radius(oscillation, torch.tensor(10.0, device=DEVICE, dtype=DTYPE), profile)
+    scalar_radius = resonance_radius(oscillation, torch.tensor(base_energy, device=DEVICE, dtype=DTYPE), profile)
+    torch.testing.assert_close(scalar_radius, torch.tensor(resonance_r, device=DEVICE, dtype=DTYPE), rtol=1.0e-5, atol=1.0e-5)
+
     energy_grid = torch.tensor([5.0, 10.0, 20.0], device=DEVICE, dtype=DTYPE)
     grid_radius = resonance_radius(oscillation, energy_grid, profile)
 
-    expected_grid = torch.tensor([float("nan"), 0.4, 0.9], device=DEVICE, dtype=DTYPE)
+    # Independently invert the profile's known linear form,
+    # density(r) = ne_res_base * (1 + (resonance_r - r)), for each energy's
+    # own (theta_13-corrected) resonance density -- rather than assuming the
+    # bare two-flavour Vk's 1/E scaling, which V'_k no longer follows exactly.
+    expected = [
+        resonance_r - (float(resonance_density(oscillation, e)) / ne_res_base - 1.0)
+        for e in (5.0, 10.0, 20.0)
+    ]
+    expected_grid = torch.tensor(expected, device=DEVICE, dtype=DTYPE)
 
-    torch.testing.assert_close(scalar_radius, torch.tensor(0.4, device=DEVICE, dtype=DTYPE), rtol=1.0e-13, atol=1.0e-13)
+    # E=5 MeV needs a higher resonance density than the profile's maximum
+    # (at r=0): no physical crossing exists on this profile.
+    assert not (0.0 <= expected_grid[0] <= 1.0)
     assert torch.isnan(grid_radius[0])
-    torch.testing.assert_close(grid_radius[1:], expected_grid[1:], rtol=1.0e-13, atol=1.0e-13)
+    torch.testing.assert_close(grid_radius[1:], expected_grid[1:], rtol=1.0e-5, atol=1.0e-5)
 
 
 def test_resonance_radius_returns_nan_without_physical_solar_resonance():
@@ -167,3 +218,62 @@ def test_standard_solar_profile_lma_is_fully_adiabatic_to_float_precision():
     assert probabilities.shape == energies.shape
     assert torch.isfinite(probabilities).all()
     torch.testing.assert_close(probabilities, torch.zeros_like(probabilities), rtol=0.0, atol=0.0)
+
+
+def test_resonance_radius_uses_full_structural_grid():
+    oscillation = make_oscillation()
+    energy_mev = 10.0
+    resonance_r = 0.7
+    ne_res = resonance_density(oscillation, energy_mev)
+
+    full_radius = torch.linspace(0.0, 1.0, 101, device=DEVICE, dtype=DTYPE)
+    full_density = ne_res * (1.0 + (resonance_r - full_radius))
+
+    # Restricted grid stops well short of the resonance at r=0.7.
+    restricted_mask = full_radius <= 0.5
+    restricted_only = SimpleProfile(
+        radius=full_radius[restricted_mask],
+        density=full_density[restricted_mask],
+    )
+    with_full_grid = SimpleProfile(
+        radius=full_radius,
+        density=full_density,
+    )
+
+    energy = torch.tensor(energy_mev, device=DEVICE, dtype=DTYPE)
+    missed = resonance_radius(oscillation, energy, restricted_only)
+    found = resonance_radius(oscillation, energy, with_full_grid)
+
+    assert torch.isnan(missed)
+    torch.testing.assert_close(found, torch.tensor(resonance_r, device=DEVICE, dtype=DTYPE), rtol=1.0e-5, atol=1.0e-5)
+
+
+def test_plz_uses_full_structural_grid():
+    # Same as above, but end-to-end through plz: a non-adiabatic (large
+    # slope, hence non-negligible P_LZ) resonance beyond the restricted
+    # grid must still contribute a nonzero transition probability once the
+    # full grid is available.
+    oscillation = make_oscillation()
+    energy_mev = 10.0
+    resonance_r = 0.7
+    ne_res = resonance_density(oscillation, energy_mev)
+
+    full_radius = torch.linspace(0.0, 1.0, 101, device=DEVICE, dtype=DTYPE)
+    full_density = ne_res * (1.0 + 1.0e15 * (resonance_r - full_radius))
+
+    restricted_mask = full_radius <= 0.5
+    restricted_only = SimpleProfile(
+        radius=full_radius[restricted_mask],
+        density=full_density[restricted_mask],
+    )
+    with_full_grid = SimpleProfile(
+        radius=full_radius,
+        density=full_density,
+    )
+
+    energy = torch.tensor(energy_mev, device=DEVICE, dtype=DTYPE)
+    p_missed = plz(oscillation, energy, restricted_only)
+    p_found = plz(oscillation, energy, with_full_grid)
+
+    torch.testing.assert_close(p_missed, torch.zeros_like(p_missed), rtol=0.0, atol=0.0)
+    assert float(p_found) > 0.0

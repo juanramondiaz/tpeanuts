@@ -1,0 +1,11 @@
+{
+  "provider": "legacy",
+  "reference": "Lisi and Montanino, Phys. Rev. D 56, 1792 (1997), hep-ph/9702343",
+  "model": "five-layer even-power electron-density parametrisation",
+  "earth_radius_km": 6371.0,
+  "composition_extension": {
+    "Ye_core": 0.467,
+    "Ye_mantle_crust": 0.495
+  },
+  "warning": "Mass and neutron densities are derived from assumed Ye; they are not observables of the original fit."
+}

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import pytest
 import torch
 
@@ -329,6 +331,27 @@ def test_atmosphere_evolutor_numerical_include_matter_nc_changes_sterile_result(
     assert torch.max(torch.abs(S_nc - S_cc)) > 0.0
 
 
+def test_atmosphere_evolutor_numerical_include_matter_nc_default_auto_resolves_true_for_sterile():
+    ctx = make_context()
+    oscillation = PropagationConfig.oscillation_parameters_from_preset(
+        "sterile_3p1_bestfit_giunti2017", context=ctx,
+    )
+    args = dict(E_MeV=2000.0, h_km=20.0, theta_deg=45.0, depth_km=1.0, context=ctx)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        S_default, _ = atmosphere_evolutor(
+            oscillation, **args, method="numerical",
+            atmosphere=make_atmosphere(nsteps=64, matter=True),
+        )
+    S_true, _ = atmosphere_evolutor(
+        oscillation, **args, method="numerical",
+        atmosphere=make_atmosphere(nsteps=64, matter=True, include_matter_nc=True),
+    )
+
+    torch.testing.assert_close(S_default, S_true, atol=1.0e-13, rtol=1.0e-13)
+
+
 def test_atmosphere_evolutor_numerical_include_matter_nc_is_noop_for_three_flavour():
     ctx = make_context()
     oscillation = make_oscillation(context=ctx)
@@ -367,6 +390,27 @@ def test_atmosphere_evolutor_analytical_include_matter_nc_changes_sterile_result
     assert torch.isfinite(S_nc.real).all() and torch.isfinite(S_nc.imag).all()
     assert_unitary(S_nc, atol=1.0e-6, rtol=1.0e-6)
     assert torch.max(torch.abs(S_nc - S_cc)) > 0.0
+
+
+def test_atmosphere_evolutor_analytical_include_matter_nc_default_auto_resolves_true_for_sterile():
+    ctx = make_context()
+    oscillation = PropagationConfig.oscillation_parameters_from_preset(
+        "sterile_3p1_bestfit_giunti2017", context=ctx,
+    )
+    args = dict(E_MeV=2000.0, h_km=20.0, theta_deg=45.0, depth_km=1.0, context=ctx)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        S_default, _ = atmosphere_evolutor(
+            oscillation, **args, method="analytical",
+            atmosphere=make_atmosphere(matter=True, perturbative_segments=4, perturbative_degree=2),
+        )
+    S_true, _ = atmosphere_evolutor(
+        oscillation, **args, method="analytical",
+        atmosphere=make_atmosphere(matter=True, perturbative_segments=4, perturbative_degree=2, include_matter_nc=True),
+    )
+
+    torch.testing.assert_close(S_default, S_true, atol=1.0e-13, rtol=1.0e-13)
 
 
 def test_atmosphere_evolutor_analytical_include_matter_nc_is_noop_for_three_flavour():

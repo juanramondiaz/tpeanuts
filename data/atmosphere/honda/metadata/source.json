@@ -1,0 +1,9 @@
+{
+  "provider": "Honda/HKKM",
+  "dataset": "HKKM 2006-2008 Frejus, 3D, solar minimum",
+  "raw_file": "frj-0608-20-12-solmin.d.gz",
+  "flux_unit": "m^-2 s^-1 sr^-1 GeV^-1",
+  "canonical_schema": ["energy_GeV", "cos_zenith", "azimuth_deg", "particle", "flux"],
+  "particles": ["numu", "numubar", "nue", "nuebar"],
+  "notes": "Honda tabulates surface flux. Production-height tables are a separate product."
+}

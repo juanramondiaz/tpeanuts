@@ -131,7 +131,7 @@ def default_new_earth_density_path() -> str:
     """Return the clean Earth-density CSV path for the new implementation.
 
     Returns:
-        String path to ``data/density/earth_density.csv``.
+        String path to the canonical PREM-derived even-power fit.
     """
     package_dir = Path(__file__).resolve().parents[2]
     return str(package_dir / default.earth_density_dir / default.earth_density_filename)

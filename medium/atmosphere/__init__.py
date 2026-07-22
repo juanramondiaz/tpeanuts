@@ -81,7 +81,12 @@ from tpeanuts.medium.atmosphere.flux import (
     atmosphere_flux_integrated_angular,
     atmosphere_flux_integrated_height,
 )
-from tpeanuts.medium.atmosphere.io import OutputConfig, load_directory
+from tpeanuts.medium.atmosphere.io import (
+    AtmosphericFluxTable,
+    OutputConfig,
+    load_atmospheric_flux,
+    load_directory,
+)
 
 __all__ = [
     "atmosphere_density",
@@ -107,5 +112,7 @@ __all__ = [
     "atmosphere_flux_integrated_angular",
     "atmosphere_flux_integrated_height",
     "OutputConfig",
+    "AtmosphericFluxTable",
+    "load_atmospheric_flux",
     "load_directory",
 ]

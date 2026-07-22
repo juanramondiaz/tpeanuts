@@ -203,7 +203,15 @@ def th13_M(
     denominator = torch.sqrt(numerator**2 + torch.sin(2.0 * th13_t) ** 2)
     arg = torch.clamp(numerator / denominator, min=-1.0, max=1.0)
 
-    return torch.remainder(0.5 * torch.arccos(arg), torch.pi / 2.0)
+    # arg is clamped to [-1, 1] above, so arccos(arg) is guaranteed in
+    # [0, pi] and 0.5*arccos(arg) already lies in the closed interval
+    # [0, pi/2] -- no wrapping is needed. A `torch.remainder(..., pi/2)`
+    # used to sit here, but since remainder(pi/2, pi/2) == 0 exactly, it
+    # silently mapped the fully-resonant angle pi/2 (denominator == 0, i.e.
+    # the matter-dominated limit) to 0 (the vacuum-like limit) -- the
+    # opposite of the correct value -- instead of being the no-op it was
+    # presumably intended as.
+    return 0.5 * torch.arccos(arg)
 
 
 def th12_M(
@@ -269,4 +277,12 @@ def th12_M(
     )
     arg = torch.clamp(numerator / denominator, min=-1.0, max=1.0)
 
-    return torch.remainder(0.5 * torch.arccos(arg), torch.pi / 2.0)
+    # arg is clamped to [-1, 1] above, so arccos(arg) is guaranteed in
+    # [0, pi] and 0.5*arccos(arg) already lies in the closed interval
+    # [0, pi/2] -- no wrapping is needed. A `torch.remainder(..., pi/2)`
+    # used to sit here, but since remainder(pi/2, pi/2) == 0 exactly, it
+    # silently mapped the fully-resonant angle pi/2 (denominator == 0, i.e.
+    # the matter-dominated limit) to 0 (the vacuum-like limit) -- the
+    # opposite of the correct value -- instead of being the no-op it was
+    # presumably intended as.
+    return 0.5 * torch.arccos(arg)
