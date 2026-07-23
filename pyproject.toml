@@ -30,18 +30,20 @@ dev = ["pytest", "pymsis", "MCEq", "crflux", "nusquids"]
 [tool.setuptools]
 packages = [
     "tpeanuts",
-    "tpeanuts.analysis",
-    "tpeanuts.coherent",
     "tpeanuts.config",
     "tpeanuts.core",
     "tpeanuts.core.BSM",
     "tpeanuts.core.common",
     "tpeanuts.core.numerical",
     "tpeanuts.core.perturbative",
+    "tpeanuts.core.perturbative.models",
+    "tpeanuts.core.perturbative.models.atmosphere",
+    "tpeanuts.core.perturbative.models.even_power",
+    "tpeanuts.core.perturbative.models.prem",
     "tpeanuts.core.SM",
     "tpeanuts.external",
+    "tpeanuts.notebooks",
     "tpeanuts.pipeline",
-    "tpeanuts.pipeline.legacy",
     "tpeanuts.external.honda",
     "tpeanuts.external.mceq",
     "tpeanuts.external.nusquids",
@@ -51,7 +53,6 @@ packages = [
     "tpeanuts.medium.earth",
     "tpeanuts.medium.solar",
     "tpeanuts.medium.vacuum",
-    "tpeanuts.tests",
     "tpeanuts.util",
     "peanuts",
 ]
@@ -62,5 +63,4 @@ include-package-data = true
 tpeanuts = ["data/**/*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
 python_files = ["test*.py"]
