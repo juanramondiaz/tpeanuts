@@ -40,6 +40,10 @@ file} in the repository and always follows the same structure:
     numerical simplifications.
   \item The grey box \textbf{Key References} links the specific bibliography
     for that piece of physics.
+  \item The teal box \textbf{Usage Example} (from \cref{ch:pipeline-solar}
+    onwards) gives a complete, runnable Python snippet showing how the
+    module's public entry points are actually called together, with prose
+    walking through each step.
   \item Central results are \keyresult{highlighted}; sections that do not yet
     have a complete derivation are explicitly flagged as pending and are
     listed in the pending-tasks index right after the table of contents.
@@ -55,12 +59,13 @@ mass eigenstates $\ket{\nu_i}$. The PMNS mixing matrix
 \begin{equation}
   \ket{\nu_\alpha} = \sum_i U_{\alpha i}\,\ket{\nu_i}.
 \end{equation}
-In vacuum each mass eigenstate evolves with a kinetic phase $e^{-iE_i L}$;
-when crossing matter an additional effective potential from coherent forward
-interaction appears (the MSW effect,
-\parencite{Wolfenstein1978,MikheyevSmirnov1985}). In both cases the evolution
-is summarised by an effective Hamiltonian $H(x)$ acting on the vector of
-flavour amplitudes,
+\begin{itemize}
+  \item In vacuum each mass eigenstate evolves with a kinetic phase $e^{-iE_i L}$.
+  \item When crossing matter an additional effective potential from coherent forward
+interaction appears (the MSW effect,\parencite{Wolfenstein1978,MikheyevSmirnov1985}).
+\end{itemize}
+In both cases the evolution is summarised by an effective Hamiltonian $H(x)$ acting
+ on the vector of flavour amplitudes,
 \begin{equation}
   i \frac{d}{dx}\, \psi(x) = H(x)\, \psi(x),
   \qquad
@@ -221,16 +226,6 @@ parameters, \cite{Esteban2018LMADark} for the \emph{LMA-Dark} preset, and
 \cite{IceCube2022NSI} for the IceCube DeepCore NSI bounds), so any numerical
 result can be traced back to its origin in the literature.}
 \end{implbox}
-
-\begin{notebox}
-Counting CP phases for the sterile extension requires care: an $N$-generation
-Dirac mixing matrix has $(N-1)(N-2)/2$ independent physical phases. For
-$N=4$ (the 3+1 case) this gives exactly \keyresult{three} Dirac phases
-($\delta_{13}$, $\delta_{14}$, $\delta_{24}$); the rotation $R_{34}$ is
-always real because the fourth phase can be absorbed into a redefinition of
-the charged-lepton fields, and hence sterile presets do not include
-\code{delta34\_deg} (see \cref{ch:core-bsm}).
-\end{notebox}
 
 % Restore the shared \modulehead (one-line italic description) for every
 % chapter from here on.

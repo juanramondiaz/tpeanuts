@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 import torch
 
@@ -93,3 +95,40 @@ def test_atmosphere_grid_pipeline_returns_full_transition_and_integrated_fluxes(
     assert result.detector_flux_height_theta_E_beta.shape == (2, 2, 3)
     assert result.detector_flux_angular_E_beta.shape == (2, 3)
     assert result.detector_rate.shape == (3,)
+
+
+def test_atmosphere_grid_pipeline_propagates_analytic_eigenvalues_and_reunitarize_atmosphere():
+    # config.analytic_eigenvalues flows into the Earth leg (pipeline/atmosphere_earth.py's
+    # earth_evolutor_from_zenith call, always the perturbative/analytical path)
+    # and config.reunitarize_atmosphere flows into the atmosphere leg
+    # (pipeline/atmosphere.py's direct atmosphere_evolutor call); neither
+    # should change the pipeline's shapes or blow up finiteness.
+    productions = {
+        flavour: [_production(flavour, 120.0), _production(flavour, 140.0)]
+        for flavour in ("nue", "numu", "nutau")
+    }
+    default_config = _config()
+    flagged_config = dataclasses.replace(
+        default_config,
+        analytic_eigenvalues=True,
+        reunitarize_atmosphere=True,
+        reunitarize_earth=True,
+    )
+
+    default_result = propagate_atmosphere_grid_to_detector(
+        productions, default_config, integrate_angular=True, integrate_energy=True,
+    )
+    flagged_result = propagate_atmosphere_grid_to_detector(
+        productions, flagged_config, integrate_angular=True, integrate_energy=True,
+    )
+
+    assert flagged_result.detector_rate.shape == default_result.detector_rate.shape
+    assert torch.isfinite(flagged_result.detector_rate).all()
+    # A loose smoke-test tolerance, not a precision check: this toy production
+    # grid uses very low (1-2 GeV) energies and a coarse (2x2) grid where
+    # reunitarize's SVD projection can shift the result by more than
+    # floating-point noise -- the point here is that the flags propagate and
+    # stay in the right physical ballpark, not bit-for-bit agreement.
+    torch.testing.assert_close(
+        flagged_result.detector_rate, default_result.detector_rate, atol=1.0e-3, rtol=1.0e-2,
+    )

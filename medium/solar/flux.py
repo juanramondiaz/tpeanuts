@@ -52,7 +52,7 @@ def solar_flux_state(
     E_MeV,
     source_spectrum: torch.Tensor | None = None,
     *,
-    method: str = "adiabatic",
+    method: str = "adiabatic_approximated",
     legacy_precision: bool = False,
     include_matter_nc: bool | None = None,
     date: str | None = None,
@@ -70,7 +70,8 @@ def solar_flux_state(
         source_spectrum: Optional spectral override. None interpolates the
             spectrum stored in ``profile``. For several sources, an override
             must include the leading source dimension when needed.
-        method: ``"adiabatic"`` (default) or ``"numerical"`` (see
+        method: ``"numerical"``, ``"adiabatic_approximated"`` (default), or
+            ``"adiabatic_exact"`` (see
             ``medium.solar.probability.solar_probability_mass``).
         legacy_precision: If True, evaluate the underlying matter-mixing
             angles with the legacy peanuts ``Vk`` prefactor for
@@ -137,7 +138,7 @@ def solar_flux_integrated(
     E_MeV,
     source_spectrum: torch.Tensor | None = None,
     *,
-    method: str = "adiabatic",
+    method: str = "adiabatic_approximated",
     legacy_precision: bool = False,
     energy_dim: int = -2,
     include_matter_nc: bool | None = None,
@@ -170,7 +171,8 @@ def solar_flux_integrated(
         E_MeV: Neutrino energy grid in MeV, one-dimensional.
         source_spectrum: Optional normalized production spectral-density
             override. None uses ``profile.spectrum(sources, E_MeV)``.
-        method: ``"adiabatic"`` (default) or ``"numerical"`` (see
+        method: ``"numerical"``, ``"adiabatic_approximated"`` (default), or
+            ``"adiabatic_exact"`` (see
             ``medium.solar.probability.solar_probability_mass``).
         legacy_precision: If True, evaluate the underlying matter-mixing
             angles with the legacy peanuts ``Vk`` prefactor for

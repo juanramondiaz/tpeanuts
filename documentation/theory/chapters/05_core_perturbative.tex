@@ -71,11 +71,82 @@ with
 The $N=4$ projector formula additionally needs
 $e_3=\tfrac13\Tr(T^3)=-c_0$ (kept as a separate function in the code to
 avoid a sign-confusion bug, since both invariants are used together for
-$N=4$). The eigenvalues $\lambda_a$ themselves have no closed-form solver
-in this module -- they are obtained numerically via
-\pyfunc{torch.linalg.eigvalsh}; only the \emph{projectors} below are
-closed-form, given the eigenvalues.
+$N=4$), and its own eigenvalue solver (below) further needs
+$e_4=\det(T)$, the fourth elementary symmetric polynomial of the
+eigenvalues. By default the eigenvalues $\lambda_a$ are obtained
+numerically via \pyfunc{torch.linalg.eigvalsh}; a closed-form alternative,
+evaluating these invariants explicitly, is also available and derived next.
+\end{theorybox}
 
+\begin{theorybox}
+\subsection*{Closed-form eigenvalues: Cardano ($N=3$) and Ferrari ($N=4$)}
+Since $T$ is Hermitian and traceless, its characteristic polynomial has no
+quadratic ($N=3$) or cubic ($N=4$) term and is guaranteed to be
+real-rooted; both properties are what make an explicit closed-form root
+solver possible here, unlike for a generic matrix.
+
+\textbf{$N=3$: Cardano's trigonometric solution.} The depressed cubic
+$\lambda^3+c_1\lambda+c_0=0$ has $c_1=-\tfrac12\Tr(T^2)\leq0$ always
+(equality iff $T=0$), since $\Tr(T^2)=\sum_a\lambda_a^2\geq0$ for
+Hermitian $T$; this is exactly the condition under which the classical
+trigonometric solution applies, giving all three roots directly, with no
+branch selection or complex intermediate arithmetic:
+\begin{equation}
+  \keyresult{\lambda_k = 2\sqrt{-\tfrac{c_1}{3}}\,
+    \cos\!\Bigl[\tfrac13\arccos(r) - \tfrac{2\pi k}{3}\Bigr]},
+  \qquad
+  r = \frac{-c_0}{2\bigl(-c_1/3\bigr)^{3/2}}, \qquad k=0,1,2.
+\end{equation}
+$r\in[-1,1]$ exactly for a genuinely Hermitian $T$ (it is, up to
+normalisation, the cosine of the phase entering the standard closed-form
+eigenvalue formula for a real symmetric $3\times3$ matrix); in code, $r$ is
+still clamped to $[-1,1]$ to absorb floating-point overshoot at
+(near-)degenerate spectra, where this formula loses precision in the same
+regime as the projector formula above.
+
+\textbf{$N=4$: Ferrari's resolvent-cubic solution.} The depressed quartic
+$\lambda^4+p\lambda^2+q\lambda+r=0$, with $p\equiv c_1$, $q\equiv-e_3$, and
+$r\equiv e_4=\det(T)$, is solved by first finding a real root $m$ of its
+\emph{resolvent cubic},
+\begin{equation}
+  m^3 + p\,m^2 + \Bigl(\tfrac{p^2}{4}-r\Bigr)m - \tfrac{q^2}{8} = 0,
+\end{equation}
+itself solved with the same trigonometric formula as the $N=3$ case above
+(after depressing it via $m=z-p/3$): since $T$ is Hermitian the quartic is
+guaranteed real-rooted, and the resolvent cubic's three roots are exactly
+the real pairwise sums
+$m_{ij|kl}=-\tfrac12(\lambda_i+\lambda_j)(\lambda_k+\lambda_l)$ over the
+three ways of splitting the four (real) roots into two pairs, so it is
+real-rooted too and the same closed form applies unconditionally. Taking
+the \emph{largest} resolvent root $m$ (the conditioning-optimal choice,
+since it keeps the next square root away from zero whenever any pairing is
+well separated) factors the quartic into two real quadratics:
+\begin{equation}
+  \keyresult{
+    s=\sqrt{2m}, \qquad
+    \lambda \in \Bigl\{\tfrac{s\pm\sqrt{\Delta_1}}{2},\ \tfrac{-s\pm\sqrt{\Delta_2}}{2}\Bigr\},
+    \qquad
+    \Delta_1 = -2\Bigl(m+p+\tfrac{q}{s}\Bigr), \quad
+    \Delta_2 = -2\Bigl(m+p-\tfrac{q}{s}\Bigr).
+  }
+\end{equation}
+Unlike the $N=3$ case, this factorisation is not unconditionally
+well-conditioned: the chosen pairing's $m$ can itself be close to singular
+(only possible, for a traceless Hermitian $T$, near $T\approx0$), or the
+resolvent cubic's own three roots can nearly coincide even when the
+\emph{chosen} $m$ is perfectly well separated from zero (e.g.\
+$\lambda=(a,a,-a,-a)$ has a well-conditioned pairing $m=2a^2$ whose
+resolvent cubic nonetheless has a repeated root elsewhere, which loses
+precision through $\arccos$'s diverging derivative at $\pm1$). Batch
+entries flagged by either check fall back directly to
+\pyfunc{torch.linalg.eigvalsh} -- unlike the projector degeneracy fallback
+below, which only ever needs to replace the \emph{projectors}, this
+closed form can lose the \emph{eigenvalues} themselves in these regimes,
+so the fallback is applied to the eigenvalues here rather than left to the
+caller.
+\end{theorybox}
+
+\begin{theorybox}
 \subsection*{Closed-form spectral projectors}
 The spectral theorem writes $T=\sum_a\lambda_a M_a$ with
 $M_a=\prod_{b\neq a}\frac{T-\lambda_b I}{\lambda_a-\lambda_b}$ (the
@@ -122,16 +193,29 @@ spectrum).
 \begin{itemize}
   \item \pyfunc{hamiltonian\_traceless(H)}: returns $(T,\Tr H)$.
   \item \pyfunc{hamiltonian\_traceless\_c0/c1/e3(T)}: the invariants above.
-  \item \pyfunc{hamiltonian\_traceless\_eigenvalues(T)}: $\lambda_a$ via
-    \pyfunc{torch.linalg.eigvalsh}.
+  \item \pyfunc{hamiltonian\_traceless\_eigenvalues(T, *, analytic=False,
+    c1=None, c0=None, e3=None, e4=None)}: $\lambda_a$ via
+    \pyfunc{torch.linalg.eigvalsh} by default. Passing \code{analytic=True}
+    instead evaluates the closed-form solution derived above: Cardano for
+    $T.\mathrm{shape}[-1]=3$, Ferrari for $T.\mathrm{shape}[-1]=4$ (any
+    other $N$ falls back to \pyfunc{eigvalsh} unconditionally, since no
+    closed form is defined there). The optional \code{c1}/\code{c0}
+    (Cardano) and \code{c1}/\code{e3}/\code{e4} (Ferrari) arguments let a
+    caller that has already computed these invariants -- chiefly
+    \pyfunc{hamiltonian\_spectral\_data} -- forward them directly, avoiding
+    redundant trace contractions.
   \item \pyfunc{hamiltonian\_spectral\_projectors\_traceless(T, ...)}:
     builds $M_a$ (closed form, with the \pyfunc{eigh} fallback above);
     returns $(M,\lambda,c_1)$.
-  \item \pyfunc{hamiltonian\_spectral\_data(H)}: the one-stop entry point
-    used by \texttt{evolutor.py} -- computes $T$, $\Tr H$, $\lambda$, $c_1$,
-    and $M$ in one call, reusing intermediate products ($T^2$, $T^3$)
-    across every invariant and the projector formula to avoid redundant
-    matrix multiplications.
+  \item \pyfunc{hamiltonian\_spectral\_data(H, *, analytic\_eigenvalues=False,
+    ...)}: the one-stop entry point used by \texttt{evolutor.py} -- computes
+    $T$, $\Tr H$, $\lambda$, $c_1$, and $M$ in one call, reusing intermediate
+    products ($T^2$, $T^3$) across every invariant and the projector formula
+    to avoid redundant matrix multiplications. \code{analytic\_eigenvalues}
+    is forwarded unchanged to \pyfunc{hamiltonian\_traceless\_eigenvalues}
+    above; this is the flag \pyfunc{evolutor\_zero\_order}/%
+    \pyfunc{evolutor\_perturbative\_segment} (\cref{sec:perturbative-evolutor})
+    expose to their own callers.
   \item \pyfunc{spectral\_projector\_residuals(M, T, lam)}: diagnostic
     residual norms (completeness $\sum_aM_a=I$, idempotency
     $M_a^2=M_a$, orthogonality $M_aM_b=0$, unit trace, and

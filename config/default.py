@@ -149,9 +149,11 @@ atmosphere_nusquids_height_km = 22.0
 # MCEq density defaults
 # ============================================================
 
-# Default zenith angle for MCEq atmospheric flux calculations, in degrees
-# (0 deg = vertical/overhead).
-mceq_theta_deg = 0.0
+# Default surface zenith angle used only to initialize a new MCEq object
+# (0 <= alpha_deg < 90 deg; 0 deg = vertical/overhead). It has no effect on
+# the returned density(h), which is angle-independent (see
+# medium.atmosphere.density.atmosphere_density).
+mceq_alpha_deg = 0.0
 # Default hadronic interaction model used by MCEq for cosmic-ray air showers.
 mceq_interaction_model = "SIBYLL23D"
 # Default atmospheric density model used by MCEq for shower development.
@@ -206,9 +208,6 @@ earth_method = "analytical"
 # Default numerical integration scheme used when earth_method requests
 # numerical propagation.
 earth_numerical_method = "midpoint"
-# Whether the default propagation targets antineutrinos (True) or
-# neutrinos (False); flips the sign of the matter potential.
-earth_antinu = False
 # Whether to express states/evolution in the neutrino mass basis (True) or
 # flavour basis (False).
 earth_massbasis = True
@@ -226,19 +225,17 @@ earth_reunitarize = False
 # EvenPowerProfileLayered and PremTabulatedProfile support this); the
 # default construction (include_neutron=False) does not.
 earth_include_matter_nc = False
-# Default torch device string requested for Earth propagation
-# ("cuda" falls back to CPU when unavailable via the resolution helpers).
-earth_device = "cuda"
+# Default torch device for Earth propagation. None selects CUDA when
+# available and CPU otherwise (same convention as the project-wide `device`
+# default above); unlike a literal "cuda" string, this degrades gracefully
+# when no working CUDA runtime is present.
+earth_device = None
 # Default perturbative expansion scheme name used by the perturbative
 # Earth-matter evolution profile.
 earth_profile_perturbative_name = "even_power"
-# Default number of integration steps for numerical Earth propagation.
-earth_nsteps = 1000
 # Default number of steps used when tabulating oscillation probabilities
 # along the path.
 earth_probability_nsteps = 100
-# Default detector depth below the Earth's surface, in meters.
-earth_depth_m = 0.0
 # Whether to use a tabulated (interpolated) Earth density profile by default
 # instead of an analytical shell model.
 earth_tabulated_density = False
@@ -248,9 +245,6 @@ earth_tabulated_density = False
 # Earth exposure defaults
 # ============================================================
 
-# Default detector geographic latitude, in radians (negative = Southern
-# hemisphere), used for nadir-angle exposure calculations.
-earth_lam_rad = -1.0
 # Default start day-of-year for the exposure time window (day 0).
 earth_d1 = 0.0
 # Default end day-of-year for the exposure time window (day 365, i.e. one

@@ -16,73 +16,17 @@
 #      June 2026
 # =============================================================================
 
-"""
-Landau-Zener non-adiabatic transition corrections for solar MSW propagation.
+"""Local Landau--Zener correction for the solar 1--2 MSW resonance.
 
-In the perfectly adiabatic limit (gamma -> infinity), a neutrino produced
-in the solar interior stays in its local matter eigenstate as it propagates
-outward through the decreasing electron density.  At finite adiabaticity the
-Landau-Zener (LZ) mechanism allows a sudden jump between the two matter
-mass-eigenstates as the neutrino traverses the MSW resonance radius.
+The Parke approximation uses ``P_LZ = exp(-pi*gamma_res/2)`` with the density
+scale height evaluated at resonance. Its position includes the effective
+theta13 correction used by ``matter_mixing.th12_M``; ``gamma_res`` retains
+the standard two-level form.
 
-The locally linear Landau-Zener approximation used in the Parke treatment
-(Parke 1986, Phys. Rev. Lett. 57, 1275) gives:
-
-    P_LZ = exp(-pi/2 * gamma_res)
-
-with the adiabaticity parameter evaluated at the resonance:
-
-    gamma_res = Delta_m^2_21 sin^2(2 theta_12) / (2 E hbar_c cos(2 theta_12))
-                * L_n(r_res)
-
-where L_n = |n_e / (dn_e/dl)|_res is the density scale height at the MSW
-resonance in metres. The resonance radius r_res(E) is defined by the same
-theta_12^M = pi/4 condition used by ``matter_mixing.th12_M`` -- i.e. the full
-effective potential V'_k (which already folds in the theta_13-sector
-correction), not the bare two-flavour V_k:
-
-    V'_k(Delta_m^2_21, E, n_e(r_res)) = cos(2 theta_12),
-    V'_k = V_k(Delta_m^2_21) cos^2(theta_13^M) + (Delta m^2_ee / Delta m^2_21)
-           sin^2(theta_13^M - theta_13)
-
-so the resonance located here is the same one ``th12_M`` actually crosses,
-rather than a bare-two-flavour approximation to it (the theta_13 correction
-to V'_k is itself typically small, so this mostly matters for precision
-studies or non-standard parameters where the difference is not negligible).
-The adiabaticity parameter ``gamma_res`` itself is left in its standard
-two-level (1-2 sector) form: only the resonance *location* picks up the
-theta_13 correction, matching the level of approximation of the Parke
-treatment this module implements.
-
-The search for r_res(E) (and the density profile used for gamma_res) is
-performed on the solar profile's full structural ``radius``/``density`` grid,
-not on the independent production grid.
-
-Scope and limitations
----------------------
-- Only the theta_12 sector resonance is tracked. At standard solar-neutrino
-  energies, the density required for the theta_13 resonance exceeds the
-  maximum density reached inside the Sun, so no physical 1--3 resonance is
-  crossed in the standard MSW picture.
-- P_LZ = 0 is returned where no resonance exists in the solar volume: energies
-  below the resonance threshold, antineutrinos (no MSW resonance in the solar
-  interior for standard parameters), and LMA-Dark parameters (theta_12 > pi/4,
-  cos2theta_12 < 0, resonance at unphysical negative density).
-- For standard LMA parameters and 8B / pp solar neutrinos, gamma_res >> 1
-  (typically 10^3 - 10^4), so P_LZ ~ exp(-1500) ~ 0 and the adiabatic
-  approximation is excellent. This module becomes relevant for non-standard
-  parameter explorations or precision studies near 1-3 MeV.
-- Solar NSI is NOT included: the resonance condition is based on the standard
-  (theta_13-corrected) MSW potential V'_k, with no off-diagonal NSI terms.
-
-Module functions:
-    density_gradient(solar_profile)
-        Numerical derivative dn_e/d(r/R_sun) on the profile's full density
-        grid.
-    resonance_radius(oscillation, E, solar_profile)
-        Radius r_res(E) in solar-radius units where the MSW resonance occurs.
-    plz(oscillation, E, solar_profile)
-        Landau-Zener transition probability P_LZ(E).
+The calculation uses the full structural density grid. It does not describe
+generic NSI, sterile multi-level crossings, the 1--3 resonance or general
+nonlinear-profile corrections. If no 1--2 resonance is crossed inside the
+Sun, including much of the standard pp spectrum, ``P_LZ`` is zero.
 """
 
 
@@ -137,22 +81,11 @@ def resonance_radius(
     *,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
-    """Locate the MSW resonance radius for each neutrino energy.
+    """Locate the solar 1--2 MSW resonance for each energy.
 
-    The theta_12 resonance occurs at the solar radius r_res(E) where the
-    full effective potential V'_k (the same one ``matter_mixing.th12_M``
-    uses, folding in the theta_13-sector correction) equals cos(2 theta_12):
-
-        V'_k(Delta_m^2_21, E, n_e(r_res)) = cos(2 theta_12),
-        V'_k = V_k(Delta_m^2_21) cos^2(theta_13^M)
-               + (Delta m^2_ee / Delta m^2_21) sin^2(theta_13^M - theta_13)
-
-    The function performs a linear interpolation between adjacent grid points
-    where the sign of V'_k - cos(2 theta_12) changes from positive to
-    negative (the condition for a crossing in the standard LMA scenario where
-    the density decreases monotonically from the solar centre outward), on
-    the profile's full density grid (see ``_full_density_grid``) so a
-    resonance located beyond the production-restricted core is not missed.
+    The resonance satisfies ``V'_k = cos(2*theta12)``, using the same
+    theta13-corrected potential as ``matter_mixing.th12_M``. Its radius is
+    interpolated across the first outward sign change on the structural grid.
 
     Args:
         oscillation: Oscillation parameters supplying theta_12, theta_13, and
@@ -227,28 +160,11 @@ def plz(
     *,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
-    """Compute the Landau-Zener transition probability P_LZ(E).
+    """Evaluate the local Parke/Landau--Zener crossing probability.
 
-    Uses the locally linear Landau-Zener approximation employed in the Parke
-    treatment:
-
-        P_LZ = exp(-pi/2 * gamma_res)
-
-    where the adiabaticity parameter at the MSW resonance is
-
-        gamma_res = Delta_m^2_21 sin^2(2 theta_12)
-                    / (2 E hbar_c cos(2 theta_12))
-                    * L_n(r_res)
-
-    and L_n = |n_e / (dn_e / dl)|_res is the electron-density scale height
-    in metres evaluated at the resonance radius, on the profile's full
-    density grid (see ``resonance_radius``/``_full_density_grid``).
-
-    This local expression is not the exact jump probability for an arbitrary
-    density profile. Exponential or otherwise non-linear profiles require the
-    corresponding profile correction when non-adiabatic effects are relevant.
-    For standard LMA solar parameters the evolution is so adiabatic that this
-    distinction is numerically negligible.
+    Uses ``P_LZ = exp(-pi*gamma_res/2)`` and the density scale height at the
+    1--2 resonance. This is a locally linear, two-level approximation rather
+    than a general solution for arbitrary density profiles.
 
     P_LZ is set to 0 (fully adiabatic) wherever no resonance exists in the
     solar volume — including below-threshold energies, LMA-Dark parameters,
@@ -318,3 +234,55 @@ def plz(
     p = torch.where(has_res, p, torch.zeros_like(p))
 
     return p.squeeze(0) if scalar_in else p
+
+
+def landau_zener_spatial_correction(
+    oscillation: OscillationParameters,
+    E: TensorLike,
+    solar_profile: object,
+    radius_samples: torch.Tensor,
+    *,
+    legacy_precision: bool = False,
+) -> torch.Tensor:
+    """Broadcast the local Landau-Zener probability across production radii.
+
+    Applies ``plz(E)`` only to production radii above the 1--2 resonance
+    density (``r_prod < r_res(E)``); production points below the resonance
+    (or energies with no resonance in the solar volume) get a zero
+    correction. This is the (E, r_prod) mask ``mass_weights_adiabatic_
+    approximated``'s ``p_lz`` argument expects.
+
+    Args:
+        oscillation: Oscillation parameters supplying theta_12, theta_13, and
+            mass_spectrum.DeltamSq21/DeltamSq3l.
+        E: Neutrino energy, scalar or 1-D grid in MeV.
+        solar_profile: SolarProfile-like object exposing the full structural
+            ``radius``/``density`` grid (see ``resonance_radius``/``plz``).
+        radius_samples: Production radii in solar-radius units, shaped
+            ``(n_r,)``.
+        legacy_precision: If True, evaluate the internal ``resonance_radius``/
+            ``plz`` calls with the legacy peanuts combined prefactor for
+            bit-comparable validation.
+
+    Returns:
+        Tensor shaped ``(n_r,)`` for scalar ``E``, or ``(n_E, n_r)`` for a
+        1-D energy grid, with the spatially resolved crossing-probability
+        correction in [0, 1].
+    """
+    E_t = torch.as_tensor(E, device=radius_samples.device, dtype=radius_samples.dtype)
+    E_1d = E_t.reshape(-1) if E_t.ndim == 1 else E_t.reshape(1)  # (n_E,)
+
+    r_res = resonance_radius(
+        oscillation, E_1d, solar_profile, legacy_precision=legacy_precision,
+    )  # (n_E,) NaN if absent
+    p_lz_e = plz(
+        oscillation, E_1d, solar_profile, legacy_precision=legacy_precision,
+    )  # (n_E,)
+
+    # above_res[e, r]: True where r_prod < r_res(E) (above resonance
+    # density). NaN comparisons evaluate to False, so energies without a
+    # resonance contribute a zero mask automatically.
+    above_res = radius_samples[None, :] < r_res[:, None]          # (n_E, n_r)
+    p_lz_2d = p_lz_e[:, None] * above_res.to(dtype=p_lz_e.dtype)  # (n_E, n_r)
+
+    return p_lz_2d.squeeze(0) if E_t.ndim == 0 else p_lz_2d

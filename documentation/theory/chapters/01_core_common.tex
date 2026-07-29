@@ -64,17 +64,18 @@ $H_{\rm mat}$ and computed by its own dedicated function:
 For antineutrinos both potentials flip sign, $V \to -V$ (the weak
 interaction has opposite sign for particle/antiparticle), which is why both
 functions take the same \code{antinu} flag. In the pure 3-flavour
-Standard Model, $V_{NC}\,\mathbb{1}_3$ is a common phase across all three
+Standard Model, $V_{NC}\,\mathbb{I}_3$ is a common phase across all three
 active flavours and therefore has \emph{no effect on any oscillation
 probability}: this is why $V_{NC}$ never appears at all in the SM matter
-Hamiltonian, and why $n_n$ is nowhere plumbed through the SM code path. The
-3+1 sterile extension changes this qualitatively, since the sterile flavour
+Hamiltonian, and why $n_n$ is nowhere plumbed through the SM code path. 
+
+The 3+1 sterile extension changes this qualitatively, since the sterile flavour
 is a gauge singlet and \emph{does not} receive $V_{NC}$: subtracting the
-same global phase $V_{NC}\,\mathbb{1}_4$ from
+same global phase $V_{NC}\,\mathbb{I}_4$ from
 $\diag(V_{CC}+V_{NC},\,V_{NC},\,V_{NC},\,0)$ leaves a genuine relative term
 on the sterile diagonal entry,
 \begin{equation}
-  \diag(V_{CC}+V_{NC},\,V_{NC},\,V_{NC},\,0) - V_{NC}\,\mathbb{1}_4
+  \diag(V_{CC}+V_{NC},\,V_{NC},\,V_{NC},\,0) - V_{NC}\,\mathbb{I}_4
   = \diag(V_{CC},\,0,\,0,\,-V_{NC}),
 \end{equation}
 which \emph{does} affect sterile-active oscillation probabilities, with
@@ -282,8 +283,9 @@ computational shortcut: the same underlying generator (\pyfunc{PMNS.\_rot})
 accepts an arbitrary rotation plane $(i,j)$ and an arbitrary phase, which is
 exactly what lets the 3+1 sterile extension reuse it unchanged for the
 active-sterile rotations $R_{14}$, $R_{24}$, $R_{34}$ (each carrying its own
-CP phase) without modifying this base class at all (BSM chapter). How
-$R_{12}$, $R_{13}$, $R_{23}$, $\Delta$ combine into a full mixing matrix ---
+CP phase) without modifying this base class at all (BSM chapter). 
+
+How $R_{12}$, $R_{13}$, $R_{23}$, $\Delta$ combine into a full mixing matrix ---
 the product order, and which rotations sit inside versus outside the block
 that commutes with the matter potential --- is scenario-specific and is
 given in the SM and BSM chapters.
@@ -461,8 +463,8 @@ call.
     (\pyclass{MassSpectrum\_BSM}, BSM chapter). This split exists because
     sizing is scenario-specific while the active-sector vector itself is
     not.
-  \item Consumed by \pyfunc{kinetic\_eigenvalue\_vector} (\texttt{potential.py})
-    to build the dimensionless kinetic phases $k_i$, and bundled into
+  \item Consumed by \pyfunc{kinetic\_eigenvalue\_vector} (\texttt{hamiltonian.py},
+    next section) to build the dimensionless kinetic phases $k_i$, and bundled into
     \pyclass{OscillationParameters} as the \code{mass\_spectrum} field
     (next section).
 \end{itemize}
@@ -475,10 +477,12 @@ immutable container grouping \code{pmns}, \code{mass\_spectrum},
 \code{antinu}, and the optional \code{nsi} coupling.}
 
 \begin{implbox}
-This introduces no new physics: it replaces the previous pattern of passing
-\code{(pmns, DeltamSq21, DeltamSq3l, antinu)} as independent arguments
-through the entire propagation stack. \pyclass{OscillationParameters} is a
-passive domain container: it does not build itself, and it never imports the
+This introduces no new physics: it bundles \code{pmns}, the mass-squared
+splittings, the antineutrino selector, and the optional NSI coupling that
+the propagation stack needs into a single immutable object, rather than
+threading them as independent arguments through every function.
+\pyclass{OscillationParameters} is a passive domain container: it does not
+build itself, and it never imports the
 concrete SM/BSM/preset implementations it bundles. Building a fully
 assembled \pyclass{OscillationParameters} from a named preset --- choosing
 the concrete PMNS/mass-spectrum implementation and reading the parameter
@@ -499,8 +503,8 @@ Attribute & Type & Default & Role \\
 \code{mass\_spectrum} & \pyclass{MassSpectrum} & required & \parbox[t]{4.4cm}{Built splitting object (\pyclass{MassSpectrum\_SM} or \pyclass{MassSpectrum\_BSM}).} \\[2pt]
 \code{antinu} & \code{bool}/\code{Tensor} & \code{False} & \parbox[t]{4.4cm}{Antineutrino selector ($U\to U^*$, $V\to-V$).} \\[2pt]
 \code{nsi} & \pyclass{NSIConfig} or \code{None} & \code{None} & \parbox[t]{4.4cm}{Optional NSI coupling; \code{None} means the plain SM matter potential.} \\[2pt]
-\code{preset\_name} & \code{str} & \code{"custom"} & \parbox[t]{4.4cm}{Name of the preset used to build this object.} \\[2pt]
-\code{ordering} & \code{str} & \code{""} & \parbox[t]{4.4cm}{Mass-ordering label carried by the preset (\code{"NO"}/\code{"IO"}).} \\[2pt]
+\code{preset\_name} & \code{str} & \parbox[t]{2.1cm}{\code{"\_SM\_\allowbreak NUFIT52\_\allowbreak NO"}} & \parbox[t]{4.4cm}{Name of the preset used to build this object; \code{"custom"} for the bare dataclass default (explicit construction, no preset).} \\[10pt]
+\code{ordering} & \code{str} & \code{"NO"} & \parbox[t]{4.4cm}{Mass-ordering label carried by the preset (\code{"NO"}/\code{"IO"}); \code{""} for the bare dataclass default.} \\[2pt]
 \code{label} & \code{str} & \code{""} & \parbox[t]{4.4cm}{Short identifier string carried by the preset.} \\[2pt]
 \code{description} & \code{str} & \code{""} & \parbox[t]{4.4cm}{Human-readable description/reference carried by the preset.} \\[2pt]
 \midrule
@@ -592,6 +596,7 @@ not commute in general, $H_{\rm flavour}$ must be re-diagonalised as a
 genuinely complex $n\times n$ matrix at every point along the path where
 the electron (and, when the NC term is active, neutron) density changes.
 
+
 \subsection*{The reduction trick: factorising out the outer block}
 Every concrete \pyclass{PMNS} scenario additionally factorises its mixing
 matrix as $U = O\,U_{\rm red}$ (\texttt{pmns.py} section above), where the
@@ -616,11 +621,15 @@ expression above simplifies to
   \label{eq:H-factorization}
 \end{align}
 \textbf{Computational consequence (the peanuts ``reduction trick'').} The
-$n$-flavour evolution problem reduces to: (1) solving the evolution of the
-smaller, cheaper reduced Hamiltonian $H_{\rm red}$, obtaining
-$S_{\rm red}(x)$; (2) \emph{dressing} the result once with the constant
-matrix $O$ (which depends on neither density nor $x$),
-$S_{\rm flavour}(x) = O\, S_{\rm red}(x)\, O^\dagger$. This is exactly what
+$n$-flavour evolution problem reduces to:
+\begin{enumerate}
+  \item solving the evolution of the smaller, cheaper reduced Hamiltonian
+    $H_{\rm red}$, obtaining $S_{\rm red}(x)$;
+  \item \emph{dressing} the result once with the constant matrix $O$ (which
+    depends on neither density nor $x$),
+    $S_{\rm flavour}(x) = O\, S_{\rm red}(x)\, O^\dagger$.
+\end{enumerate}
+This is exactly what
 \pyfunc{pmns.flavour\_basis} does: the spectral calculations that
 diagonalise the propagation Hamiltonian only ever need to act on
 $H_{\rm red}$, never on $H_{\rm flavour}$. This shortcut is \emph{not}
@@ -637,10 +646,19 @@ scenario, the reduced Hamiltonian is
 \begin{equation}
   \keyresult{H_{\rm red} = U_{\rm red}\,\diag(k_1,\dots,k_n)\,U_{\rm red}^{\dagger} + \diag(V_{CC},0,\dots,0)}.
 \end{equation}
+Each dimensionless kinetic eigenvalue $k_i$ entering $\diag(k_1,\dots,k_n)$
+is obtained by feeding the corresponding component of that mass-squared
+vector, together with the neutrino energy $E$, through
+\pyfunc{kinetic\_potential} (\texttt{potential.py} section above); applying
+this conversion to the whole vector at once, after first sizing
+\pyclass{MassSpectrum.difference\_vector()} to \code{oscillation.pmns}'s
+flavour count, is exactly what \pyfunc{kinetic\_eigenvalue\_vector} (below)
+does.
 The matter term populates only the electron-flavour entry, by construction
 of $H_{\rm mat}$ (\texttt{potential.py} section above): this holds for any
 flavour count $n$, so no special handling is needed as $n$ grows --- every
 additional flavour beyond the first simply carries a zero matter coupling.
+
 When Non-Standard Interactions are active, the matter term
 generalises to $V_{CC}\,(\diag(1,0,\dots,0)+\varepsilon)$ for a Hermitian
 coupling matrix $\varepsilon$, built in the flavour basis and rotated back
@@ -678,9 +696,10 @@ ignored rather than raising.
 \begin{implbox}
 \begin{itemize}
   \item \pyfunc{kinetic\_eigenvalue\_vector(oscillation, E, ...)}
-    (\code{core/common/potential.py}) converts the mass spectrum's
+    (\code{core/common/hamiltonian.py}) converts the mass spectrum's
     \pyfunc{difference\_vector()} (previous section) into the dimensionless
-    kinetic phases $k_i$ via \pyfunc{kinetic\_potential}.
+    kinetic phases $k_i$ via \pyfunc{kinetic\_potential}
+    (\texttt{potential.py}, previous sections).
   \item \pyfunc{hamiltonian\_kinetic\_reduced(...)} implements
     $U_{\rm red}\diag(k)\,U_{\rm red}^\dagger$ for any flavour count, always
     using the Hermitian conjugate.
@@ -744,21 +763,27 @@ them against the spectral projectors without recomputing the rotation at
 every energy or density sample.
 \end{implbox}
 
-\begin{notebox}
+\begin{notebox}[title={Hermitian Conjugate vs. Plain Transpose}]
 The reduced kinetic term is always built as $U_{\rm red}\diag(k)\,U_{\rm
 red}^\dagger$ (the Hermitian conjugate, never the plain transpose): this is
 the only form for which \pyfunc{pmns.flavour\_basis} applied to it
 reproduces $U_{\rm full}\diag(k)\,U_{\rm full}^\dagger$ exactly, since
-$U_{\rm full}=O\,U_{\rm red}$ per \labelcref{eq:H-factorization}. Whenever
+$U_{\rm full}=O\,U_{\rm red}$ per \labelcref{eq:H-factorization}.
+
+Whenever
 $U_{\rm red}$ happens to be real for a given scenario, the Hermitian
 conjugate and the transpose coincide there numerically; the distinction
-only becomes observable once $U_{\rm red}$ is genuinely complex. This is,
+only becomes observable once $U_{\rm red}$ is genuinely complex. 
+
+This is,
 in fact, exactly what happened in the original \texttt{peanuts}
 implementation \parencite{LucentePeanuts}: since it only ever considered
 the plain 3-flavour Standard Model, its reduced mixing matrix was always
 real, so using the plain transpose there was correct, not merely
 convenient -- the two conventions were indistinguishable in that restricted
-setting. It is only once \texttt{tpeanuts} generalises to a genuinely
+setting. 
+
+It is only once \texttt{tpeanuts} generalises to a genuinely 
 complex $U_{\rm red}$ (the 3+1 sterile extension with $\delta_{14}\neq0$,
 \cref{ch:core-bsm}) that the plain transpose silently becomes wrong, which
 is why the code always uses the Hermitian conjugate unconditionally rather
@@ -829,10 +854,16 @@ below.
 \begin{itemize}
   \item \pyfunc{apply\_evolutor\_to\_state(S, psi)}: applies a scalar or
     batched evolutor to a state vector, with automatic broadcasting.
-  \item \pyfunc{compose\_segment\_evolutors(segments)}: performs the ordered
-    product above; internally uses a binary-tree reduction
-    (\code{util.math.tree\_reduce\_matmul}) to minimise the depth of the
-    matrix-multiplication chain on GPU.
+  \item \pyfunc{compose\_segment\_evolutors(segments, *, segment\_dim=-3,
+    multiply="left")}: performs the ordered product above; internally uses a
+    binary-tree reduction (\code{util.math.tree\_reduce\_matmul}) to minimise
+    the depth of the matrix-multiplication chain on GPU. The default
+    \code{multiply="left"} accumulates each new segment on the left
+    ($U_{\rm total}\to U_{\rm seg}\,U_{\rm total}$), reproducing the
+    ``most-recent-leg-on-the-left'' convention above; \code{multiply="right"}
+    accumulates in the opposite (left-to-right) order, for callers that need
+    the reversed product directly instead of composing and reversing
+    afterwards.
 \end{itemize}
 \end{implbox}
 
@@ -847,18 +878,20 @@ flavour),
 \begin{equation}
   P(\nu_\alpha\to\nu_\beta) = \bigl|S_{\beta\alpha}\bigr|^2.
 \end{equation}
-For a coherent initial state $\psi_\alpha$ (flavour superposition with
+\begin{itemize}
+  \item For a coherent initial state $\psi_\alpha$ (flavour superposition with
 physical phase), the final flavour probability is
 \begin{equation}
   P_\beta = \Bigl|\sum_\alpha S_{\beta\alpha}\psi_\alpha\Bigr|^2
           = \bigl|(S\psi)_\beta\bigr|^2.
 \end{equation}
-For an incoherent mass mixture with weights $w_i\geq0$, $\sum_i w_i=1$
+\item For an incoherent mass mixture with weights $w_i\geq0$, $\sum_i w_i=1$
 (no relative-phase information between mass eigenstates, the regime selected
 by \code{massbasis=True} throughout the code),
 \begin{equation}
   P_\beta = \sum_i \bigl|(S\,U_{\rm PMNS})_{\beta i}\bigr|^2\, w_i .
 \end{equation}
+\end{itemize}
 Probability conservation: since $S$ is unitary, $\sum_\beta P_{\beta\alpha}=1$
 for every column $\alpha$; this is used as a numerical consistency check,
 not as an additional physics ingredient.
@@ -1029,7 +1062,8 @@ Function & Coordinate & Formula implemented \\
 \end{tabular}
 \end{center}
 \pyfunc{flux\_integrated}'s default \code{energy\_dim=-2} matches a plain
-\code{(..., E, 3)} flux; an angle-resolved \code{(..., E, angle, 3)} flux is
+\code{(..., E, N)} flux ($N=3$ or $4$, the latter for the 3+1 sterile
+extension); an angle-resolved \code{(..., E, angle, N)} flux is
 integrated with \code{energy\_dim=-3}, preserving the angle axis in the
 result. \pyfunc{flux\_integrated\_angular} assumes azimuthal symmetry and
 is evaluated by the trapezoidal rule with an explicit $2\pi$ azimuthal

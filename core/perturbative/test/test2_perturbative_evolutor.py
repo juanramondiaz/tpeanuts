@@ -192,6 +192,20 @@ def test_evolutor_zero_order_matches_matrix_exp():
     assert_unitary(U0, name="zero-order evolutor")
 
 
+def test_evolutor_zero_order_analytic_eigenvalues_matches_matrix_exp():
+    H = make_hamiltonian()
+    length = torch.tensor(0.37, device=DEVICE, dtype=DTYPE)
+
+    U0 = evolutor_zero_order(H, length, analytic_eigenvalues=True)
+    expected = torch.matrix_exp(-1j * H * length)
+
+    assert U0.shape == (3, 3)
+    assert_close(
+        U0, expected, name="Cardano zero-order evolutor equals matrix_exp", atol=1e-10, rtol=1e-10,
+    )
+    assert_unitary(U0, name="Cardano zero-order evolutor")
+
+
 def test_evolutor_zero_order_returns_reusable_spectral_data():
     H = make_hamiltonian()
     length = torch.tensor(0.37, device=DEVICE, dtype=DTYPE)

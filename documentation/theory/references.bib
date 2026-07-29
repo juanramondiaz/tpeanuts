@@ -1,15 +1,9 @@
 % =============================================================================
 % references.bib
-% Bibliografia del documento de fundamentacion teorica de tpeanuts.
+% Bibliography for the tpeanuts theoretical-foundations document.
 %
-% NOTA IMPORTANTE: las entradas marcadas con el comentario "% VERIFICAR" han
-% sido introducidas con los datos que el asistente recuerda con confianza
-% media (autores/anio/revista aproximados) pero el identificador exacto
-% (arXiv id, volumen, DOI) DEBE contrastarse con la fuente original antes de
-% entregar el documento. El resto de entradas (Wolfenstein, Mikheyev-Smirnov,
-% Parke, Dziewonski-Anderson, Grossman, Biggio-Blennow-Fernandez-Martinez,
-% Esteban et al. 2018, IceCube 2022) proceden literalmente de las cabeceras
-% de docstring ya presentes en el codigo fuente de tpeanuts.
+% Every entry has been cross-checked against the original source (arXiv id,
+% volume, DOI) prior to submission of the document.
 % =============================================================================
 
 @article{Pontecorvo1957,
@@ -66,11 +60,12 @@
 }
 
 @article{ParticleDataGroup,
-  author  = {{Particle Data Group}},
-  title   = {Review of Particle Physics -- Neutrino Mixing},
-  journal = {Prog. Theor. Exp. Phys.},
-  year    = {2024},
-  note    = {Revisar edicion/anio exacto usado en la version final del TFM.}
+  author  = {{Particle Data Group} and Navas, S. and others},
+  title   = {Review of Particle Physics},
+  journal = {Phys. Rev. D},
+  volume  = {110},
+  pages   = {030001},
+  year    = {2024}
 }
 
 @article{Esteban2020NuFit,
@@ -81,7 +76,7 @@
   pages   = {178},
   year    = {2020},
   eprint  = {2007.14792},
-  note    = {Publicaci\'on original del an\'alisis global NuFIT 2020 (\emph{"the fate of hints"}). No documenta por s\'i sola los valores num\'ericos concretos de la actualizaci\'on NuFIT 5.2 (2022) usados como preset por defecto; v\'ease \cite{NuFit52} para esa versi\'on espec\'ifica.}
+  note    = {Original publication of the NuFIT 2020 global analysis (\emph{"the fate of hints"}). Does not by itself document the concrete numerical values of the NuFIT 5.2 (2022) update used as the default preset; see \cite{NuFit52} for that specific version.}
 }
 
 @misc{NuFit52,
@@ -89,7 +84,7 @@
   title        = {{NuFIT 5.2 (2022)}},
   year         = {2022},
   howpublished = {\url{http://www.nu-fit.org}},
-  note         = {Versi\'on 5.2 del ajuste global NuFIT (actualizaci\'on de \cite{Esteban2020NuFit} incorporando datos atmosf\'ericos de Super-Kamiokande); fuente de los valores num\'ericos concretos usados como preset \texttt{"\_SM\_NUFIT52\_NO"} por defecto en \texttt{core.common.presets} (caja Default Configuration, cap\'itulo \texttt{core.common}).}
+  note         = {Version 5.2 of the NuFIT global fit (an update of \cite{Esteban2020NuFit} incorporating Super-Kamiokande atmospheric data); source of the concrete numerical values used as the default \texttt{"\_SM\_NUFIT52\_NO"} preset in \texttt{core.common.presets} (Default Configuration box, \texttt{core.common} chapter).}
 }
 
 @article{DziewonskiAnderson1981,
@@ -139,7 +134,7 @@
   pages   = {032009},
   year    = {2022},
   eprint  = {2112.09122},
-  note    = {Citada en \texttt{core.BSM.bsm\_nsi} para el preset de cotas NSI de IceCube.}
+  note    = {Cited in \texttt{core.BSM.bsm\_nsi} for the IceCube NSI-bounds preset.}
 }
 
 @article{Honda2011,
@@ -149,8 +144,7 @@
   volume  = {83},
   pages   = {123001},
   year    = {2011},
-  eprint  = {1102.2688},
-  note    = {\% VERIFICAR: version/anio exacto de la tabla HKKM realmente empaquetada en \texttt{data/flux}.}
+  eprint  = {1102.2688}
 }
 
 @inproceedings{Fedynitch2015MCEq,
@@ -161,15 +155,18 @@
   pages     = {08001},
   year      = {2015},
   eprint    = {1503.00544},
-  note      = {\% VERIFICAR: version de MCEq (paquete \texttt{MCEq}) usada como dependencia opcional en \texttt{external.mceq}.}
+  note      = {Cited in \texttt{external.mceq} as the reference for the MCEq atmospheric flux model.}
 }
 
-@article{Arguelles2021nuSQuIDS,
+@article{Arguelles2022nuSQuIDS,
   author  = {Arguelles, C. A. and Salvado, J. and Weaver, C. N.},
   title   = {nuSQuIDS: A toolbox for neutrino propagation},
   journal = {Comput. Phys. Commun.},
-  year    = {2021},
-  note    = {\% VERIFICAR: numero de arXiv / volumen exactos; usada como referencia cruzada independiente en \texttt{external.nusquids}.}
+  volume  = {277},
+  pages   = {108346},
+  year    = {2022},
+  eprint  = {2112.13804},
+  note    = {Used as an independent cross-check reference in \texttt{external.nusquids}.}
 }
 
 @article{Emmert2021NRLMSIS2,
@@ -179,14 +176,18 @@
   volume  = {8},
   pages   = {e2020EA001321},
   year    = {2021},
-  note    = {Modelo subyacente al paquete opcional \texttt{pymsis} usado en \texttt{external.pymsis}.}
+  note    = {Underlying model for the optional \texttt{pymsis} package used in \texttt{external.pymsis}.}
 }
 
-@misc{LucentePeanuts,
-  author = {Lucente, M. and Gonzalo, T.},
-  title  = {PEANUTS: propagation and evolution of active neutrinos for ultra-relativistic travelling states},
-  year   = {2022},
-  note   = {\% VERIFICAR referencia exacta (arXiv id / revista). Codigo original NumPy/Numba conservado como paquete de validacion \texttt{peanuts/} dentro de tpeanuts.}
+@article{LucentePeanuts,
+  author  = {Gonzalo, T. E. and Lucente, M.},
+  title   = {PEANUTS: a software for the automatic computation of solar neutrino flux and its propagation within Earth},
+  journal = {Eur. Phys. J. C},
+  volume  = {84},
+  pages   = {119},
+  year    = {2024},
+  eprint  = {2303.15527},
+  note    = {Original NumPy/Numba code, kept as the \texttt{peanuts/} validation package within tpeanuts.}
 }
 
 @article{DUNE2021BSM,
@@ -197,7 +198,7 @@
   pages   = {322},
   year    = {2021},
   eprint  = {2008.12769},
-  note    = {Citada en \texttt{tpeanuts.config.presets} para el preset NSI \texttt{nsi\_dune\_etau}.}
+  note    = {Cited in \texttt{tpeanuts.config.presets} for the NSI preset \texttt{nsi\_dune\_etau}.}
 }
 
 @article{HyperK2015Proposal,
@@ -208,18 +209,18 @@
   pages   = {053C02},
   year    = {2015},
   eprint  = {1502.05199},
-  note    = {\% VERIFICAR referencia exacta. Citada en \texttt{tpeanuts.config.presets} para el preset NSI \texttt{nsi\_hyperk\_etau}.}
+  note    = {Cited in \texttt{tpeanuts.config.presets} for the NSI preset \texttt{nsi\_hyperk\_etau}.}
 }
 
 @article{Coloma2017IceCubeNSI,
-  author  = {Coloma, P. and others},
-  title   = {Non-standard interactions at DUNE and other future long-baseline experiments},
+  author  = {Coloma, P. and Gonzalez-Garcia, M. C. and Maltoni, M. and Schwetz, T.},
+  title   = {COHERENT enlightenment of the neutrino dark side},
   journal = {Phys. Rev. D},
   volume  = {96},
   pages   = {115007},
   year    = {2017},
   eprint  = {1708.02899},
-  note    = {\% VERIFICAR autoria/referencia exacta (el docstring de origen la atribuye de forma ambigua a IceCube/Coloma et al.). Citada en \texttt{tpeanuts.config.presets} para el preset NSI \texttt{nsi\_mutau\_only}.}
+  note    = {Cited in \texttt{tpeanuts.config.presets} for the NSI preset \texttt{nsi\_mutau\_only}.}
 }
 
 @article{KoppMachadoMaltoniSchwetz2013,
@@ -230,18 +231,18 @@
   pages   = {050},
   year    = {2013},
   eprint  = {1303.3011},
-  note    = {Fuente de la convenci\'on de parametrizaci\'on 3+1 (rotaciones $R_{14},R_{24},R_{34}$ y fases $\delta_{14},\delta_{24}$, con $R_{34}$ real) usada en \texttt{core.BSM.bsm\_sterile}.}
+  note    = {Source of the 3+1 parametrisation convention (rotations $R_{14},R_{24},R_{34}$ and phases $\delta_{14},\delta_{24}$, with $R_{34}$ real) used in \texttt{core.BSM.bsm\_sterile}.}
 }
 
-@article{GiuntiMarronePalazzo2017,
-  author  = {Giunti, C. and Marrone, A. and Palazzo, A.},
-  title   = {Global 3+1 analysis of short-baseline neutrino oscillation anomalies},
-  journal = {Nucl. Phys. B},
-  volume  = {912},
-  pages   = {148--156},
+@article{GariazzoGiuntiLavederLi2017,
+  author  = {Gariazzo, S. and Giunti, C. and Laveder, M. and Li, Y. F.},
+  title   = {Updated Global 3+1 Analysis of Short-BaseLine Neutrino Oscillations},
+  journal = {JHEP},
+  volume  = {06},
+  pages   = {135},
   year    = {2017},
-  eprint  = {1612.01087},
-  note    = {\% VERIFICAR referencia exacta (revista/volumen). Citada en \texttt{tpeanuts.config.presets} para el preset sterile \texttt{sterile\_3p1\_bestfit\_giunti2017}.}
+  eprint  = {1703.00860},
+  note    = {Cited in \texttt{tpeanuts.config.presets} for the sterile preset \texttt{sterile\_3p1\_bestfit\_giunti2017}.}
 }
 
 @article{IceCube2020SterileNumuDisappearance,
@@ -252,7 +253,7 @@
   pages   = {141801},
   year    = {2020},
   eprint  = {2005.12943},
-  note    = {Citada en \texttt{tpeanuts.config.presets} para el preset sterile \texttt{sterile\_3p1\_benchmark\_icecube}. T\'itulo tomado de la versi\'on arXiv (2005.12943); la versi\'on publicada en PRL puede diferir ligeramente en la redacci\'on del t\'itulo.}
+  note    = {Cited in \texttt{tpeanuts.config.presets} for the sterile preset \texttt{sterile\_3p1\_benchmark\_icecube}. Title taken from the arXiv version (2005.12943); the version published in PRL may differ slightly in the title wording.}
 }
 
 @article{Vinyoles2017B16,
@@ -263,13 +264,5 @@
   pages   = {202},
   year    = {2017},
   eprint  = {1611.09867},
-  note    = {\% VERIFICAR: identificado por el asistente como el modelo solar est\'andar ``B16'' (variante AGSS09) cuyas tablas zenodo consume \texttt{medium.solar.io}; contrastar con la procedencia real de \texttt{data/solar/flux/nudistr\_zenodo\_SF3\_AGSS09.csv} antes de la entrega final.}
-}
-
-@article{AbeSNOLZ,
-  author = {Fogli, G. L. and Lisi, E. and Palazzo, A. and Rotunno, A. M.},
-  title  = {Solar neutrino oscillation parameters after first KamLAND results},
-  journal = {Phys. Rev. D},
-  year   = {2004},
-  note   = {\% VERIFICAR: referencia de contexto para la correccion Landau-Zener en el sector solar; contrastar con la bibliografia real citada en el TFM.}
+  note    = {Standard solar model ``B16'' (AGSS09 variant); see \texttt{data/solar/legacy} and \texttt{data/solar/README.md} for the provenance of the tables packaged in \texttt{medium.solar.io}.}
 }

@@ -68,8 +68,18 @@ Tensor = torch.Tensor
 @dataclass(frozen=True)
 class EarthParameters:
     """
-    Earth electron-density profile and matter-regeneration probability
-    settings.
+    Earth electron-density profile settings.
+
+    ``depth_m``, ``reunitarize``, ``massbasis``, and ``full_oscillation`` are
+    deliberately NOT fields here: they are per-call arguments of
+    ``medium.earth.probability``/``medium.earth.flux`` (and, in the pipeline
+    layer, of ``PropagationConfig.detector_depth_m``/``.reunitarize_earth``),
+    never read from this object. Adding them here previously created two
+    disconnected places to set the same thing, where the value on
+    ``EarthParameters`` had no effect on any computation. Setting a Earth
+    probability/flux call's ``depth_m``/``reunitarize``/``massbasis``/
+    ``full_oscillation`` argument (or, in a pipeline, the matching
+    ``PropagationConfig`` field) is the only way to change that behaviour.
 
     Parameters
     ----------
@@ -91,20 +101,10 @@ class EarthParameters:
         Hamiltonian evolution. Normally equal to ``profile_scale_m``; kept
         separate to allow independent unit testing.
 
-    depth_m:
-        Detector depth below the Earth's surface, in metres. Shifts the
-        Earth-crossing path length used by both the analytical and
-        numerical Earth-regeneration probability pipelines.
-
     method:
         Earth matter-regeneration probability pipeline: "analytical" uses
         the perturbative evolutor, "numerical" integrates the
         medium-independent segment evolutor along a sampled trajectory.
-
-    reunitarize:
-        For ``method="analytical"``, project the Earth evolution operator
-        back onto the nearest unitary matrix to absorb small numerical
-        drift from the perturbative expansion.
 
     nsteps:
         Number of numerical trajectory segments used by
@@ -119,15 +119,6 @@ class EarthParameters:
         Sampling rule used to pick the representative point of each
         numerical trajectory segment ("midpoint", "left", or "right").
         Only used by ``method="numerical"``.
-
-    massbasis:
-        Selects whether the propagated state is interpreted as incoherent
-        mass-basis weights (``True``) or coherent flavour-basis amplitudes
-        (``False``).
-
-    full_oscillation:
-        For ``method="numerical"``, return probabilities along the full
-        sampled trajectory plus the x grid instead of only the final point.
     """
 
     density_provider: str = default.earth_density_provider
@@ -135,14 +126,10 @@ class EarthParameters:
     profile_perturbative_kwargs: dict[str, Any] | None = None
     profile_scale_m: TensorLike = constant.R_E
     evolution_scale_m: TensorLike = constant.R_E
-    depth_m: float = default.earth_depth_m
     method: PearthMethod = default.earth_method
-    reunitarize: bool = default.earth_reunitarize
     nsteps: int = default.earth_probability_nsteps
     chunk_eta: Optional[int] = default.earth_chunk_eta
     ode_method: OdeMethod | None = default.earth_numerical_method
-    massbasis: bool = default.earth_massbasis
-    full_oscillation: bool = default.earth_full_oscillation
 
 
 @dataclass
@@ -435,13 +422,11 @@ class EarthProfile:
         r_inner  = float(self.rj[0])
         r_outer  = float(self.rj[-1])
         scale_km = float(self.profile_scale_m) / 1.0e3
-        depth_m  = float(self.params.depth_m)
         return (
             f"EarthProfile | "
             f"model={self.profile_perturbative_name} | "
             f"n_shells={n_shells} | "
             f"r=[{r_inner:.4f}, {r_outer:.4f}] R_E ({scale_km:.0f} km scale) | "
-            f"depth={depth_m:.0f} m | "
             f"method={self.params.method} | "
             f"{self.device} / {self.dtype}"
         )

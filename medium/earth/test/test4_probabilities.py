@@ -225,6 +225,35 @@ def test_energy_eta_grid_probabilities_shape_and_normalization():
     _assert_probability_vector(P)
 
 
+def test_earth_probability_state_analytic_eigenvalues_matches_default():
+    profile = _two_shell_profile()
+    weights = torch.tensor([0.55, 0.30, 0.15], device=DEVICE, dtype=DTYPE)
+    E = torch.tensor([800.0, 2000.0], device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor([0.30, 1.10], device=DEVICE, dtype=DTYPE)
+
+    P_default = _analytical(weights, profile, _oscillation(), E, eta, DEPTH_SURFACE_M, massbasis=True)
+    P_cardano = earth_probability_state(
+        weights, profile, _oscillation(), E, eta, DEPTH_SURFACE_M,
+        method="analytical", massbasis=True, reunitarize=True, analytic_eigenvalues=True,
+    )
+
+    assert_close(P_cardano, P_default, name="Cardano earth_probability_state vs eigvalsh")
+
+
+def test_earth_probability_state_rejects_analytic_eigenvalues_with_numerical_method():
+    profile = _two_shell_profile()
+    weights = torch.tensor([0.55, 0.30, 0.15], device=DEVICE, dtype=DTYPE)
+    E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.40, device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="analytic_eigenvalues=True has no effect"):
+        earth_probability_state(
+            weights, profile, _oscillation(), E, eta, DEPTH_SURFACE_M,
+            method="numerical", massbasis=True, analytic_eigenvalues=True,
+            context=RuntimeContext.resolve(DEVICE, DTYPE),
+        )
+
+
 def test_antineutrino_probabilities_differ_and_valid():
     profile = _two_shell_profile()
     weights = torch.tensor([0.20, 0.50, 0.30], device=DEVICE, dtype=DTYPE)
@@ -678,7 +707,41 @@ def test_pearth_rejects_invalid_method():
                torch.tensor(0.4, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M, method="bogus")
 
 
-def test_pearth_numerical_rejects_non_scalar_antinu():
+def test_pearth_rejects_reunitarize_with_numerical_method():
+    # reunitarize only applies to the analytical evolutor; method="numerical"
+    # silently ignored it before this check existed.
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="reunitarize=True has no effect"):
+        earth_probability_state(
+            state, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
+            torch.tensor(0.4, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+            method="numerical", reunitarize=True,
+        )
+
+
+def test_pearth_rejects_full_oscillation_with_analytical_method():
+    # full_oscillation only applies to the numerical evolutor; method="analytical"
+    # silently ignored it before this check existed.
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="full_oscillation=True has no effect"):
+        earth_probability_state(
+            state, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
+            torch.tensor(0.4, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+            method="analytical", full_oscillation=True,
+        )
+
+
+def test_pearth_numerical_rejects_antinu_not_broadcastable_to_eta_grid():
+    """antinu must be broadcastable *to* the (energy, eta) grid shape, not
+    just any tensor with more than one element -- here eta is scalar (grid
+    shape ()) but antinu claims 2 independent values, which cannot broadcast
+    down to a scalar grid."""
     profile = _two_shell_profile()
     oscillation = OscillationParameters(
         pmns=build_pmns(),
@@ -690,10 +753,66 @@ def test_pearth_numerical_rejects_non_scalar_antinu():
     )
     state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
 
-    with pytest.raises(ValueError, match="only supports scalar antinu"):
+    with pytest.raises(ValueError, match="must be broadcastable to the .energy, eta. grid shape"):
         earth_probability_state_numerical(state, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
                           torch.tensor(0.4, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M, massbasis=True,
                           context=RuntimeContext.resolve(DEVICE, DTYPE))
+
+
+def test_pearth_numerical_accepts_antinu_batched_over_eta_grid():
+    """A tensor antinu broadcastable to the (energy, eta) grid -- e.g. one
+    bool per eta value -- now works in one batched call instead of being
+    rejected outright; each row must match the scalar-antinu result computed
+    for that same eta value individually."""
+    profile = _two_shell_profile()
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
+    E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor([0.3, 0.9, 2.2], device=DEVICE, dtype=DTYPE)
+    antinu_per_eta = torch.tensor([False, True, False], device=DEVICE)
+
+    def make_oscillation(antinu) -> OscillationParameters:
+        return OscillationParameters(
+            pmns=build_pmns(),
+            mass_spectrum=MassSpectrum_SM(
+                DeltamSq21=torch.tensor(DM21_EV2, device=DEVICE, dtype=DTYPE),
+                DeltamSq3l=torch.tensor(DM3L_EV2, device=DEVICE, dtype=DTYPE),
+            ),
+            antinu=antinu,
+        )
+
+    P_batched = earth_probability_state_numerical(
+        state, profile, make_oscillation(antinu_per_eta), E, eta, DEPTH_SURFACE_M,
+        massbasis=True, nsteps=30, context=ctx,
+    )
+
+    assert P_batched.shape == (3, 3)
+    for i, eta_value in enumerate(eta.tolist()):
+        antinu_scalar = bool(antinu_per_eta[i].item())
+        P_scalar = earth_probability_state_numerical(
+            state, profile, make_oscillation(antinu_scalar), E,
+            torch.tensor(eta_value, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+            massbasis=True, nsteps=30, context=ctx,
+        )
+        assert_close(P_batched[i], P_scalar, name=f"batched antinu row {i} (eta={eta_value}) matches scalar call")
+
+
+@pytest.mark.parametrize("eta_value", [-0.5, -1.0e-6, math.pi + 0.5, math.pi + 1.0e-6])
+def test_pearth_numerical_rejects_eta_outside_physical_range(eta_value):
+    """method="analytical" (via earth_evolutor) has always validated eta in
+    [0, pi]; method="numerical" used to skip this check entirely and would
+    silently return a finite but physically meaningless probability vector
+    for an out-of-range eta instead of raising."""
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="eta must be between 0 and pi"):
+        earth_probability_state_numerical(
+            state, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
+            torch.tensor(eta_value, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+            massbasis=True, nsteps=30, context=RuntimeContext.resolve(DEVICE, DTYPE),
+        )
 
 
 def test_earth_probability_transition_is_doubly_stochastic():

@@ -150,6 +150,21 @@ class ExposureParameters:
     detector_latitude_rad: Optional[float] = None
     inclination: float = default.earth_inclination
 
+    def __post_init__(self) -> None:
+        """Reject a degenerate eta grid before it reaches any consumer.
+
+        A single-point grid (``exposure_ns=1``) has no spacing to compute:
+        ``make_eta_grid`` would still build it, but the first downstream
+        consumer to need ``eta[1] - eta[0]`` (e.g. ``earth_probability_
+        exposure``'s rectangle-sum integration) would fail with a raw,
+        confusing ``IndexError`` instead of a clear configuration error.
+        """
+        if self.exposure_ns < 2:
+            raise ValueError(
+                f"exposure_ns must be at least 2 to define a nadir-angle "
+                f"grid with a spacing; got {self.exposure_ns!r}."
+            )
+
 
 @dataclass
 class NadirExposureTable:
@@ -244,6 +259,14 @@ def integrate_exposure(
 ) -> torch.Tensor:
     """Integrate eta-dependent probabilities against an exposure weight.
 
+    Uses ``torch.trapezoid``, so unlike ``medium.earth.exposure_integration.
+    earth_probability_exposure`` (a rectangle-sum rule chosen to match the
+    legacy peanuts convention, see that module's docstring), this accepts a
+    non-uniform ``eta`` grid and is the more accurate quadrature of the two.
+    It is not called by that pipeline and will not reproduce its numbers
+    bit-for-bit; use it directly when integrating an already-computed
+    ``(eta, exposure)`` pair without needing to match the legacy reference.
+
     Args:
         probabilities_eta: Probability tensor whose penultimate dimension is
             the nadir-angle axis and whose final dimension is flavour.
@@ -311,7 +334,7 @@ def prepare_nadir_exposure(
             "and exposure_source is math/cache/legacy."
         )
 
-    exposure_table = build_nadir_exposure(exposure=exposure, context=context)
+    exposure_table = build_nadir_exposure(exposure=exposure, context=context, normalized=True)
 
     return exposure_table.eta, exposure_table.exposure, {
         "source": exposure.exposure_source,

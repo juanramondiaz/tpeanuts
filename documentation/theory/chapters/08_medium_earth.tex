@@ -357,21 +357,29 @@ exposure integration (respectively) on top of
 (\cref{sec:earth-exposure}).}}
 
 \begin{implbox}
-\pyfunc{earth\_flux\_state(nustate, profile\_earth, oscillation, E\_MeV, eta, depth\_m, flux, spectrum, method, ...)}
-calls \pyfunc{earth\_probability\_state} then
-\pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}), propagating
-the \code{(probabilities\_along\_path, x)} pair through unchanged when
-\code{method="numerical"} and \code{full\_oscillation=True}.
-\pyfunc{earth\_flux\_integrated(nustate, profile\_earth, oscillation, E\_MeV,
-eta, depth\_m, flux, spectrum, ...)} builds \pyfunc{earth\_flux\_state} on an
-energy grid at a fixed nadir angle and integrates it with
-\pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
-physical rate. \pyfunc{earth\_flux\_exposure(nustate, profile\_earth,
-oscillation, E\_MeV, depth\_m, flux, spectrum, exposure, ...)} instead starts
-from \pyfunc{earth\_probability\_exposure} (\cref{sec:earth-exposure}): the
-angular exposure average happens at the probability level, before the flux
-normalisation is applied. All three accept \code{include\_matter\_nc=False},
-forwarded unchanged to the underlying probability function.
+\begin{itemize}
+  \item \pyfunc{earth\_flux\_state(nustate, profile\_earth, oscillation,
+    E\_MeV, eta, depth\_m, flux, spectrum, method, ...)}: calls
+    \pyfunc{earth\_probability\_state} then
+    \pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}),
+    propagating the \code{(probabilities\_along\_path, x)} pair through
+    unchanged when \code{method="numerical"} and
+    \code{full\_oscillation=True}.
+  \item \pyfunc{earth\_flux\_integrated(nustate, profile\_earth,
+    oscillation, E\_MeV, eta, depth\_m, flux, spectrum, ..., energy\_dim=-2)}:
+    builds \pyfunc{earth\_flux\_state} on an energy grid at a fixed nadir
+    angle and integrates it with \pyfunc{core.common.flux.flux\_integrated},
+    returning an unnormalised physical rate. Distinct from
+    \pyfunc{earth\_flux\_exposure} below, which integrates over the nadir
+    angle instead of energy.
+  \item \pyfunc{earth\_flux\_exposure(nustate, profile\_earth, oscillation,
+    E\_MeV, depth\_m, flux, spectrum, exposure, ...)}: instead starts from
+    \pyfunc{earth\_probability\_exposure} (\cref{sec:earth-exposure}): the
+    angular exposure average happens at the probability level, before the
+    flux normalisation is applied.
+\end{itemize}
+All three accept \code{include\_matter\_nc=False}, forwarded unchanged to
+the underlying probability function.
 \end{implbox}
 
 \section[Nadir-angle exposure]{Nadir-angle exposure: \texttt{exposure\_math.py}, \texttt{exposure\_table.py}, \texttt{exposure\_integration.py}, \texttt{exposure\_io.py}}

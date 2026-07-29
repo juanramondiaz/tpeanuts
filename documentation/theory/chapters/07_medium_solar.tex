@@ -327,14 +327,28 @@ optional spectra, and energy integration to
 \pyfunc{solar\_\allowbreak{}probability\_\allowbreak{}state}'s output.}
 
 \begin{implbox}
-\pyfunc{solar\_flux\_state(sources, profile, oscillation, E\_MeV, source\_spectrum=None, ...)}
-adds no new physics: it calls \pyfunc{solar\_probability\_state} above for
-the requested source(s), then \pyfunc{core.common.flux.flux\_state}
-(\cref{ch:core-common}) to apply each source's total flux normalisation
-(\pyfunc{SolarProfile.flux}) and optional energy spectrum -- the same
-minimal pattern established in \cref{ch:vacuum}.
-\pyfunc{solar\_flux\_integrated(...)} builds \pyfunc{solar\_flux\_state} on
-an energy grid and integrates it with
-\pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
-physical rate.
+\begin{itemize}
+  \item \pyfunc{solar\_flux\_state(sources, profile, oscillation, E\_MeV,
+    source\_spectrum=None, ..., date=None)}: adds no new physics -- calls
+    \pyfunc{solar\_probability\_state} above for the requested source(s),
+    then \pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}) to
+    apply each source's total flux normalisation (\pyfunc{SolarProfile.flux})
+    and optional energy spectrum -- the same minimal pattern established in
+    \cref{ch:vacuum}. The optional \code{date} rescales the result by the
+    instantaneous Sun-Earth distance modulation
+    $(1\,\mathrm{AU}/R(\text{date}))^2$
+    (\pyfunc{medium.solar.geometry.sun\_earth\_distance\_factor}); omitted
+    (the default), the flux stays at its 1~AU reference normalisation.
+  \item \pyfunc{solar\_flux\_integrated(sources, profile, oscillation,
+    E\_MeV, source\_spectrum=None, ..., energy\_dim=-2, date=None)}: builds
+    \pyfunc{solar\_flux\_state} on an energy grid and integrates it with
+    \pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
+    physical rate. \pyfunc{SolarProfile.flux} is each source's already
+    energy-\emph{integrated} total, not a spectral density, so a normalised
+    production spectrum -- \code{profile.spectrum} by default, or an
+    explicit \code{source\_spectrum} override -- is what turns it into the
+    genuine $\mathrm{d}\Phi/\mathrm{d}E$ that \pyfunc{flux\_integrated}
+    expects; without it, the energy integral would silently pick up a
+    spurious factor of the grid's own units and spacing.
+\end{itemize}
 \end{implbox}

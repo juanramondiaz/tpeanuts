@@ -1,0 +1,100 @@
+\chapter{\texttt{pipeline.atmosphere} --- atmospheric production to Earth surface}
+\label{ch:pipeline-atmosphere}
+
+\texttt{pipeline.atmosphere} is the production-to-surface leg for
+atmospheric neutrinos: given a tabulated production flux for one produced
+particle (e.g.\ Honda/HKKM-style tables, binned in energy, production
+height, and zenith/off-axis angle), it selects the requested angular bin
+and coherently propagates that produced flavour through the atmosphere to
+the Earth surface (\cref{ch:atmosphere}). Continuing the resulting surface
+state through the Earth to a detector is a separate step, covered by
+\cref{ch:pipeline-atmosphere-earth}.
+
+\section{\texttt{pipeline.atmosphere} --- production selection and surface propagation}
+
+\modulehead{pipeline/atmosphere.py}{\pyfunc{select\_production\_flux} and
+\pyfunc{propagate\_atmosphere\_to\_surface}: pick one produced
+particle/angle from a flux dataset, then propagate it coherently to the
+Earth surface.}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{select\_production\_flux(flux\_data, particle, *,
+    alpha\_deg=None, theta\_deg=None, angle\_index=None,
+    angle\_mode="theta", angle\_tolerance\_deg=None, context=...)}: given a
+    \code{\{particle: \{grids, tables, \ldots\}\}} mapping (as produced by
+    the project's flux-table loaders), locates the angular bin closest to
+    the requested \code{alpha\_deg}/\code{theta\_deg} (or an explicit
+    \code{angle\_index}), and returns a single \code{production} dictionary
+    -- the energy/height grids, the selected slice of the height-resolved
+    production flux \code{phi\_Eh} and the angle-integrated
+    \code{phi\_E\_theta}, the resolved \code{theta\_deg}, and the
+    \pyfunc{core.common.neutrino.flavour\_index} of \code{particle} -- that
+    every function below consumes. \code{angle\_tolerance\_deg} raises if
+    no angular bin lies close enough to the requested angle, instead of
+    silently returning a distant one.
+  \item \pyclass{AtmosphereSurfaceResult} (frozen dataclass): the
+    \code{production} dictionary above, the coherent \code{initial\_state}
+    and \code{surface\_states} amplitudes, the full evolutor
+    \code{S\_atmosphere}, \code{surface\_probabilities}, the built
+    \code{trajectories} (\cref{ch:atmosphere}, \texttt{geometry.py}
+    section), and -- only when \code{production["phi\_Eh"]} is present --
+    the production-flux-weighted \code{surface\_probability\_height\_averaged},
+    \code{surface\_flux\_Eh}, and their optional height/energy-integrated
+    reductions.
+  \item \pyfunc{propagate\_atmosphere\_to\_surface(production, config, *,
+    initial\_flavour=None, trajectory\_steps=200, integrate\_energy=False)}:
+    builds the coherent initial state (defaulting to
+    \code{production["particle"]} itself, i.e.\ no flavour change at
+    production), evaluates \pyfunc{atmosphere\_evolutor}
+    (\cref{ch:atmosphere}) on the full energy--height grid at the
+    production angle, and applies it to obtain \code{surface\_states} and
+    \code{surface\_probabilities}. When the production dictionary carries a
+    height-resolved flux, it is additionally combined with the
+    probabilities via \pyfunc{core.common.flux.flux\_state} and
+    \pyfunc{probability\_weighted\_average}/\pyfunc{flux\_integrated\_coordinate}
+    (\cref{ch:core-common}) to give the height-averaged probability and
+    height-integrated flux directly, so a caller that only needs the
+    energy-resolved surface flux does not have to redo that reduction by
+    hand.
+\end{itemize}
+\end{implbox}
+
+\begin{examplebox}[title={Muon-neutrino production at 60\textdegree{} zenith, propagated to the surface}]
+\begin{lstlisting}[style=tpython]
+import torch
+
+from tpeanuts.config.propagation import PropagationConfig
+from tpeanuts.pipeline.atmosphere import (
+    propagate_atmosphere_to_surface,
+    select_production_flux,
+)
+from tpeanuts.util.context import RuntimeContext
+
+context = RuntimeContext.resolve("cpu", torch.float64)
+oscillation = PropagationConfig.oscillation_parameters_from_preset(
+    "_SM_NUFIT52_NO", context=context,
+)
+config = PropagationConfig(runtime=context, oscillation=oscillation)
+
+# flux_data: {"numu": {...}, "nue": {...}, ...}, as returned by this
+# project's Honda/HKKM-style flux-table loader (see medium.atmosphere).
+production = select_production_flux(
+    flux_data,
+    particle="numu",
+    theta_deg=60.0,
+    angle_tolerance_deg=1.0,
+    context=context,
+)
+
+surface = propagate_atmosphere_to_surface(
+    production,
+    config,
+    trajectory_steps=200,
+)
+
+print(surface.surface_probabilities.shape)          # (E, h, flavour)
+print(surface.surface_flux_Eh.shape)                # (E, h, flavour)
+print(surface.surface_flux_height_integrated_E.shape)  # (E, flavour)
+\end{lstlisting}
+\end{examplebox}

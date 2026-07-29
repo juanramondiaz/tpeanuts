@@ -298,6 +298,49 @@ def test_earth_profile_prem_model_also_valid():
     assert check_positive(n_e)
 
 
+@pytest.mark.parametrize("density_provider", ["prem", "ak135", "legacy"])
+def test_earth_profile_prem_tabulated_model_accepts_every_density_provider(density_provider):
+    # "prem500"/"prem_tabulated"/etc. are aliases for the same
+    # PremTabulatedProfile model; it reads the provider's plain radial
+    # density table (earth_provider_path), which exists for all three
+    # bundled providers, unlike the even_power fit tables below.
+    profile = _default_profile(profile_perturbative_name="prem", density_provider=density_provider)
+
+    assert profile.rj.ndim == 1
+    assert torch.all(torch.diff(profile.rj) > 0)
+
+    n_e = profile.density_x_eta(
+        torch.tensor(0.0, device=DEVICE, dtype=DTYPE),
+        torch.tensor(0.0, device=DEVICE, dtype=DTYPE),
+    )
+    assert check_no_nan_inf(n_e)
+    assert check_positive(n_e)
+
+
+@pytest.mark.parametrize("density_provider", ["prem", "legacy"])
+def test_earth_profile_even_power_model_accepts_providers_with_fit_tables(density_provider):
+    # even_power reads a pre-fitted table from <provider>/fit/, which only
+    # "prem" and "legacy" ship; see the ak135 counterpart below.
+    profile = _default_profile(profile_perturbative_name="even_power", density_provider=density_provider)
+
+    n_e = profile.density_x_eta(
+        torch.tensor(0.0, device=DEVICE, dtype=DTYPE),
+        torch.tensor(0.0, device=DEVICE, dtype=DTYPE),
+    )
+    assert check_no_nan_inf(n_e)
+    assert check_positive(n_e)
+
+
+def test_earth_profile_even_power_model_rejects_ak135_missing_fit_table():
+    # ak135 ships a plain radial density table (used by the prem_tabulated
+    # path above) but no even_power/fit directory, so requesting the
+    # even_power model (the library default) with density_provider="ak135"
+    # must fail loudly at construction time instead of resolving to a
+    # missing/wrong file silently.
+    with pytest.raises(ValueError, match="even-power fit"):
+        _default_profile(profile_perturbative_name="even_power", density_provider="ak135")
+
+
 def _two_shell_prem_profile(**params_kwargs) -> EarthProfile:
     """Synthetic two-shell PREM profile with constant n_e/n_n per shell."""
     rj = torch.tensor([0.5, 1.0], device=DEVICE, dtype=DTYPE)

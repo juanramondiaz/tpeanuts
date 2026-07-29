@@ -297,6 +297,16 @@ always real: the fourth possible phase can be absorbed into a field
 redefinition, so sterile presets do not include \code{delta34\_deg}.
 \end{theorybox}
 
+\begin{notebox}
+Counting CP phases for the sterile extension requires care: an
+$N$-generation Dirac mixing matrix has $(N-1)(N-2)/2$ independent physical
+phases. For $N=4$ (the 3+1 case) this gives exactly \keyresult{three} Dirac
+phases ($\delta_{13}$, $\delta_{14}$, $\delta_{24}$); the rotation
+$R_{34}$ is always real because the fourth phase can be absorbed into a
+redefinition of the charged-lepton fields, and hence sterile presets do not
+include \code{delta34\_deg}.
+\end{notebox}
+
 \begin{theorybox}
 \subsection*{Transforming to the reduced basis: $H_{\rm kin}$ and $H_{\rm mat}$}
 Exactly as in \cref{ch:core-sm}, the reduced-basis kinetic term uses the
@@ -312,48 +322,58 @@ $R_{14}$, which -- unlike $R_{12}$/$R_{13}$ -- is built with a non-trivial
 phase); the Hermitian-conjugate convention is therefore not merely a safe
 default here, but the only correct choice.
 
-\textbf{Without NSI and without the neutral-current term} (the default),
-the matter term needs no basis change at all:
-$O_4\,\diag(V_{CC},0,0,0)\,O_4^\dagger=\diag(V_{CC},0,0,0)$ exactly (shown
-above), so
-\begin{equation}
-  H_{\rm mat,4}^{\rm red} = H_{\rm mat,4}^{\rm flavour} = \diag(V_{CC},0,0,0),
-\end{equation}
-and the reduced Hamiltonian is simply
-$H_{\rm red,4}=H_{\rm kin,4}^{\rm red}+H_{\rm mat,4}^{\rm red}$
-(\pyfunc{hamiltonian\_reduced}, \cref{ch:core-common}), dressed back to the
-flavour basis with $O_4(\cdot)O_4^\dagger$ (\pyfunc{hamiltonian\_flavour}).
-This case introduces no approximation beyond \cref{ch:core-sm}: the
-reduced-basis simplification stays exact for any $\theta_{14},\theta_{24},\theta_{34}$.
-Supplying a neutron density activates
-$H_{\rm mat,4}^{\rm flavour}=\diag(V_{CC},0,0,-V_{NC})$
-(\cref{ch:core-common}) instead: since this no longer commutes with $O_4$,
-the shortcut above is unavailable and \pyfunc{hamiltonian\_matter\_reduced}
-takes the general rotated path,
-$H_{\rm mat,4}^{\rm red}=O_4^\dagger\,H_{\rm mat,4}^{\rm flavour}\,O_4$,
-even when NSI is off.
-
-\textbf{Simultaneous NSI} is fully supported by the same code path
-(\cref{sec:nsi-presets}): \pyfunc{NSIConfig.epsilon\_tensor(n\_flavours=4)}
-embeds the $3\times3$ $\epsilon$ block into the top-left corner of a
-$4\times4$ zero matrix (the sterile row/column stay zero, since $\nu_s$ is
-an $\mathrm{SU}(2)_L\times\mathrm{U}(1)_Y$ singlet and carries no NSI
-coupling), and \pyfunc{hamiltonian\_matter\_reduced} rotates the resulting
-$H_{\rm mat,4}^{\rm NSI,\,flavour}=V\bigl(\diag(1,0,0,0)+\epsilon_4\bigr)$
-into the reduced basis with the \emph{same} $O_4^\dagger(\cdot)O_4$
-transformation as the 3-flavour case:
-\begin{equation}
-  H_{\rm mat,4}^{\rm NSI,\,red} = O_4^\dagger\,H_{\rm mat,4}^{\rm NSI,\,flavour}\,O_4,
-\end{equation}
-again exact for arbitrary $\epsilon$, since it is computed explicitly
-rather than assumed to commute with $O_4$ -- the same approximation
-trade-off as the 3-flavour NSI case applies here too (previous sections):
-the closed-form real-arithmetic shortcut is lost, and diagonalisation falls
-back to \code{torch.linalg.eigh}. Nothing in
-\pyfunc{hamiltonian\_reduced}/\pyfunc{hamiltonian\_flavour} branches
-explicitly on ``sterile or NSI or both'': the flavour count $n\in\{3,4\}$
-and the presence of \code{oscillation.nsi} are read directly off
-\pyclass{OscillationParameters}, so all four combinations (SM, SM+NSI,
+Depending on whether NSI and/or the neutral-current term are active, the
+matter term in the reduced basis takes one of three forms:
+\begin{itemize}
+  \item \textbf{Without NSI and without the neutral-current term} (the
+    default). The matter term needs no basis change at all:
+    $O_4\,\diag(V_{CC},0,0,0)\,O_4^\dagger=\diag(V_{CC},0,0,0)$ exactly
+    (shown above), so
+    \begin{equation}
+      H_{\rm mat,4}^{\rm red} = H_{\rm mat,4}^{\rm flavour} = \diag(V_{CC},0,0,0),
+    \end{equation}
+    and the reduced Hamiltonian is simply
+    $H_{\rm red,4}=H_{\rm kin,4}^{\rm red}+H_{\rm mat,4}^{\rm red}$
+    (\pyfunc{hamiltonian\_reduced}, \cref{ch:core-common}), dressed back to
+    the flavour basis with $O_4(\cdot)O_4^\dagger$
+    (\pyfunc{hamiltonian\_flavour}). This case introduces no approximation
+    beyond \cref{ch:core-sm}: the reduced-basis simplification stays exact
+    for any $\theta_{14},\theta_{24},\theta_{34}$.
+  \item \textbf{Without NSI but with the neutral-current term.} Supplying a
+    neutron density activates
+    $H_{\rm mat,4}^{\rm flavour}=\diag(V_{CC},0,0,-V_{NC})$
+    (\cref{ch:core-common}) instead: since this no longer commutes with
+    $O_4$, the shortcut above is unavailable and
+    \pyfunc{hamiltonian\_matter\_reduced} takes the general rotated path,
+    \begin{equation}
+      H_{\rm mat,4}^{\rm red}=O_4^\dagger\,H_{\rm mat,4}^{\rm flavour}\,O_4,
+    \end{equation}
+    even though NSI is off.
+  \item \textbf{Simultaneously with NSI (and, optionally, the
+    neutral-current term).} Fully supported by the same code path
+    (\cref{sec:nsi-presets}): \pyfunc{NSIConfig.epsilon\_tensor(n\_flavours=4)}
+    embeds the $3\times3$ $\epsilon$ block into the top-left corner of a
+    $4\times4$ zero matrix (the sterile row/column stay zero, since $\nu_s$
+    is an $\mathrm{SU}(2)_L\times\mathrm{U}(1)_Y$ singlet and carries no NSI
+    coupling), and \pyfunc{hamiltonian\_matter\_reduced} rotates the
+    resulting
+    $H_{\rm mat,4}^{\rm NSI,\,flavour}=V\bigl(\diag(1,0,0,0)+\epsilon_4\bigr)$
+    (plus the $-V_{NC}$ sterile-diagonal term when a neutron density is also
+    supplied) into the reduced basis with the \emph{same}
+    $O_4^\dagger(\cdot)O_4$ transformation:
+    \begin{equation}
+      H_{\rm mat,4}^{\rm NSI,\,red} = O_4^\dagger\,H_{\rm mat,4}^{\rm NSI,\,flavour}\,O_4,
+    \end{equation}
+    again exact for arbitrary $\epsilon$, since it is computed explicitly
+    rather than assumed to commute with $O_4$ -- the same approximation
+    trade-off as the 3-flavour NSI case applies here too (previous
+    sections): the closed-form real-arithmetic shortcut is lost, and
+    diagonalisation falls back to \code{torch.linalg.eigh}.
+\end{itemize}
+Nothing in \pyfunc{hamiltonian\_reduced}/\pyfunc{hamiltonian\_flavour}
+branches explicitly on ``sterile or NSI or both'': the flavour count
+$n\in\{3,4\}$ and the presence of \code{oscillation.nsi} are read directly
+off \pyclass{OscillationParameters}, so all four combinations (SM, SM+NSI,
 sterile, sterile+NSI) are handled by the exact same two functions.
 \end{theorybox}
 
@@ -411,7 +431,7 @@ literal matrix identity between the three named methods.
 
 \begin{refbox}
 3+1 mixing parametrisation convention: \cite{KoppMachadoMaltoniSchwetz2013}.
-Global 3+1 fit: \cite{GiuntiMarronePalazzo2017}. IceCube atmospheric
+Global 3+1 fit: \cite{GariazzoGiuntiLavederLi2017}. IceCube atmospheric
 $\nu_\mu$ disappearance search: \cite{IceCube2020SterileNumuDisappearance}.
 \end{refbox}
 
@@ -452,7 +472,7 @@ Preset & Parameters and origin \\
   $\theta_{34}=0$, $\Delta m^2_{41}=1.7\ \mathrm{eV^2}$
   ($\sin^2 2\theta_{14}=0.085$, $\sin^2 2\theta_{24}=0.068$). Global 3+1
   fit combining the reactor and gallium anomalies with solar data
-  \parencite{GiuntiMarronePalazzo2017}; sterile CP phases fixed to zero
+  \parencite{GariazzoGiuntiLavederLi2017}; sterile CP phases fixed to zero
   (no sensitivity in that data combination).} \\[30pt]
 \parbox[t]{3.2cm}{\code{sterile\_\allowbreak{}3p1\_\allowbreak{}benchmark\_\allowbreak{}icecube}} &
   \parbox[t]{9.4cm}{$\theta_{14}=0$, $\theta_{24}\approx9.22^\circ$
@@ -492,4 +512,111 @@ the physics (the standard 2-flavour formula is itself an approximation once
 more than one active-sterile angle is non-zero), not a code limitation; the
 preset exists specifically to isolate and validate this effect
 numerically.
+\end{notebox}
+
+\section{Supported configurations across the codebase}
+\label{sec:bsm-support-matrix}
+
+This chapter and \cref{ch:core-sm} establish the three orthogonal
+oscillation scenarios exposed by \pyclass{OscillationParameters}: the plain
+Standard Model, the Non-Standard Interactions extension, and the 3+1
+sterile extension --- freely combinable, in any pair or all three at once,
+via \code{oscillation.pmns.n\_flavours} and \code{oscillation.nsi}
+(\cref{ch:core-common}). Which of these combinations a given
+\emph{propagation method} actually accepts, however, is not uniform:
+\pyfunc{hamiltonian\_reduced} / \pyfunc{hamiltonian\_flavour} themselves, the
+generic numerical evolutor, and most perturbative and solar paths are fully
+generic in flavour count and NSI content, while a couple of closed-form
+solar methods are deliberately restricted to the plain SM because their
+underlying formula has no BSM generalisation. This section collects that
+support matrix in one place, so a caller can check at a glance whether a
+chosen propagation method accepts the oscillation scenario it needs.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Configuration option & Standard Model & NSI & Sterile (3+1) \\
+\midrule
+\parbox[t]{4.0cm}{Numerical propagation (\pyfunc{evolutor\_numerical})} &
+  \parbox[t]{3.2cm}{\checkmark\ Supported} &
+  \parbox[t]{3.2cm}{\checkmark\ Supported} &
+  \parbox[t]{3.2cm}{\checkmark\ Supported} \\[12pt]
+\parbox[t]{4.0cm}{Perturbative propagation --- vacuum (\texttt{medium.\allowbreak vacuum.\allowbreak evolutor})} &
+  \parbox[t]{3.2cm}{\checkmark\ own exact closed form} &
+  \parbox[t]{3.2cm}{\checkmark\ (no physical effect: $H_{\rm mat}=0$ in vacuum)} &
+  \parbox[t]{3.2cm}{\checkmark\ same closed form, generic in $n$} \\[18pt]
+\parbox[t]{4.0cm}{Perturbative propagation --- earth (\texttt{medium.\allowbreak earth.\allowbreak evolutor})} &
+  \parbox[t]{3.2cm}{\checkmark\ } &
+  \parbox[t]{3.2cm}{\checkmark} &
+  \parbox[t]{3.2cm}{\checkmark} \\[18pt]
+\parbox[t]{4.0cm}{Perturbative propagation --- atmosphere (\texttt{medium.\allowbreak atmosphere.\allowbreak evolutor})} &
+  \parbox[t]{3.2cm}{\checkmark\ } &
+  \parbox[t]{3.2cm}{\checkmark} &
+  \parbox[t]{3.2cm}{\checkmark} \\[18pt]
+\parbox[t]{4.0cm}{Solar --- adiabatic approximated } &
+  \parbox[t]{3.2cm}{\checkmark\ } &
+  \parbox[t]{3.2cm}{$\times$\ raises \code{ValueError}} &
+  \parbox[t]{3.2cm}{$\times$\ raises \code{ValueError}} \\[18pt]
+\parbox[t]{4.0cm}{Solar --- adiabatic exact } &
+  \parbox[t]{3.2cm}{\checkmark} &
+  \parbox[t]{3.2cm}{\checkmark} &
+  \parbox[t]{3.2cm}{\checkmark\ (+ optional $V_{NC}$)} \\[18pt]
+\parbox[t]{4.0cm}{Solar --- fully numerical } &
+  \parbox[t]{3.2cm}{\checkmark} &
+  \parbox[t]{3.2cm}{\checkmark} &
+  \parbox[t]{3.2cm}{\checkmark\ (+ optional $V_{NC}$)} \\[18pt]
+\parbox[t]{4.0cm}{Solar --- Landau-Zener correction } &
+  \parbox[t]{3.2cm}{\checkmark\ (adiabatic approximated)} &
+  \parbox[t]{3.2cm}{$\times$} &
+  \parbox[t]{3.2cm}{$\times$} \\[18pt]
+\parbox[t]{4.0cm}{Eigenvalue solver, analytic } &
+  \parbox[t]{3.2cm}{Cardano ($n=3$)} &
+  \parbox[t]{3.2cm}{Cardano ($n=3$) or Ferrari ($n=4$)} &
+  \parbox[t]{3.2cm}{Ferrari ($n=4$)} \\[14pt]
+\parbox[t]{4.0cm}{Neutral-current term $V_{NC}$ (sterile diagonal) } &
+  \parbox[t]{3.2cm}{n/a (unobservable common phase, never computed)} &
+  \parbox[t]{3.2cm}{n/a unless sterile also active} &
+  \parbox[t]{3.2cm}{\checkmark\ optional ( off by default)} \\[6pt]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{notebox}[title={Reading This Table}]
+\begin{itemize}
+  \item \textbf{A \checkmark\ is scenario-exact, not error-free.} Every
+    \checkmark\ entry above is exact within whatever approximation the
+    method itself represents (the adiabatic approximation, a finite
+    numerical step size, \dots) --- it is not a claim that the method is
+    free of the usual numerical or physical approximations documented in
+    its own chapter.
+  \item \textbf{Vacuum never touches \cref{ch:core-perturbative} or
+    \cref{ch:core-numerical}.} With $H_{\rm mat}=0$ there is nothing to
+    perturb or exponentiate segment by segment, so
+    \texttt{medium.vacuum.evolutor} implements the exact three-step
+    mass-basis scheme directly (\cref{ch:core-sm}, the \textbf{Coherent
+    propagation scheme} box). That scheme happens to be $n$-flavour
+    generic, so NSI (a no-op there) and the sterile extension are
+    ``supported'' in the sense that nothing breaks, not because the
+    perturbative or numerical machinery was invoked.
+  \item \textbf{The solar adiabatic-approximated method and Landau-Zener are
+    the only genuinely SM-only propagation paths in the whole project.}
+    Both rely on a closed-form two-level mixing-angle formula
+    ($\theta_{12}^M$, $\theta_{13}^M$, and the MSW resonance condition
+    respectively) that has no NSI or 3+1 generalisation, and the solar
+    dispatcher enforces this by raising rather than silently ignoring the
+    BSM extension.
+  \item \textbf{The analytic eigenvalue solver is selected by flavour count
+    alone, never by whether NSI is active.} Cardano's trigonometric cubic
+    solution applies to any traceless Hermitian $3\times3$ reduced
+    Hamiltonian (SM or SM+NSI), and Ferrari's quartic solution applies to
+    any traceless Hermitian $4\times4$ one (sterile, with or without NSI or
+    $V_{NC}$) --- both formulas only require Hermiticity, not a real
+    matrix, so neither NSI's complex $\epsilon$ nor a non-zero
+    active-sterile CP phase $\delta_{14}$ forces a numerical fallback. That
+    fallback (\code{torch.linalg.eigvalsh}) is used only when
+    \code{analytic\_eigenvalues=False} (the default) or when the
+    closed-form solver's own conditioning guard detects a near-degenerate
+    spectrum.
+\end{itemize}
 \end{notebox}

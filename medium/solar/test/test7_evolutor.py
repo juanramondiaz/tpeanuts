@@ -33,7 +33,7 @@ from tpeanuts.medium.solar.evolutor import (
     solar_evolutor_numerical,
     solar_evolutor_numerical_history,
 )
-from tpeanuts.medium.solar.probability import Tei
+from tpeanuts.medium.solar.adiabatic import mass_weights_adiabatic_approximated
 from tpeanuts.medium.solar.profile import build_solar_profile
 from tpeanuts.util.context import RuntimeContext
 
@@ -163,7 +163,7 @@ def test_mass_weights_numerical_shape_and_normalization():
     )
 
 
-def test_mass_weights_numerical_matches_tei_at_production_points_in_sm_limit():
+def test_mass_weights_numerical_matches_adiabatic_approximated_at_production_points_in_sm_limit():
     # Cross-validation against the independently-implemented adiabatic path:
     # agreement at the several-percent level is expected for standard LMA
     # parameters, where the adiabatic approximation itself is excellent but
@@ -174,11 +174,11 @@ def test_mass_weights_numerical_matches_tei_at_production_points_in_sm_limit():
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     weights_numerical = mass_weights_numerical(oscillation, energy, profile)
-    weights_tei = Tei(
+    weights_adiabatic = mass_weights_adiabatic_approximated(
         oscillation,
         energy[:, None],
         profile.electron_density(profile.production_radius)[None, :],
     )
 
-    assert weights_numerical.shape == weights_tei.shape
-    torch.testing.assert_close(weights_numerical, weights_tei, rtol=0.0, atol=7.0e-2)
+    assert weights_numerical.shape == weights_adiabatic.shape
+    torch.testing.assert_close(weights_numerical, weights_adiabatic, rtol=0.0, atol=7.0e-2)

@@ -30,7 +30,7 @@ from tpeanuts.core.common.pmns import PMNSParams
 from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.solar.matter_mixing import DeltamSqee, Vk, th12_M, th13_M
-from tpeanuts.medium.solar.probability import Tei
+from tpeanuts.medium.solar.adiabatic import mass_weights_adiabatic_approximated
 from tpeanuts.util.context import RuntimeContext
 
 
@@ -154,7 +154,7 @@ def test_tei_weights_are_normalized_and_match_matter_angles():
     energy = torch.tensor([1.0, 10.0], device=DEVICE, dtype=DTYPE)[:, None]
     density = torch.tensor([0.0, 10.0, 100.0], device=DEVICE, dtype=DTYPE)[None, :]
 
-    weights = Tei(oscillation, energy, density)
+    weights = mass_weights_adiabatic_approximated(oscillation, energy, density)
     theta13_m = th13_M(oscillation, energy, density)
     theta12_m = th12_M(oscillation, energy, density)
     expected = torch.stack(
@@ -176,8 +176,10 @@ def test_tei_landau_zener_probability_swaps_first_two_weights_at_full_jump():
     energy = torch.tensor(10.0, device=DEVICE, dtype=DTYPE)
     density = torch.tensor([0.0, 50.0, 100.0], device=DEVICE, dtype=DTYPE)
 
-    adiabatic = Tei(oscillation, energy, density)
-    full_jump = Tei(oscillation, energy, density, p_lz=torch.ones_like(density))
+    adiabatic = mass_weights_adiabatic_approximated(oscillation, energy, density)
+    full_jump = mass_weights_adiabatic_approximated(
+        oscillation, energy, density, p_lz=torch.ones_like(density),
+    )
 
     torch.testing.assert_close(full_jump[..., 0], adiabatic[..., 1], rtol=1.0e-14, atol=1.0e-14)
     torch.testing.assert_close(full_jump[..., 1], adiabatic[..., 0], rtol=1.0e-14, atol=1.0e-14)

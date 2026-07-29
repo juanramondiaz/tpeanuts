@@ -48,7 +48,11 @@ Module functions:
     
     eta_to_theta(...)
         Converts peanuts nadir angles back to atmosphere zenith degrees.
-    
+
+    validate_theta_range(...)
+        Validate that atmosphere zenith angles lie in the physical interval
+        [0, 180] degrees.
+
     alpha_surface_to_theta_detector(...), theta_detector_to_alpha_surface(...)
         Convert between detector and surface zenith angles.
         
@@ -63,8 +67,11 @@ Module functions:
     altitude_along_detector_path(...), atmosphere_path_grid(...)
         Build altitude and distance grids along the detector-to-production
         ray used by density and propagation modules.
-    
-    
+
+    angle_distance(...)
+        Angular distance from a grid to a reference alpha or theta value,
+        used by the pipeline to locate the nearest tabulated angle.
+
 """
 
 
@@ -74,8 +81,12 @@ from __future__ import annotations
 from typing import Union, Optional
 import torch
 
+from tpeanuts.util.constant import R_E_KM
+from tpeanuts.util.type import TensorLike, as_tensor
+from tpeanuts.util.torch_util import resolve_device
 
-def _angle_distance(
+
+def angle_distance(
     angle_grid: torch.Tensor,
     *,
     alpha_deg: Optional[float],
@@ -92,10 +103,6 @@ def _angle_distance(
             raise ValueError("theta_deg is required when angle_mode='theta'.")
         return torch.abs(angle_grid - float(theta_deg))
     raise ValueError("angle_mode must be 'alpha' or 'theta'.")
-
-from tpeanuts.util.constant import R_E_KM
-from tpeanuts.util.type import TensorLike, as_tensor
-from tpeanuts.util.torch_util import resolve_device
 
 
 # ============================================================
@@ -148,6 +155,37 @@ def eta_to_theta(
     eta_rad = as_tensor(eta_rad, device=device, dtype=dtype)
     theta_rad = torch.pi - eta_rad
     return torch.rad2deg(theta_rad)
+
+
+def validate_theta_range(
+    theta_deg: TensorLike,
+    *,
+    device: Optional[Union[str, torch.device]] = None,
+    dtype: torch.dtype = torch.float64,
+) -> None:
+    """Validate atmosphere zenith angles.
+
+    ``sin``/``cos`` are periodic and never raise outside [0, 180] degrees, so
+    a genuinely unphysical ``theta_deg`` (e.g. -50 or 250) would otherwise be
+    silently accepted and propagated through the full evolutor pipeline,
+    producing a finite but meaningless result instead of an error -- mirrors
+    ``medium.earth.geometry.validate_eta_range``.
+
+    Args:
+        theta_deg: Atmosphere zenith angle(s) in degrees. Scalar or tensor;
+            theta=0 is vertically downward, theta=180 is vertically upward
+            (the mceq convention, see the module docstring).
+        device: Optional torch device used to convert ``theta_deg``.
+        dtype: Real dtype used to convert ``theta_deg``.
+
+    Raises:
+        ValueError: If any angle lies outside the interval [0, 180] degrees.
+    """
+    theta = as_tensor(theta_deg, device=device, dtype=dtype)
+    bad = (theta < 0.0) | (theta > 180.0)
+
+    if bool(torch.any(bad).detach().cpu()):
+        raise ValueError("theta_deg must be between 0 and 180 degrees.")
 
 
 @torch.no_grad()

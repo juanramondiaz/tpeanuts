@@ -1,0 +1,134 @@
+\chapter{\texttt{pipeline.atmosphere\_earth} --- atmospheric surface to detector}
+\label{ch:pipeline-atmosphere-earth}
+
+\texttt{pipeline.atmosphere\_earth} continues a coherent atmospheric
+surface state (\cref{ch:pipeline-atmosphere}) through the Earth to a
+detector. It also hosts the detector-composition helpers that
+\texttt{medium.atmosphere} deliberately does not carry itself
+(\cref{ch:atmosphere}): the atmosphere medium only propagates production
+$\to$ surface, while combining per-flavour detector probabilities with
+production-flux tables, integrating over production height, and summing
+incoherent produced-flavour contributions are all pipeline-level composition
+concerns tied to this surface-to-detector step.
+
+\begin{theorybox}
+\subsection*{The production-flux-weighted height average, computed directly}
+\pyfunc{propagate\_atmosphere\_grid\_to\_detector} (below) needs the same
+production-flux-weighted probability average over production height that
+\cref{ch:atmosphere} already derives for a single flavour
+(\pyfunc{atmosphere\_probability\_integrated\_height}), but here for the
+\emph{full} transition matrix $P_{\beta\alpha}(\theta,E,h)$ across every
+zenith angle and produced flavour $\alpha$ at once. Rather than calling
+that single-flavour function once per $(\theta,\alpha)$ pair, it evaluates
+the same weighted-average identity directly on the stacked tensors,
+\begin{equation}
+  \keyresult{\langle P\rangle_h(\theta,E)_{\beta\alpha}
+  = \frac{\int P_{\beta\alpha}(\theta,E,h)\,\phi^{\rm prod}_\alpha(\theta,E,h)\,\mathrm{d}h}
+         {\int \phi^{\rm prod}_\alpha(\theta,E,h)\,\mathrm{d}h}},
+\end{equation}
+with the produced-flavour axis $\alpha$ broadcast against the transition
+matrix's own two flavour indices via an extra singleton dimension on the
+weight (\code{production\_flux.unsqueeze(-2)}), so a single pair of
+trapezoidal integrals (numerator and denominator) produces the
+height-averaged transition matrix for every $(\theta,\alpha,\beta)$
+combination in one call. The corresponding height-\emph{integrated} (not
+averaged) detector flux, $\Phi_\beta(\theta,E)=\sum_\alpha\int
+P_{\beta\alpha}\,\phi^{\rm prod}_\alpha\,\mathrm{d}h$, is obtained from the
+transition matrix directly via
+\pyfunc{core.common.flux.flux\_transition}/\pyfunc{flux\_integrated\_coordinate}
+(\cref{ch:core-common}), mirroring the single-flavour identity
+$\langle P\rangle_h\,\Phi_h=\int P(h)\,\phi^{\rm prod}(h)\,\mathrm{d}h$
+already established in \cref{ch:atmosphere}.
+\end{theorybox}
+
+\section{\texttt{pipeline.atmosphere\_earth} --- surface-to-detector and composition helpers}
+
+\modulehead{pipeline/atmosphere\_earth.py}{\pyfunc{propagate\_surface\_to\_detector}
+(one produced flavour, one zenith angle) and
+\pyfunc{propagate\_atmosphere\_grid\_to\_detector} (every produced flavour,
+every zenith angle, full transition matrix), plus the detector-composition
+helpers \pyfunc{detector\_flux\_from\_production},
+\pyfunc{integrate\_detector\_flux\_over\_height}, and
+\pyfunc{sum\_detected\_flavours}.}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{AtmosphereEarthDetectorResult} (frozen dataclass): the
+    input \code{surface} (\pyclass{AtmosphereSurfaceResult},
+    \cref{ch:pipeline-atmosphere}), the Earth evolutor \code{S\_earth}, the
+    composed \code{S\_total} ($S_{\rm earth}\,S_{\rm atmosphere}$),
+    \code{detector\_states}/\code{detector\_probabilities} for the single
+    produced flavour carried by \code{surface}, the full
+    \code{transition\_probabilities} matrix, and -- when
+    \code{surface.production} carries a height-resolved flux -- the same
+    height-averaged/-integrated fields as \pyclass{AtmosphereSurfaceResult},
+    now evaluated at the detector.
+  \item \pyfunc{propagate\_surface\_to\_detector(surface, config, *,
+    profile\_earth=None, integrate\_energy=False)}: builds (or reuses)
+    the Earth profile, evaluates
+    \pyfunc{earth\_evolutor\_from\_zenith} (\cref{ch:earth}) at the
+    production zenith angle, composes it with \code{surface.S\_atmosphere},
+    and applies the result to \code{surface.initial\_state}.
+  \item \pyclass{AtmosphereDetectorGridResult} (frozen dataclass): the
+    stacked, multi-angle, full-transition observables returned by the
+    function below -- \code{transition\_probability\_theta\_Eh\_beta\_alpha},
+    \code{probability\_height\_theta\_E\_beta\_alpha},
+    \code{production\_flux\_theta\_Eh\_alpha},
+    \code{detector\_flux\_theta\_Eh\_beta}, the height-, and optionally
+    angle- and energy-integrated fluxes, plus the individual
+    \code{detector\_results} (one \pyclass{AtmosphereEarthDetectorResult}
+    per zenith angle).
+  \item \pyfunc{propagate\_atmosphere\_grid\_to\_detector(production\_by\_flavour,
+    config, *, flavour\_order=None, profile\_earth=None,
+    trajectory\_steps=200, integrate\_angular=False, integrate\_energy=False)}:
+    given \code{\{flavour: [production dict per zenith angle]\}} (aligned
+    energy/height/angle grids across flavours, missing flavours treated as
+    zero production flux), propagates each produced flavour at each zenith
+    angle in turn, stacks the resulting transition matrices and production
+    fluxes, and evaluates the weighted-average identity derived above.
+  \item \pyfunc{detector\_flux\_from\_production(production\_flux,
+    detector\_probabilities)} / \pyfunc{integrate\_detector\_flux\_over\_height(%
+    h\_grid\_km, detector\_flux)} / \pyfunc{sum\_detected\_flavours(%
+    integrated\_flux\_by\_production\_flavour)}: the three composition
+    primitives \pyfunc{propagate\_atmosphere\_grid\_to\_detector} is built
+    from, also usable directly by a caller assembling a custom multi-source
+    composition -- respectively \pyfunc{core.common.flux.flux\_state}, a
+    plain trapezoidal height integral, and an incoherent sum over a
+    \code{\{flavour: flux\}} mapping (requiring at least one entry and
+    matching shapes across all of them).
+\end{itemize}
+\end{implbox}
+
+\begin{examplebox}[title={Continuing the atmosphere surface state through the Earth}]
+\begin{lstlisting}[style=tpython]
+from tpeanuts.pipeline.atmosphere_earth import propagate_surface_to_detector
+
+# `surface` from the pipeline.atmosphere example (Chapter 13): a coherent
+# nu_mu state produced at theta_deg=60, already propagated to the surface.
+detector = propagate_surface_to_detector(surface, config)
+
+print(detector.detector_probabilities.shape)     # (E, h, flavour)
+print(detector.transition_probabilities.shape)   # (E, h, flavour_out, flavour_in)
+\end{lstlisting}
+\end{examplebox}
+
+Summing several produced-flavour contributions at the detector, once each
+has already been propagated and integrated over production height, is a
+plain incoherent sum over a name $\to$ tensor mapping:
+\begin{examplebox}[title={Combining $\nu_\mu$- and $\nu_e$-produced contributions at the detector}]
+\begin{lstlisting}[style=tpython]
+from tpeanuts.pipeline.atmosphere_earth import (
+    integrate_detector_flux_over_height,
+    sum_detected_flavours,
+)
+
+h_km = surface.production["h_grid_km"]
+numu_integrated = integrate_detector_flux_over_height(h_km, detector.detector_flux_Eh)
+nue_integrated = integrate_detector_flux_over_height(h_km, nue_detector.detector_flux_Eh)
+
+total_detector_flux = sum_detected_flavours({
+    "numu": numu_integrated,
+    "nue": nue_integrated,
+})
+\end{lstlisting}
+\end{examplebox}

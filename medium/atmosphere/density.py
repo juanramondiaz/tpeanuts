@@ -187,7 +187,7 @@ def atmosphere_density(
     nusquids_config: Optional[NuSQuIDSConfig] = None,
     density_file: Optional[str] = None,
     mceq=None,
-    theta_deg: TensorLike = default.mceq_theta_deg,
+    alpha_deg: TensorLike = default.mceq_alpha_deg,
     mceq_config: Optional[MCEqModelConfig] = None,
     pymsis_config: Optional[PyMSISatmosphereConfig] = None,
     *,
@@ -205,8 +205,12 @@ def atmosphere_density(
             ``"electron_density"`` and ``"neutron_density"`` return mol/cm^3,
             using the electron fraction Ye and its complement (1 - Ye)
             respectively.
-        Ye: Electron fraction used to convert non-PyMSIS mass densities into
-            electron or neutron density.
+        Ye: Electron fraction used to convert mass density into electron or
+            neutron density. Only used by the ``"exponential"`` and
+            ``"file"`` backends; ``"nusquids"``/``"earthatm"``/
+            ``"nusquids_earthatm"`` always use ``nusquids_config.nusquids_Ye``
+            instead, and ``"msis"``/``"pymsis"`` always use
+            ``pymsis_config.Ye`` instead, silently ignoring this argument.
         rho0_gcm3: Zero-altitude density for the exponential backend in
             g/cm^3.
         scale_height_km: Scale height for the exponential backend in km.
@@ -216,7 +220,12 @@ def atmosphere_density(
         density_file: Two-column altitude-density file required by the file
             backend.
         mceq: Optional initialized MCEq object.
-        theta_deg: Zenith angle in degrees used to initialize MCEq.
+        alpha_deg: Surface zenith angle in degrees (0 <= alpha_deg < 90) used
+            only to initialize a new MCEq object when mceq is None. It has no
+            effect on the returned density(h): MCEq's atmosphere models are
+            angle-independent vertical profiles, so this value only feeds
+            MCEq's own internal shower geometry and is otherwise a dummy
+            parameter here.
         mceq_config: Configuration used when the MCEq backend must initialize
             a new MCEq object.
         pymsis_config: Configuration used by the external PyMSIS backend.
@@ -276,7 +285,7 @@ def atmosphere_density(
         rho_gcm3 = atmosphere_density_mceq(
             h_km=h_km,
             mceq=mceq,
-            alpha_deg=theta_deg,
+            alpha_deg=alpha_deg,
             config=mceq_config,
             device=h_km.device,
             dtype=dtype,

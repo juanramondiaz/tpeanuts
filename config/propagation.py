@@ -113,6 +113,31 @@ class PropagationConfig:
     reunitarize_earth:
         If True, project the Earth evolution operator back onto the nearest
         unitary matrix to absorb small numerical drift.
+
+    reunitarize_atmosphere:
+        If True, project the atmosphere evolution operator back onto the
+        nearest unitary matrix to absorb small numerical drift (see
+        ``medium.atmosphere.evolutor.atmosphere_evolutor``'s
+        ``reunitarize``). Independent of ``reunitarize_earth``: the two
+        propagation stages are unitarized separately, so one can be enabled
+        without the other.
+
+    analytic_eigenvalues:
+        If True, compute perturbative-evolutor Hamiltonian eigenvalues with
+        the closed-form Cardano (3-flavour SM/NSI) or Ferrari (3+1 sterile
+        extension) solution instead of ``torch.linalg.eigvalsh`` (see
+        ``core.perturbative.spectral.hamiltonian_traceless_eigenvalues``).
+        Applies only to perturbative/analytical evolution paths (Earth's
+        ``earth_evolutor``/``earth_probability_state`` with
+        ``method="analytical"``, and the atmosphere's
+        ``atmosphere_evolutor``/``atmosphere_probability_*`` with
+        ``method="analytical"``); requesting it together with a
+        ``method="numerical"`` path raises, since those propagate via
+        ``torch.linalg.matrix_exp`` and never diagonalize. Like
+        ``reunitarize_earth``, this is deliberately a top-level field here
+        rather than nested inside ``earth``/``atmosphere`` (see
+        ``EarthParameters``'s docstring for why per-call numerical-method
+        knobs live at this level).
     """
 
     runtime: RuntimeContext
@@ -126,6 +151,8 @@ class PropagationConfig:
     source: Optional[str] = None
     detector_depth_m: float = 0.0
     reunitarize_earth: bool = False
+    reunitarize_atmosphere: bool = False
+    analytic_eigenvalues: bool = False
 
     @staticmethod
     def oscillation_parameters_from_preset(

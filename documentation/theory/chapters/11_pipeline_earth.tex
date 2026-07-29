@@ -1,0 +1,100 @@
+\chapter{\texttt{pipeline.earth} --- Earth surface to detector}
+\label{ch:pipeline-earth}
+
+\texttt{pipeline.earth} propagates an already-known incident state --
+flavour-basis coherent amplitudes, or incoherent mass-basis weights such as
+the ones \cref{ch:pipeline-solar} produces -- through the Earth to a
+detector, over either an explicit nadir-angle grid or the configured
+day/night exposure window (\cref{sec:earth-exposure}). It is the Earth leg
+reused, unchanged, by \texttt{pipeline.solar\_earth}
+(\cref{ch:pipeline-solar-earth}); used on its own it also covers any
+externally-produced incident flux (reactor, accelerator, atmospheric
+production already reduced to a single flavour, \ldots) that only needs
+Earth regeneration, not a solar production stage.
+
+\section{\texttt{pipeline.earth} --- pure Earth workflow}
+
+\modulehead{pipeline/earth.py}{\pyfunc{propagate\_earth\_to\_detector} and
+\pyfunc{propagate\_earth\_to\_detector\_exposure}: Earth-crossing
+propagation over an explicit nadir-angle grid, or averaged over the
+configured exposure window.}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyclass{EarthDetectorResult} (frozen dataclass): \code{incident\_state},
+    \code{incident\_basis} (\code{"flavour"} or \code{"mass"}), \code{E\_MeV},
+    the built \code{profile} (\pyclass{medium.earth.profile.EarthProfile}),
+    and \emph{either} the explicit-grid pair (\code{eta}, \code{exposure},
+    \code{probabilities\_eta}) \emph{or} the exposure-averaged
+    \code{probabilities\_exposure} -- exactly one of the two pairs is
+    populated, matching which of the two functions below built the result.
+  \item \pyfunc{propagate\_earth\_to\_detector(incident\_state, *, E\_MeV,
+    config, incident\_basis="flavour", earth\_profile=None, eta=None)}:
+    resolves the nadir-angle grid via
+    \pyfunc{medium.earth.exposure\_table.prepare\_nadir\_exposure} (an
+    explicit \code{eta} if given, otherwise the one implied by
+    \code{config.exposure}), then calls
+    \pyfunc{earth\_probability\_state} (\cref{ch:earth}) on the Cartesian
+    product of the energy and eta grids. \code{config.earth.chunk\_eta}
+    splits the eta axis into sub-batches evaluated one at a time (a memory
+    control for large energy--angle grids), concatenated back together
+    before being returned.
+  \item \pyfunc{propagate\_earth\_to\_detector\_exposure(incident\_state, *,
+    E\_MeV, config, incident\_basis="flavour", earth\_profile=None)}: calls
+    \pyfunc{earth\_probability\_exposure} (\cref{sec:earth-exposure})
+    directly, i.e.\ propagates and averages over the nadir-angle exposure
+    weight $W(\eta)$ in one step rather than returning a
+    per-angle grid.
+\end{itemize}
+Both functions accept \code{incident\_basis="mass"} for an incoherent mass
+mixture (e.g.\ \cref{ch:pipeline-solar}'s \code{mass\_weights}) and
+\code{"flavour"} (the default) for coherent flavour amplitudes, dispatching
+to \pyfunc{earth\_probability\_state}/\pyfunc{earth\_probability\_exposure}'s
+own \code{massbasis} flag accordingly.
+\end{implbox}
+
+\begin{examplebox}[title={A pure $\nu_\mu$ beam crossing the Earth on a nadir-angle grid}]
+\begin{lstlisting}[style=tpython]
+import torch
+
+from tpeanuts.config.propagation import PropagationConfig
+from tpeanuts.core.common.neutrino import flavour_state
+from tpeanuts.pipeline.earth import propagate_earth_to_detector
+from tpeanuts.util.context import RuntimeContext
+
+context = RuntimeContext.resolve("cpu", torch.float64)
+oscillation = PropagationConfig.oscillation_parameters_from_preset(
+    "_SM_NUFIT52_NO", context=context,
+)
+config = PropagationConfig(runtime=context, oscillation=oscillation)
+
+nu_mu = flavour_state("mu", device=context.device, dtype=context.dtype)
+
+result = propagate_earth_to_detector(
+    nu_mu,
+    E_MeV=[500.0, 2000.0],
+    config=config,
+    eta=[0.2, 0.8, 1.4],   # nadir angle in radians, 0 = through the core
+)
+
+print(result.probabilities_eta.shape)   # torch.Size([2, 3, 3]): (E, eta, flavour)
+\end{lstlisting}
+\end{examplebox}
+
+For a detector-exposure average instead of a fixed grid, call
+\pyfunc{propagate\_earth\_to\_detector\_exposure} with the same
+\code{nu\_mu}/\code{E\_MeV}/\code{config} -- no \code{eta} argument, since
+the angular average is taken internally over
+\code{config.exposure} (\cref{sec:earth-exposure}):
+\begin{examplebox}[title={The same beam, averaged over the configured detector exposure}]
+\begin{lstlisting}[style=tpython]
+from tpeanuts.pipeline.earth import propagate_earth_to_detector_exposure
+
+exposure_result = propagate_earth_to_detector_exposure(
+    nu_mu,
+    E_MeV=[500.0, 2000.0],
+    config=config,
+)
+print(exposure_result.probabilities_exposure.shape)   # torch.Size([2, 3]): (E, flavour)
+\end{lstlisting}
+\end{examplebox}

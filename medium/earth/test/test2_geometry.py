@@ -215,7 +215,7 @@ def test_build_earth_trajectory_earth_crossing_mode():
         evolution_scale_m=constant.R_E,
     )
 
-    assert trajectory.meta["mode"] == "earth_crossing"
+    assert bool(trajectory.meta["is_earth_crossing"])
     assert trajectory.x.shape == (51,)
     assert trajectory.dx_evolution.shape == (50,)
     assert trajectory.sample_x.shape == (50,)
@@ -244,26 +244,50 @@ def test_build_earth_trajectory_local_constant_mode():
     r_d = torch.tensor(1.0, device=DEVICE, dtype=DTYPE)
     delta_x = chord_length_case_b(eta, r_d)
 
-    assert trajectory.meta["mode"] == "local_constant"
+    assert not bool(trajectory.meta["is_earth_crossing"])
     assert_close(trajectory.x[0], torch.tensor(0.0, dtype=DTYPE), atol=1.0e-14, rtol=1.0e-14, name="local_constant starts at 0")
     assert_close(trajectory.x[-1], delta_x, name="local_constant trajectory ends at case-B chord length")
 
 
-def test_build_earth_trajectory_rejects_non_scalar_eta():
+def test_build_earth_trajectory_accepts_mixed_batch_matching_scalar_calls():
+    """A batch spanning both case A (eta<pi/2) and case B (eta>=pi/2) must
+    match, entry by entry, what build_earth_trajectory returns for each eta
+    value called individually -- this is the batching this function used to
+    reject outright (see the removed 'only supports scalar eta' check)."""
     profile = _two_shell_profile()
-    eta = torch.tensor([0.1, 0.2], device=DEVICE, dtype=DTYPE)
+    eta_values = [0.1, 0.3, 1.2, 2.0, 2.8]
+    eta_batch = torch.tensor(eta_values, device=DEVICE, dtype=DTYPE)
 
-    with pytest.raises(ValueError, match="only supports scalar eta"):
-        build_earth_trajectory(
+    batched = build_earth_trajectory(
+        profile_earth=profile,
+        eta=eta_batch,
+        depth_m=0.0,
+        nsteps=20,
+        method="midpoint",
+        device=DEVICE,
+        dtype=DTYPE,
+        evolution_scale_m=constant.R_E,
+    )
+
+    assert batched.x.shape == (5, 21)
+    assert batched.dx_evolution.shape == (5, 20)
+    assert batched.sample_x.shape == (5, 20)
+    assert batched.meta["is_earth_crossing"].tolist() == [True, True, True, False, False]
+
+    for i, eta_value in enumerate(eta_values):
+        scalar = build_earth_trajectory(
             profile_earth=profile,
-            eta=eta,
+            eta=torch.tensor(eta_value, device=DEVICE, dtype=DTYPE),
             depth_m=0.0,
-            nsteps=10,
+            nsteps=20,
             method="midpoint",
             device=DEVICE,
             dtype=DTYPE,
             evolution_scale_m=constant.R_E,
         )
+        assert_close(batched.x[i], scalar.x, name=f"batched x matches scalar call (eta={eta_value})")
+        assert_close(batched.dx_evolution[i], scalar.dx_evolution, name=f"batched dx_evolution matches scalar call (eta={eta_value})")
+        assert_close(batched.sample_x[i], scalar.sample_x, name=f"batched sample_x matches scalar call (eta={eta_value})")
 
 
 def test_build_earth_trajectory_rejects_non_positive_evolution_scale():

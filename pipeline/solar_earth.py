@@ -49,7 +49,7 @@ def propagate_solar_to_earth_detector(
     source_spectrum: Optional[torch.Tensor] = None,
     integrate_exposure: Optional[bool] = None,
     integrate_energy: bool = False,
-    solar_method: str = "adiabatic",
+    solar_method: str = "adiabatic_approximated",
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
     date: Optional[str] = None,

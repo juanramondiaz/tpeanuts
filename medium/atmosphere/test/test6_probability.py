@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import pytest
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
@@ -94,6 +95,77 @@ def test_patmosphere_exposes_analytical_dispatcher():
     numerical = atmosphere_probability_state(**args, method="numerical")
 
     torch.testing.assert_close(analytical, numerical, atol=1.0e-8, rtol=1.0e-8)
+
+
+def test_atmosphere_probability_state_analytic_eigenvalues_matches_default():
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    state = torch.tensor([0.0, 1.0, 0.0], device=DEVICE, dtype=CDTYPE)
+    atmosphere = make_atmosphere(
+        matter=True,
+        nsteps=600,
+        perturbative_segments=6,
+        perturbative_degree=3,
+    )
+    args = dict(
+        nustate=state,
+        oscillation=oscillation,
+        E_MeV=5000.0,
+        h_km=80.0,
+        theta_deg=85.0,
+        atmosphere=atmosphere,
+        context=context,
+        method="analytical",
+    )
+
+    default = atmosphere_probability_state(**args)
+    cardano = atmosphere_probability_state(**args, analytic_eigenvalues=True)
+
+    torch.testing.assert_close(cardano, default, atol=1.0e-10, rtol=1.0e-10)
+
+
+def test_atmosphere_probability_state_rejects_analytic_eigenvalues_with_numerical():
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    state = torch.tensor([0.0, 1.0, 0.0], device=DEVICE, dtype=CDTYPE)
+
+    with pytest.raises(ValueError, match="analytic_eigenvalues=True has no effect"):
+        atmosphere_probability_state(
+            nustate=state,
+            oscillation=oscillation,
+            E_MeV=1000.0,
+            h_km=20.0,
+            theta_deg=45.0,
+            atmosphere=make_atmosphere(nsteps=48, matter=False),
+            context=context,
+            method="numerical",
+            analytic_eigenvalues=True,
+        )
+
+
+def test_atmosphere_probability_state_reunitarize_is_still_normalized():
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    state = torch.tensor([0.0, 1.0, 0.0], device=DEVICE, dtype=CDTYPE)
+    atmosphere = make_atmosphere(nsteps=48, matter=True)
+    args = dict(
+        nustate=state,
+        oscillation=oscillation,
+        E_MeV=1000.0,
+        h_km=20.0,
+        theta_deg=45.0,
+        atmosphere=atmosphere,
+        context=context,
+        method="numerical",
+    )
+
+    default = atmosphere_probability_state(**args)
+    reunitarized = atmosphere_probability_state(**args, reunitarize=True)
+
+    torch.testing.assert_close(
+        reunitarized.sum(dim=-1), torch.ones((), device=DEVICE, dtype=DTYPE), atol=1.0e-10, rtol=1.0e-10,
+    )
+    torch.testing.assert_close(reunitarized, default, atol=1.0e-6, rtol=1.0e-6)
 
 
 def test_atmosphere_probability_matches_evolutor_modulus_squared():

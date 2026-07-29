@@ -125,16 +125,21 @@ normalisation and energy integration to
 \pyfunc{vacuum\_\allowbreak{}probability\_\allowbreak{}state}'s output.}
 
 \begin{implbox}
-\pyfunc{vacuum\_flux\_state(nustate, oscillation, E\_MeV, L\_km, flux, spectrum, massbasis, ...)}
-adds no new physics: it calls \pyfunc{vacuum\_probability\_state} above,
-then \pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}) to apply
-the flux normalisation and optional spectral weight. This is the minimal
-instance of the flux pattern that every later medium's \texttt{flux.py}
-extends. \pyfunc{vacuum\_flux\_integrated(...)} builds
-\pyfunc{vacuum\_flux\_state} on an energy grid and integrates it with
-\pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
-physical rate rather than the normalised average of
-\pyfunc{vacuum\_probability\_integrated}.
+\begin{itemize}
+  \item \pyfunc{vacuum\_flux\_state(nustate, oscillation, E\_MeV, L\_km,
+    flux, spectrum, massbasis, ...)}: adds no new physics -- calls
+    \pyfunc{vacuum\_probability\_state} above, then
+    \pyfunc{core.common.flux.flux\_state} (\cref{ch:core-common}) to apply
+    the flux normalisation and optional spectral weight. This is the
+    minimal instance of the flux pattern that every later medium's
+    \texttt{flux.py} extends.
+  \item \pyfunc{vacuum\_flux\_integrated(nustate, oscillation, E\_MeV,
+    L\_km, flux, massbasis, ..., energy\_dim=-2)}: builds
+    \pyfunc{vacuum\_flux\_state} on an energy grid and integrates it with
+    \pyfunc{core.common.flux.flux\_integrated}, returning an unnormalised
+    physical rate rather than the normalised average of
+    \pyfunc{vacuum\_probability\_integrated}.
+\end{itemize}
 \end{implbox}
 
 \section{\texttt{validation.py} --- cross-check against legacy \texttt{peanuts}}

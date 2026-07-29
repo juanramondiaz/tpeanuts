@@ -278,8 +278,8 @@ register_preset(
     ),
 )
 
-# 4. Global 3+1 best fit from Giunti, Marrone & Palazzo (2017).
-# Reference: arXiv:1612.01087, Table 3 (combined global fit).
+# 4. Global 3+1 best fit from Gariazzo, Giunti, Laveder & Li (2017).
+# Reference: arXiv:1703.00860, JHEP 06 (2017) 135 (combined global fit).
 # Sterile CP phases marginalized over (effectively 0 in the published fit).
 # sin^2(2 theta14) ~ 0.085 -> theta14 ~ 8.5 deg
 # sin^2(2 theta24) ~ 0.068 -> theta24 ~ 7.5 deg
@@ -297,7 +297,8 @@ register_preset(
     DeltamSq41=1.7,
     label="sterile_3p1_bestfit_giunti2017",
     description=(
-        "Global 3+1 best fit (Giunti, Marrone, Palazzo 2017, arXiv:1612.01087). "
+        "Global 3+1 best fit (Gariazzo, Giunti, Laveder, Li 2017, "
+        "arXiv:1703.00860). "
         "Combines reactor anomaly, gallium anomaly, and solar data. "
         "sin^2(2 theta14)=0.085, sin^2(2 theta24)=0.068, Delta m^2_41=1.7 eV^2. "
         "Sterile CP phases assumed zero (no sensitivity in reactor/gallium data). "

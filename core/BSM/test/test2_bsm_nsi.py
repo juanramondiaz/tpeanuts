@@ -59,12 +59,6 @@ def make_oscillation(*, antinu=False, NSI_extension: str | None = None) -> Oscil
     )
 
 
-def with_epsilon(cfg: NSIConfig) -> NSIConfig:
-    """Populate a directly-constructed NSIConfig's epsilon field (only
-    from_preset does this automatically)."""
-    return dataclasses.replace(cfg, epsilon=cfg.epsilon_tensor_base(device=DEVICE, real_dtype=DTYPE))
-
-
 def eye_like(matrix: torch.Tensor) -> torch.Tensor:
     return torch.eye(matrix.shape[-1], device=matrix.device, dtype=matrix.dtype).expand(matrix.shape)
 
@@ -189,7 +183,7 @@ def test_positive_eps_ee_strengthens_and_negative_weakens_matter_potential():
     H_sm = hamiltonian_reduced(osc_sm, E, n_e, context=ctx)
     V_ee_sm = H_sm[0, 0].real
 
-    osc_pos = dataclasses.replace(osc_sm, nsi=with_epsilon(NSIConfig(eps_ee=0.30)))
+    osc_pos = dataclasses.replace(osc_sm, nsi=NSIConfig(eps_ee=0.30, device=DEVICE, real_dtype=DTYPE))
     osc_neg = make_oscillation(NSI_extension="nsi_lma_dark_esteban2018")
 
     H_pos = hamiltonian_reduced(osc_pos, E, n_e, context=ctx)
@@ -257,7 +251,7 @@ def test_epsilon_tensor_passthrough_when_shape_matches():
     ctx = make_context()
     eps4 = torch.zeros((4, 4), device=DEVICE, dtype=CDTYPE)
     eps4[0, 1] = 0.1 + 0.05j
-    cfg = dataclasses.replace(NSIConfig(), epsilon=eps4)
+    cfg = NSIConfig.from_raw_epsilon(eps4)
     out = cfg.epsilon_tensor(n_flavours=4, context=ctx)
     assert_close(out, eps4, name="4x4 epsilon passthrough")
 
@@ -266,7 +260,7 @@ def test_epsilon_tensor_embeds_3x3_for_larger_n_flavours():
     ctx = make_context()
     eps3 = torch.zeros((3, 3), device=DEVICE, dtype=CDTYPE)
     eps3[0, 0] = 0.3
-    cfg = dataclasses.replace(NSIConfig(), epsilon=eps3)
+    cfg = NSIConfig.from_raw_epsilon(eps3)
     out = cfg.epsilon_tensor(n_flavours=4, context=ctx)
 
     assert out.shape == (4, 4)
@@ -276,7 +270,7 @@ def test_epsilon_tensor_embeds_3x3_for_larger_n_flavours():
 
 def test_epsilon_tensor_incompatible_shape_raises():
     ctx = make_context()
-    cfg = dataclasses.replace(NSIConfig(), epsilon=torch.zeros((2, 2), device=DEVICE, dtype=CDTYPE))
+    cfg = NSIConfig.from_raw_epsilon(torch.zeros((2, 2), device=DEVICE, dtype=CDTYPE))
     with pytest.raises(ValueError, match="epsilon must have final dimensions"):
         cfg.epsilon_tensor(n_flavours=4, context=ctx)
 
@@ -289,5 +283,9 @@ def test_epsilon_tensor_uses_self_epsilon():
 
 
 def test_epsilon_tensor_missing_epsilon_raises():
+    """epsilon is always auto-populated by __post_init__ now; force it back
+    to None to exercise epsilon_tensor's defensive check."""
+    cfg = NSIConfig()
+    object.__setattr__(cfg, "epsilon", None)
     with pytest.raises(ValueError, match="No epsilon matrix available"):
-        NSIConfig().epsilon_tensor(n_flavours=3, context=make_context())
+        cfg.epsilon_tensor(n_flavours=3, context=make_context())

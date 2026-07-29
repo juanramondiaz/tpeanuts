@@ -20,6 +20,7 @@ FLAVOUR_COLORS = ["C0", "C1", "C2"]
 FLAVOUR_INDEX = {name: i for i, name in enumerate(FLAVOUR_NAMES)}
 
 REL_FLOOR = 1.0e-12
+ABSOLUTE_THRESHOLD = 1.0e-5
 TOL_PPM = 1.0e-6
 TOL_PPB = 1.0e-9
 
@@ -336,4 +337,167 @@ def plot_tripanel(
             ax.set_xscale("log")
         ax.legend(fontsize=7)
     fig.tight_layout()
+    save_and_show(filename, fig, output_dir=output_dir, show_plots=show_plots)
+
+
+def validation_metrics(
+    case: str,
+    reference: torch.Tensor,
+    tested: torch.Tensor,
+    *,
+    reference_label: str = "reference",
+    tested_label: str = "tested",
+    absolute_threshold: float = ABSOLUTE_THRESHOLD,
+) -> tuple[dict, torch.Tensor, torch.Tensor]:
+    """Return reusable validation metrics and pointwise discrepancies.
+
+    Relative errors are evaluated only where ``abs(reference)`` is at least
+    ``absolute_threshold``. Masked entries are zero in the returned relative
+    tensor so reductions used by plots remain finite; they are excluded from
+    the reported maximum and mean relative errors.
+    """
+    if reference.shape != tested.shape:
+        raise ValueError("reference and tested must have identical shapes.")
+    absolute = torch.abs(tested - reference)
+    mask = torch.abs(reference) >= absolute_threshold
+    relative = torch.zeros_like(absolute)
+    relative[mask] = absolute[mask] / torch.abs(reference[mask])
+    selected = relative[mask]
+    norm_reference = torch.amax(torch.abs(reference.sum(dim=-1) - 1.0)).item()
+    norm_tested = torch.amax(torch.abs(tested.sum(dim=-1) - 1.0)).item()
+    row = {
+        "case": case,
+        "max_abs": absolute.max().item(),
+        "mean_abs": absolute.mean().item(),
+        "max_rel": selected.max().item() if selected.numel() else float("nan"),
+        "mean_rel": selected.mean().item() if selected.numel() else float("nan"),
+        f"normalization_{reference_label}": norm_reference,
+        f"normalization_{tested_label}": norm_tested,
+        "relative_points": int(mask.sum().item()),
+        "absolute_threshold": absolute_threshold,
+    }
+    return row, absolute, relative
+
+
+def validation_heatmap(
+    absolute,
+    relative,
+    x,
+    y,
+    *,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    filename: str,
+    output_dir: Path,
+    reference_label: str = "reference",
+    absolute_threshold: float = ABSOLUTE_THRESHOLD,
+    show_plots: bool = True,
+):
+    """Plot the repeated absolute/thresholded-relative validation heatmaps."""
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 4.8), sharex=True, sharey=True)
+    labels = (
+        r"maximum $|\Delta P|$",
+        f"maximum relative error vs {reference_label} for |P_reference| >= {absolute_threshold:.0e}",
+    )
+    for ax, values, subtitle, label in zip(
+        axes, (absolute, relative), ("Absolute error", "Relative error"), labels
+    ):
+        im = ax.pcolormesh(to_numpy(x), to_numpy(y), to_numpy(values).T, shading="auto", cmap="magma")
+        ax.set(xlabel=xlabel, ylabel=ylabel, title=subtitle)
+        fig.colorbar(im, ax=ax, label=label)
+    fig.suptitle(title)
+    fig.tight_layout()
+    save_and_show(filename, fig, output_dir=output_dir, show_plots=show_plots)
+
+
+def validation_comparison_grid(
+    reference,
+    tested,
+    energy,
+    angle,
+    fixed_angle,
+    fixed_energy,
+    *,
+    title: str,
+    angle_label: str,
+    filename: str,
+    output_dir: Path,
+    reference_label: str = "reference",
+    tested_label: str = "tested",
+    absolute_threshold: float = ABSOLUTE_THRESHOLD,
+    log_energy: bool = False,
+    labels: Sequence[str] | None = None,
+    colours: Sequence[str] | None = None,
+    show_plots: bool = True,
+):
+    """Plot probability, absolute-error and relative-error energy/angle scans.
+
+    ``labels`` and ``colours`` default to the three active flavours, but may
+    be supplied explicitly for model extensions such as the 3+1 sterile case.
+    """
+    labels = FLAVOUR_LABELS if labels is None else labels
+    colours = FLAVOUR_COLORS if colours is None else colours
+    n_flavours = reference.shape[-1]
+    if len(labels) != n_flavours or len(colours) != n_flavours:
+        raise ValueError(
+            "labels and colours must match the final flavour dimension "
+            f"({n_flavours}); got {len(labels)} and {len(colours)}."
+        )
+    i_angle = int(torch.argmin(torch.abs(angle - fixed_angle)))
+    i_energy = int(torch.argmin(torch.abs(energy - fixed_energy)))
+    _, absolute, relative = validation_metrics(
+        title, reference, tested,
+        reference_label=reference_label,
+        tested_label=tested_label,
+        absolute_threshold=absolute_threshold,
+    )
+    fig, axes = plt.subplots(3, 2, figsize=(13.5, 11), sharex="col")
+    for flavour, (label, colour) in enumerate(zip(labels, colours)):
+        axes[0, 0].plot(to_numpy(energy), to_numpy(reference[:, i_angle, flavour]), color=colour, label=f"{label} {reference_label}")
+        axes[0, 0].plot(to_numpy(energy), to_numpy(tested[:, i_angle, flavour]), "--", color=colour, label=f"{label} {tested_label}")
+        axes[1, 0].plot(to_numpy(energy), to_numpy(absolute[:, i_angle, flavour]), color=colour, label=label)
+        axes[2, 0].plot(to_numpy(energy), to_numpy(relative[:, i_angle, flavour]), color=colour, label=label)
+        axes[0, 1].plot(to_numpy(angle), to_numpy(reference[i_energy, :, flavour]), color=colour, label=f"{label} {reference_label}")
+        axes[0, 1].plot(to_numpy(angle), to_numpy(tested[i_energy, :, flavour]), "--", color=colour, label=f"{label} {tested_label}")
+        axes[1, 1].plot(to_numpy(angle), to_numpy(absolute[i_energy, :, flavour]), color=colour, label=label)
+        axes[2, 1].plot(to_numpy(angle), to_numpy(relative[i_energy, :, flavour]), color=colour, label=label)
+    axes[0, 0].set_title(f"Energy scan at {angle_label}={float(angle[i_angle]):.3g}")
+    axes[0, 1].set_title(f"Angular scan at E={float(energy[i_energy]):.3g} MeV")
+    for ax in axes[0]:
+        ax.set_ylabel("Probability"); ax.set_ylim(-0.02, 1.02); ax.legend(fontsize=7, ncol=2)
+    for ax in axes[1]: ax.set_ylabel("Absolute error"); ax.set_yscale("log")
+    for ax in axes[2]: ax.set_ylabel("Thresholded relative error"); ax.set_yscale("log")
+    axes[2, 0].set_xlabel("E [MeV]"); axes[2, 1].set_xlabel(angle_label)
+    if log_energy:
+        for ax in axes[:, 0]: ax.set_xscale("log")
+    for ax in axes.flat: ax.grid(alpha=0.25)
+    fig.suptitle(title); fig.tight_layout()
+    save_and_show(filename, fig, output_dir=output_dir, show_plots=show_plots)
+
+
+def validation_summary_plot(
+    rows,
+    *,
+    title: str,
+    filename: str,
+    output_dir: Path,
+    show_plots: bool = True,
+):
+    """Plot max/mean absolute and relative errors in a reusable 2x2 grid."""
+    labels = [row["case"] for row in rows]
+    panels = (
+        ("max_abs", "Maximum absolute error", "C0"),
+        ("max_rel", "Maximum relative error", "C1"),
+        ("mean_abs", "Mean absolute error", "C2"),
+        ("mean_rel", "Mean relative error", "C3"),
+    )
+    fig, axes = plt.subplots(2, 2, figsize=(13.5, 8.6))
+    for ax, (key, subtitle, colour) in zip(axes.flat, panels):
+        ax.bar(range(len(labels)), [row[key] for row in rows], color=colour)
+        ax.set_title(subtitle); ax.set_yscale("log")
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=25, ha="right", fontsize=8)
+        ax.grid(alpha=0.25, axis="y")
+    fig.suptitle(title); fig.tight_layout()
     save_and_show(filename, fig, output_dir=output_dir, show_plots=show_plots)

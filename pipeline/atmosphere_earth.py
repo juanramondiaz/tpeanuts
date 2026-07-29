@@ -104,6 +104,7 @@ def propagate_surface_to_detector(
         theta_deg=theta_deg,
         depth_m=float(config.detector_depth_m),
         reunitarize=config.reunitarize_earth,
+        analytic_eigenvalues=config.analytic_eigenvalues,
     )
     surface_states = as_tensor(
         surface.surface_states,

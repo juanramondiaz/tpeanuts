@@ -72,6 +72,7 @@ from tpeanuts.medium.earth.evolutor import earth_evolutor
 from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real, state_tensor
+from tpeanuts.util.torch_util import broadcast_tensor
 from tpeanuts.core.common.probability import (
     probability_coherent,
     probability_integrated,
@@ -81,7 +82,7 @@ from tpeanuts.core.common.probability import (
 )
 from tpeanuts.core.numerical.evolutor import evolutor_numerical
 from tpeanuts.core.numerical.geometry import OdeMethod
-from tpeanuts.medium.earth.geometry import build_earth_trajectory
+from tpeanuts.medium.earth.geometry import build_earth_trajectory, validate_eta_range
 from tpeanuts.util.constant import R_E
 
 
@@ -96,6 +97,7 @@ def earth_probability_transition(
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
+    analytic_eigenvalues: bool = False,
 ) -> Tensor:
     """Build the full Earth flavour-transition probability matrix.
 
@@ -121,6 +123,10 @@ def earth_probability_transition(
             coefficients). If ``None`` (the default), auto-resolved
             per-call (see ``core.common.oscillation.
             resolve_include_matter_nc``).
+        analytic_eigenvalues: If True, compute the Earth evolutor's
+            eigenvalues with the closed-form Cardano/Ferrari solution
+            instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.earth.evolutor.earth_evolutor``).
 
     Returns:
         Real tensor |S_earth[beta, alpha]|^2 with final two dimensions final
@@ -135,6 +141,7 @@ def earth_probability_transition(
         reunitarize=reunitarize,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     return probability_transition(U_earth)
@@ -153,6 +160,7 @@ def earth_probability_state_analytical(
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
+    analytic_eigenvalues: bool = False,
 ) -> Tensor:
     """Compute Earth probabilities with the analytical perturbative evolutor.
 
@@ -175,6 +183,10 @@ def earth_probability_state_analytical(
             still raises if ``profile_earth`` lacks neutron-density
             coefficients). If ``None`` (the default), auto-resolved
             per-call.
+        analytic_eigenvalues: If True, compute the Earth evolutor's
+            eigenvalues with the closed-form Cardano/Ferrari solution
+            instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.earth.evolutor.earth_evolutor``).
 
     Returns:
         Final flavour probabilities with final dimension 3.
@@ -188,6 +200,7 @@ def earth_probability_state_analytical(
         reunitarize=reunitarize,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     state = state_tensor(
@@ -226,7 +239,7 @@ def earth_probability_state_numerical(
     context: RuntimeContext = RuntimeContext.resolve(default.earth_device, default.dtype),
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
-) -> Tensor | None:
+) -> Tensor | tuple[Tensor, Tensor]:
     """Compute Earth probabilities with the numerical segment evolutor.
 
     Args:
@@ -234,11 +247,22 @@ def earth_probability_state_numerical(
             incoherent mass weights when ``massbasis=True`` and coherent
             flavour amplitudes otherwise.
         profile_earth: EarthProfile-compatible profile object.
-        oscillation: Built pmns object plus mass splittings, a scalar antinu
+        oscillation: Built pmns object plus mass splittings, an antinu
             selection, and the optional ``nsi`` (NSIConfig) attribute.
-        E_MeV: Neutrino energy in MeV.
-        eta: Detector nadir angle in radians. Numerical mode currently
-            supports scalar trajectories.
+            ``antinu`` may be a bool or a tensor broadcastable to the
+            (energy, eta) grid shape formed from ``E_MeV``/``eta`` (see
+            ``util.torch_util.broadcast_tensor``); a tensor that is not
+            broadcastable to that shape raises ``ValueError``.
+        E_MeV: Neutrino energy in MeV. Scalar or tensor.
+        eta: Detector nadir angle(s) in radians, each required to lie in
+            [0, pi] (see ``medium.earth.geometry.validate_eta_range``, the
+            same check ``method="analytical"`` applies via
+            ``earth_evolutor``). Scalar or any batch shape; broadcast
+            against ``E_MeV`` the same way ``method="analytical"`` does (two
+            differently-sized 1D grids form an independent outer product,
+            see ``util.torch_util.broadcast_tensor``), so a full (energy,
+            eta) grid is built and propagated in one batched call rather
+            than looping in Python.
         depth_m: Detector depth in metres.
         massbasis: Selects the interpretation of ``nustate``.
         full_oscillation: Return probabilities along the full trajectory plus
@@ -268,12 +292,39 @@ def earth_probability_state_numerical(
     Returns:
         Final flavour probabilities. If ``full_oscillation=True``, returns
         ``(probabilities_along_path, x_grid)``.
+
+    Raises:
+        ValueError: If any broadcast ``eta`` value lies outside [0, pi], or
+            if a tensor ``oscillation.antinu`` is not broadcastable to the
+            (energy, eta) grid shape.
     """
+    dev, dtype = context.device, context.dtype
+    E_b, eta_b = broadcast_tensor(
+        E_MeV, eta, device=dev, dtype=dtype, independent_1d=True,
+    )
+    validate_eta_range(eta_b)
+
+    # A scalar/bool antinu broadcasts trivially; a tensor antinu must itself
+    # be broadcastable *to* the (energy, eta) grid shape of E_b/eta_b (not
+    # symmetrically broadcast against it, which could silently pull eta_b
+    # into an unrelated extra dimension antinu introduced on its own, e.g. a
+    # stray antinu shape with nothing to do with the actual eta grid).
+    # Matching eta_b's shape means antinu also lines up with dx_evolution/
+    # n_e's leading batch dims below, and evolutor_numerical_segment pads it
+    # with one more trailing dim to reach the segment axis (same mechanism
+    # the analytical path already relies on via PMNS.select_antinu).
     antinu = oscillation.antinu
     if torch.is_tensor(antinu):
-        if antinu.numel() != 1:
-            raise ValueError("earth_probability_state_numerical only supports scalar antinu.")
-        antinu = bool(antinu.item())
+        original_antinu_shape = tuple(antinu.shape)
+        antinu = antinu.to(device=dev, dtype=torch.bool)
+        try:
+            antinu = torch.broadcast_to(antinu, eta_b.shape)
+        except RuntimeError as exc:
+            raise ValueError(
+                "oscillation.antinu must be broadcastable to the (energy, "
+                f"eta) grid shape {tuple(eta_b.shape)}; got antinu shape "
+                f"{original_antinu_shape}."
+            ) from exc
         oscillation = dataclasses.replace(oscillation, antinu=antinu)
 
     include_matter_nc = resolve_include_matter_nc(
@@ -283,10 +334,9 @@ def earth_probability_state_numerical(
         context_name="earth_probability_state_numerical",
     )
 
-    dev, dtype = context.device, context.dtype
     trajectory = build_earth_trajectory(
         profile_earth=profile_earth,
-        eta=eta,
+        eta=eta_b,
         depth_m=depth_m,
         nsteps=nsteps,
         method=ode_method,
@@ -295,48 +345,30 @@ def earth_probability_state_numerical(
         evolution_scale_m=R_E,
     )
 
-    if trajectory.meta["mode"] == "earth_crossing":
-        n_e = profile_earth.density_x_eta(
-            trajectory.sample_x,
-            trajectory.meta["eta_prime"],
-        )
-        n_n = (
-            profile_earth.density_n_x_eta(
-                trajectory.sample_x,
-                trajectory.meta["eta_prime"],
-            )
-            if include_matter_nc
-            else None
-        )
+    # Case A (earth-crossing) and case B (local-constant) entries are both
+    # present in a mixed eta batch; compute both branches with batched
+    # tensor ops and select per entry -- no Python loop over eta.
+    is_earth_crossing = trajectory.meta["is_earth_crossing"]
+    eta_prime_seg = trajectory.meta["eta_prime"][..., None]
+    r_mid = 0.5 * (1.0 + trajectory.meta["r_d"])
+    zero = torch.tensor(0.0, device=dev, dtype=dtype)
+
+    n_e_crossing = profile_earth.density_x_eta(trajectory.sample_x, eta_prime_seg)
+    n_e_constant = profile_earth.density_x_eta(r_mid, zero)
+    n_e = torch.where(is_earth_crossing[..., None], n_e_crossing, n_e_constant)
+
+    if include_matter_nc:
+        n_n_crossing = profile_earth.density_n_x_eta(trajectory.sample_x, eta_prime_seg)
+        n_n_constant = profile_earth.density_n_x_eta(r_mid, zero)
+        n_n = torch.where(is_earth_crossing[..., None], n_n_crossing, n_n_constant)
     else:
-        r_mid = 0.5 * (1.0 + trajectory.meta["r_d"])
-        n_1 = profile_earth.density_x_eta(
-            r_mid,
-            torch.tensor(0.0, device=dev, dtype=dtype),
-        )
-        n_e = torch.ones_like(trajectory.sample_x) * as_tensor(
-            n_1,
-            device=dev,
-            dtype=dtype,
-        )
-        if include_matter_nc:
-            n_1n = profile_earth.density_n_x_eta(
-                r_mid,
-                torch.tensor(0.0, device=dev, dtype=dtype),
-            )
-            n_n = torch.ones_like(trajectory.sample_x) * as_tensor(
-                n_1n,
-                device=dev,
-                dtype=dtype,
-            )
-        else:
-            n_n = None
+        n_n = None
 
     n_e = as_tensor(n_e, device=dev, dtype=dtype)
     n_n = None if n_n is None else as_tensor(n_n, device=dev, dtype=dtype)
     Sx = evolutor_numerical(
         oscillation,
-        E_MeV=E_MeV,
+        E_MeV=E_b,
         n_e_mol_cm3=n_e,
         n_n_mol_cm3=n_n,
         dx_evolution=trajectory.dx_evolution,
@@ -385,6 +417,7 @@ def earth_probability_state(
     reunitarize: bool = default.earth_reunitarize,
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
+    analytic_eigenvalues: bool = False,
 ) -> Tensor | tuple[Tensor, Tensor]:
     """Dispatch Earth matter-regeneration probabilities by method.
 
@@ -413,19 +446,62 @@ def earth_probability_state(
         context: Runtime device/dtype for method="numerical"; analytical
             infers from inputs.
         reunitarize: For method="analytical", project evolution operators to
-            the nearest unitary matrix.
+            the nearest unitary matrix. Must be False (the default) for
+            method="numerical", which has no unitary-projection step.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor throughout Earth propagation.
         include_matter_nc: If True/False, applied/not applied for either
             method (see ``earth_probability_state_analytical``/
             ``earth_probability_state_numerical``). If ``None`` (the
             default), auto-resolved per-call.
+        analytic_eigenvalues: If True, compute the analytical evolutor's
+            eigenvalues with the closed-form Cardano/Ferrari solution
+            instead of ``torch.linalg.eigvalsh`` (see
+            ``earth_probability_state_analytical``). Only meaningful with
+            ``method="analytical"``.
 
     Returns:
         Probability tensor with final dimension 3. If method="numerical" and
         full_oscillation=True, returns (probabilities_along_path, x_grid).
+
+    Raises:
+        ValueError: If ``method`` is not "analytical"/"numerical", if
+            ``reunitarize=True`` is requested with ``method="numerical"``, if
+            ``full_oscillation=True`` is requested with
+            ``method="analytical"`` -- both combinations would otherwise
+            silently drop the flag instead of applying it, since
+            ``earth_probability_state_analytical`` has no ``full_oscillation``
+            parameter and ``earth_probability_state_numerical`` never
+            re-unitarizes -- or if ``analytic_eigenvalues=True`` is requested
+            with ``method="numerical"``, which propagates via
+            ``torch.linalg.matrix_exp`` and never diagonalizes.
     """
     method = str(method).lower().strip()
+
+    if method not in ("analytical", "numerical"):
+        raise ValueError("method must be either 'analytical' or 'numerical'.")
+
+    if method == "numerical" and reunitarize:
+        raise ValueError(
+            "reunitarize=True has no effect for method='numerical': only "
+            "the analytical perturbative evolutor is re-unitarized. Pass "
+            "reunitarize=False (the default), or use method='analytical'."
+        )
+    if method == "analytical" and full_oscillation:
+        raise ValueError(
+            "full_oscillation=True has no effect for method='analytical': "
+            "only method='numerical' can return the full trajectory. Pass "
+            "full_oscillation=False (the default), or use method='numerical'."
+        )
+    if method == "numerical" and analytic_eigenvalues:
+        raise ValueError(
+            "analytic_eigenvalues=True has no effect for method='numerical': "
+            "only the analytical perturbative evolutor supports closed-form "
+            "eigenvalues (method='numerical' propagates via "
+            "torch.linalg.matrix_exp and never diagonalizes). Pass "
+            "analytic_eigenvalues=False (the default), or use "
+            "method='analytical'."
+        )
 
     if method == "analytical":
         return earth_probability_state_analytical(
@@ -439,26 +515,24 @@ def earth_probability_state(
             reunitarize=reunitarize,
             legacy_precision=legacy_precision,
             include_matter_nc=include_matter_nc,
+            analytic_eigenvalues=analytic_eigenvalues,
         )
 
-    if method == "numerical":
-        return earth_probability_state_numerical(
-            nustate=nustate,
-            profile_earth=profile_earth,
-            oscillation=oscillation,
-            E_MeV=E_MeV,
-            eta=eta,
-            depth_m=depth_m,
-            massbasis=massbasis,
-            full_oscillation=full_oscillation,
-            nsteps=nsteps,
-            ode_method=ode_method,
-            context=context if context is not None else RuntimeContext.resolve(default.earth_device, default.dtype),
-            legacy_precision=legacy_precision,
-            include_matter_nc=include_matter_nc,
-        )
-
-    raise ValueError("method must be either 'analytical' or 'numerical'.")
+    return earth_probability_state_numerical(
+        nustate=nustate,
+        profile_earth=profile_earth,
+        oscillation=oscillation,
+        E_MeV=E_MeV,
+        eta=eta,
+        depth_m=depth_m,
+        massbasis=massbasis,
+        full_oscillation=full_oscillation,
+        nsteps=nsteps,
+        ode_method=ode_method,
+        context=context if context is not None else RuntimeContext.resolve(default.earth_device, default.dtype),
+        legacy_precision=legacy_precision,
+        include_matter_nc=include_matter_nc,
+    )
 
 
 @torch.no_grad()
@@ -480,6 +554,7 @@ def earth_probability_integrated(
     legacy_precision: bool = False,
     energy_dim: int = -2,
     include_matter_nc: Optional[bool] = None,
+    analytic_eigenvalues: bool = False,
 ) -> Tensor:
     """Average final Earth flavour probabilities over energy.
 
@@ -516,6 +591,10 @@ def earth_probability_integrated(
         include_matter_nc: If True/False, applied/not applied for either
             method (see ``earth_probability_state``). If ``None`` (the
             default), auto-resolved per-call.
+        analytic_eigenvalues: If True, use the closed-form Cardano/Ferrari
+            eigenvalues instead of ``torch.linalg.eigvalsh`` (see
+            ``earth_probability_state``). Only meaningful with
+            ``method="analytical"``.
 
     Returns:
         Spectrum-weighted average probability, with the energy axis removed.
@@ -536,6 +615,7 @@ def earth_probability_integrated(
         reunitarize=reunitarize,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     return probability_integrated(

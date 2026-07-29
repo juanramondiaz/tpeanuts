@@ -16,46 +16,15 @@
 #      June 2026
 # =============================================================================
 
-"""Numerical (non-adiabatic) solar-interior propagation.
+"""Coherent numerical propagation through the solar density profile.
 
-``medium.solar.probability``'s ``method="adiabatic"`` path never builds a
-coherent evolutor: it invokes the adiabatic theorem directly at the local
-production density (``Tei``), with a closed-form Landau-Zener correction for
-the plain 3-flavour case only (``landau_zener.py``) -- that correction has no
-simple generalisation once NSI and/or the 3+1 sterile extension distort the
-resonance structure.
+The profile is represented by constant-density segments and evolved with
+``core.numerical``. No adiabatic or separate Landau--Zener approximation is
+imposed, but accuracy depends on the radial grid and segment sampling rule.
 
-This module instead builds a genuine coherent flavour-basis evolutor
-``S(r_end, r)`` with the same ``core.numerical`` machinery used for
-Earth-crossing propagation (NSI/sterile/NC generic, no Landau-Zener
-approximation needed since every non-adiabatic transition is captured by
-construction). Because it integrates the Schroedinger equation outward
-instead of invoking the adiabatic theorem, it needs the full structural
-density grid (``profile.radius``/``density``, extending to near-vacuum), not
-the production-restricted grid ``Tei`` alone needs.
-
-Every production point shares the same trajectory endpoint, so
-``solar_evolutor_numerical`` builds the segment history S(r_j, 0) once over
-the merged (production points + full density grid) trajectory and recovers
-every point's evolutor to the endpoint via S(r_end, r_k) = S(r_end, 0) @
-S(r_k, 0)^dagger (valid since each S(r_j, 0) is unitary), instead of
-integrating a separate trajectory per production point.
-
-Accuracy is tied to the density table's own tabulated grid (no separate
-refinement), so cross-validate against ``method="adiabatic"`` in the plain SM
-limit (where both must agree) before trusting non-standard configurations.
-
-Module functions:
-    build_solar_trajectory(...)
-        Merge the full density grid and production-point grid into one
-        trajectory, so every production point is an exact segment boundary.
-    solar_evolutor_numerical_history(...)
-        Compute S(r_j, 0) for every trajectory boundary point in one batch.
-    solar_evolutor_numerical(...)
-        Production-point-to-endpoint evolutor for every production radius.
-    mass_weights_numerical(...)
-        Exact (non-adiabatic) per-production-point mass-basis weights --
-        the numerical counterpart of ``Tei``.
+One history ``S(r_j, 0)`` is reused for every production point through
+``S(r_end, r_k) = S(r_end, 0) @ S(r_k, 0)^dagger``. The Hamiltonian supports
+the same SM, NSI, sterile and neutral-current terms as the common evolutor.
 """
 
 from __future__ import annotations
@@ -233,7 +202,7 @@ def mass_weights_numerical(
     include_matter_nc: bool = False,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
-    """Exact per-production-point mass-basis weights (numerical counterpart of Tei).
+    """Compute numerical mass weights at every production point.
 
     Propagates a pure electron-flavour state from every production radius to
     the trajectory endpoint with ``solar_evolutor_numerical``, then projects

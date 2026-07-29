@@ -47,6 +47,7 @@ import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
 from tpeanuts.util.context import RuntimeContext
+from tpeanuts.util.math import project_to_unitary
 from tpeanuts.util.type import TensorLike, cdtype_from_real
 from tpeanuts.core.numerical.evolutor import evolutor_numerical
 from tpeanuts.core.common.evolutor import compose_segment_evolutors
@@ -57,6 +58,7 @@ from tpeanuts.medium.atmosphere.geometry import (
     altitude_along_detector_path,
     atmosphere_path_length,
     underground_path_length,
+    validate_theta_range,
 )
 from tpeanuts.util.constant import R_E
 from tpeanuts.util.type import as_tensor
@@ -117,6 +119,7 @@ def atmosphere_evolutor_numerical(
         dev, dtype = infer_device_dtype(E_MeV, h_km, theta_deg, depth_km)
     cdtype = cdtype_from_real(dtype)
     resolved_context = RuntimeContext(device=dev, dtype=dtype)
+    validate_theta_range(theta_deg, device=dev, dtype=dtype)
 
     if atmosphere.nsteps < 1:
         raise ValueError("atmosphere.nsteps must be at least one segment.")
@@ -171,6 +174,7 @@ def atmosphere_evolutor_analytical(
     atmosphere: Optional[AtmosphereParameters] = None,
     context: Optional[RuntimeContext] = None,
     legacy_precision: bool = False,
+    analytic_eigenvalues: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Compute atmosphere evolution with automatically fitted polynomials.
 
@@ -189,6 +193,11 @@ def atmosphere_evolutor_analytical(
             ``oscillation.pmns`` is 4-flavour).
         context: Optional runtime device and real dtype.
         legacy_precision: Use the legacy matter-potential prefactor.
+        analytic_eigenvalues: If True, compute each segment Hamiltonian's
+            eigenvalues with the closed-form Cardano (3-flavour SM/NSI) or
+            Ferrari (3+1 sterile extension) solution instead of
+            ``torch.linalg.eigvalsh``, forwarded to
+            ``core.perturbative.evolutor.evolutor_perturbative_segment``.
 
     Returns:
         Pair ``(S, x)`` containing the full flavour-basis evolutor and the
@@ -201,6 +210,7 @@ def atmosphere_evolutor_analytical(
         dev, dtype = infer_device_dtype(E_MeV, h_km, theta_deg, depth_km)
     resolved_context = RuntimeContext(device=dev, dtype=dtype)
     cdtype = cdtype_from_real(dtype)
+    validate_theta_range(theta_deg, device=dev, dtype=dtype)
     n_segments, degree = atmosphere.perturbative_segments, atmosphere.perturbative_degree
     if n_segments < 1 or degree < 0:
         raise ValueError("perturbative_segments must be positive and perturbative_degree non-negative.")
@@ -278,6 +288,7 @@ def atmosphere_evolutor_analytical(
         evolution_scale_m=atmosphere.evolution_scale_m,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
     U_red = compose_segment_evolutors(U_segments, segment_dim=-3, multiply="left")
     S = oscillation.pmns.flavour_basis(
@@ -304,18 +315,60 @@ def atmosphere_evolutor(
     atmosphere: Optional[AtmosphereParameters] = None,
     context: Optional[RuntimeContext] = None,
     legacy_precision: bool = False,
+    analytic_eigenvalues: bool = False,
+    reunitarize: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Dispatch atmosphere propagation to the selected evolution method."""
+    """Dispatch atmosphere propagation to the selected evolution method.
+
+    ``analytic_eigenvalues`` (Cardano/Ferrari eigenvalues instead of
+    ``eigvalsh``, see ``atmosphere_evolutor_analytical``) only affects
+    ``method="analytical"``; it is not applicable to ``method="numerical"``,
+    which propagates with ``torch.linalg.matrix_exp`` and never
+    diagonalizes.
+
+    ``reunitarize`` applies to both methods: unlike ``analytic_eigenvalues``,
+    unitary-projection is a generic post-processing step on the returned
+    evolutor S, independent of how S was built (mirrors
+    ``medium.earth.evolutor.earth_evolutor``'s ``reunitarize``).
+
+    Args:
+        reunitarize: If True, project the returned evolutor onto the nearest
+            unitary matrix (``util.math.project_to_unitary``) to absorb
+            small numerical drift.
+
+    Raises:
+        ValueError: If ``method`` is not ``"analytical"``/``"numerical"``,
+            or if ``analytic_eigenvalues=True`` is requested with
+            ``method="numerical"`` -- that combination would otherwise
+            silently drop the flag instead of raising or applying it, since
+            ``atmosphere_evolutor_numerical`` has no such parameter.
+    """
+    if method == "numerical" and analytic_eigenvalues:
+        raise ValueError(
+            "analytic_eigenvalues=True has no effect for method='numerical': "
+            "only the analytical perturbative evolutor supports closed-form "
+            "eigenvalues (method='numerical' propagates via "
+            "torch.linalg.matrix_exp and never diagonalizes). Pass "
+            "analytic_eigenvalues=False (the default), or use "
+            "method='analytical'."
+        )
     if method == "analytical":
-        return atmosphere_evolutor_analytical(
+        S, x = atmosphere_evolutor_analytical(
             oscillation, E_MeV, h_km, theta_deg, depth_km,
             atmosphere=atmosphere, context=context, legacy_precision=legacy_precision,
+            analytic_eigenvalues=analytic_eigenvalues,
         )
-    if method == "numerical":
-        return atmosphere_evolutor_numerical(
+    elif method == "numerical":
+        S, x = atmosphere_evolutor_numerical(
             oscillation, E_MeV, h_km, theta_deg, depth_km,
             atmosphere=atmosphere, context=context,
             legacy_precision=legacy_precision,
         )
-    raise ValueError("method must be 'analytical' or 'numerical'.")
+    else:
+        raise ValueError("method must be 'analytical' or 'numerical'.")
+
+    if reunitarize:
+        S = project_to_unitary(S)
+
+    return S, x
 

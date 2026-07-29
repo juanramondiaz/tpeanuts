@@ -91,6 +91,7 @@ def _earth_evolutor_case_a_batched(
     n_flavours: int = 3,
     legacy_precision: bool = False,
     include_matter_nc: bool = False,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor:
     """
     Compute Earth evolution operators for trajectories crossing Earth shells.
@@ -122,6 +123,11 @@ def _earth_evolutor_case_a_batched(
             ``oscillation.pmns``; requires the profile to have been built
             with neutron-density coefficients, see
             ``core.perturbative.evolutor.evolutor_perturbative_segment``).
+        analytic_eigenvalues: If True, compute each segment Hamiltonian's
+            eigenvalues with the closed-form Cardano (3-flavour SM/NSI) or
+            Ferrari (3+1 sterile extension) solution instead of
+            ``torch.linalg.eigvalsh``, forwarded to
+            ``evolutor_perturbative_segment``.
 
     Returns:
         Tensor with shape `(batch_size, n_flavours, n_flavours)` containing
@@ -220,6 +226,7 @@ def _earth_evolutor_case_a_batched(
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     I = identity3.view(1, 1, n_flavours, n_flavours)
@@ -257,6 +264,7 @@ def _earth_evolutor_case_a_batched(
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     # Compose the detector-side half path excluding the duplicated first segment
@@ -311,6 +319,7 @@ def _earth_evolutor_case_a_batched(
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
     U_segments_mirrored = torch.where(
         segments.crossed.view(batch_size, ns, 1, 1),
@@ -372,6 +381,7 @@ def _earth_evolutor_case_b_batched(
     n_flavours: int = 3,
     legacy_precision: bool = False,
     include_matter_nc: bool = False,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor:
     """
     Compute Earth evolution operators for shallow detector-near trajectories.
@@ -400,6 +410,11 @@ def _earth_evolutor_case_b_batched(
             ``oscillation.pmns``; requires ``profile_earth`` to expose
             ``call_neutron`` -- i.e. the profile was built with
             neutron-density coefficients).
+        analytic_eigenvalues: If True, compute the segment Hamiltonian's
+            eigenvalues with the closed-form Cardano (3-flavour SM/NSI) or
+            Ferrari (3+1 sterile extension) solution instead of
+            ``torch.linalg.eigvalsh``, forwarded to
+            ``evolutor_perturbative_segment``.
 
     Returns:
         Tensor with shape `(batch_size, n_flavours, n_flavours)` containing
@@ -475,6 +490,7 @@ def _earth_evolutor_case_b_batched(
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     # Transform the reduced evolution operator to the full flavour basis.
@@ -501,6 +517,7 @@ def earth_evolutor(
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor:
     """
     Compute the full Earth matter evolution operator in flavour basis.
@@ -544,6 +561,11 @@ def earth_evolutor(
             ``RuntimeWarning`` if sterile was requested but the profile
             lacks neutron-density data). Always ``False`` for the plain
             3-flavour case.
+        analytic_eigenvalues: If True, compute every segment Hamiltonian's
+            eigenvalues with the closed-form Cardano (3-flavour SM/NSI) or
+            Ferrari (3+1 sterile extension) solution instead of
+            ``torch.linalg.eigvalsh``, forwarded to
+            both trajectory cases.
     Returns:
         Complex tensor with shape `(*broadcast_shape(E, eta), N, N)`, N in
         {3, 4}. Entries above the Earth horizon remain the identity operator;
@@ -634,6 +656,7 @@ def earth_evolutor(
         n_flavours=n_flavours,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     if reunitarize:
@@ -663,6 +686,7 @@ def earth_evolutor(
         n_flavours=n_flavours,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     if reunitarize:
@@ -687,6 +711,7 @@ def earth_evolutor_from_zenith(
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor:
     """Build the Earth evolutor from zenith angles with configurable scales.
 
@@ -720,6 +745,9 @@ def earth_evolutor_from_zenith(
             prefactor in Earth matter propagation.
         include_matter_nc: If True, also apply the 3+1 sterile extension's
             neutral-current matter term (see ``earth_evolutor``).
+        analytic_eigenvalues: If True, use the closed-form Cardano/Ferrari
+            eigenvalues instead of ``torch.linalg.eigvalsh`` (see
+            ``earth_evolutor``).
 
     Returns:
         Complex tensor with shape `(*broadcast_shape(E_MeV, theta_deg), N, N)`,
@@ -741,4 +769,5 @@ def earth_evolutor_from_zenith(
         evolution_scale_m=evolution_scale_m,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )

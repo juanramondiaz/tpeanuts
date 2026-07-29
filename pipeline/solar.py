@@ -34,7 +34,7 @@ def propagate_solar_to_surface(
     config: PropagationConfig,
     source: str,
     solar_profile: Optional[SolarProfile] = None,
-    method: str = "adiabatic",
+    method: str = "adiabatic_approximated",
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
 ) -> SolarSurfaceResult:
@@ -48,7 +48,8 @@ def propagate_solar_to_surface(
         source: Solar source key.
         solar_profile: Optional pre-built ``SolarProfile``; None loads the
             default/configured one.
-        method: ``"adiabatic"`` (default) or ``"numerical"`` (see
+        method: ``"numerical"``, ``"adiabatic_approximated"`` (default), or
+            ``"adiabatic_exact"`` (see
             ``medium.solar.probability.solar_probability_mass``).
         legacy_precision: If True, evaluate the underlying matter-mixing
             angles with the legacy peanuts ``Vk`` prefactor for

@@ -15,7 +15,7 @@ from tpeanuts.core.common.probability import (
     probability_weighted_average,
 )
 from tpeanuts.medium.atmosphere.evolutor import atmosphere_evolutor
-from tpeanuts.medium.atmosphere.geometry import _angle_distance
+from tpeanuts.medium.atmosphere.geometry import angle_distance
 from tpeanuts.medium.earth.geometry import build_atmosphere_trajectories
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import as_tensor
@@ -68,7 +68,7 @@ def select_production_flux(
         group[angle_key], device=context.device, dtype=context.dtype
     )
     if angle_index is None:
-        distance = _angle_distance(
+        distance = angle_distance(
             angle_grid,
             alpha_deg=alpha_deg,
             theta_deg=theta_deg,
@@ -156,6 +156,7 @@ def propagate_atmosphere_to_surface(
         ),
         atmosphere=config.atmosphere,
         context=context,
+        reunitarize=config.reunitarize_atmosphere,
     )
     surface_states = torch.einsum("...ab,b->...a", S_atmosphere, initial_state)
     surface_probabilities = probability_coherent_state(

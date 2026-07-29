@@ -29,8 +29,11 @@ from tpeanuts.core.BSM.bsm_nsi import NSIConfig
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.config.propagation import PropagationConfig
 from tpeanuts.medium.solar.profile import build_solar_profile, SolarParameters
+from tpeanuts.medium.solar.adiabatic import (
+    mass_weights_adiabatic_approximated,
+    mass_weights_adiabatic_exact,
+)
 from tpeanuts.medium.solar.probability import (
-    Tei,
     solar_probability_state,
     solar_probability_mass,
 )
@@ -96,8 +99,8 @@ def make_inverted_ordering(oscillation: OscillationParameters) -> OscillationPar
 
 
 def make_zero_nsi(oscillation: OscillationParameters) -> OscillationParameters:
-    """Attach an exactly-zero NSIConfig, forcing Tei's numerical (eigh) path
-    while remaining physically identical to the plain analytic SM path."""
+    """Attach an exactly-zero NSIConfig, forcing the exact (eigh) diagonalisation
+    path while remaining physically identical to the plain analytic SM path."""
     zero_nsi = NSIConfig()
     zero_nsi = dataclasses.replace(zero_nsi, epsilon=zero_nsi.epsilon_tensor_base())
     return dataclasses.replace(oscillation, nsi=zero_nsi)
@@ -110,12 +113,12 @@ def make_profile(*, use_lz: bool = False):
     return profile
 
 
-def test_tei_returns_normalized_finite_weights_for_energy_density_grid():
+def test_adiabatic_approximated_returns_normalized_finite_weights_for_energy_density_grid():
     oscillation = make_oscillation()
     energy = torch.tensor([0.1, 1.0, 10.0], device=DEVICE, dtype=DTYPE)[:, None]
     density = torch.tensor([0.0, 1.0, 100.0], device=DEVICE, dtype=DTYPE)[None, :]
 
-    weights = Tei(oscillation, energy, density)
+    weights = mass_weights_adiabatic_approximated(oscillation, energy, density)
 
     assert weights.shape == (3, 3, 3)
     assert torch.isfinite(weights).all()
@@ -234,12 +237,12 @@ def test_lz_enabled_standard_lma_matches_adiabatic_result_to_float_precision():
 # 3+1 sterile extension
 # -----------------------------------------------------------------------
 
-def test_tei_numerical_path_triggered_by_sterile_alone_returns_four_weights():
+def test_adiabatic_exact_triggered_by_sterile_alone_returns_four_weights():
     oscillation = make_sterile_oscillation()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)[:, None]
     density = torch.tensor([0.0, 1.0, 100.0], device=DEVICE, dtype=DTYPE)[None, :]
 
-    weights = Tei(oscillation, energy, density)
+    weights = mass_weights_adiabatic_exact(oscillation, energy, density)
 
     assert weights.shape == (3, 3, 4)
     assert torch.isfinite(weights).all()
@@ -257,7 +260,7 @@ def test_solar_probability_state_sterile_does_not_crash_and_is_normalized():
     profile = make_profile()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B")
+    probabilities = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_exact")
 
     assert probabilities.shape == (3, 4)
     assert torch.isfinite(probabilities).all()
@@ -282,22 +285,22 @@ def test_solar_probability_state_sterile_null_mixing_reduces_to_sm_active_sector
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     p_sm = solar_probability_state(oscillation_sm, energy, profile, "8B")
-    p_st = solar_probability_state(oscillation_st, energy, profile, "8B")
+    p_st = solar_probability_state(oscillation_st, energy, profile, "8B", method="adiabatic_exact")
 
     assert p_st.shape == (3, 4)
     torch.testing.assert_close(p_st[..., 3], torch.zeros(3, device=DEVICE, dtype=DTYPE), rtol=0.0, atol=1.0e-12)
     torch.testing.assert_close(p_st[..., :3], p_sm, rtol=0.0, atol=1.0e-4)
 
 
-def test_tei_numerical_path_io_zero_nsi_matches_analytic_path():
-    # Regression test for the eigh mass-index mislabelling bug (see Tei's
-    # numerical-path vacuum-permutation logic). With epsilon exactly zero,
-    # Tei's numerical (eigh) path and its analytic path describe the same
-    # physics via two
-    # independent algorithms (closed-form arccos formulas vs. eigh matrix
-    # diagonalisation), so they agree only to numerical precision, not
-    # bit-for-bit -- the same "independently correct implementations"
-    # tolerance already used below for the sterile-null-mixing check.
+def test_adiabatic_exact_io_zero_nsi_matches_adiabatic_approximated_path():
+    # Regression test for the eigh mass-index mislabelling bug (see
+    # mass_weights_adiabatic_exact's vacuum-permutation logic). With epsilon
+    # exactly zero, the exact (eigh) path and the approximated (analytic)
+    # path describe the same physics via two independent algorithms
+    # (closed-form arccos formulas vs. eigh matrix diagonalisation), so they
+    # agree only to numerical precision, not bit-for-bit -- the same
+    # "independently correct implementations" tolerance already used below
+    # for the sterile-null-mixing check.
     # Before the fix, this disagreed by O(1) under inverted ordering
     # (a wrong-index swap), not at this ~1e-4 numerical-precision level.
     oscillation_io = make_inverted_ordering(make_oscillation())
@@ -306,8 +309,8 @@ def test_tei_numerical_path_io_zero_nsi_matches_analytic_path():
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)[:, None]
     density = torch.tensor([0.0, 1.0, 50.0, 100.0], device=DEVICE, dtype=DTYPE)[None, :]
 
-    w_analytic = Tei(oscillation_io, energy, density)
-    w_numerical = Tei(oscillation_io_zero_nsi, energy, density)
+    w_analytic = mass_weights_adiabatic_approximated(oscillation_io, energy, density)
+    w_numerical = mass_weights_adiabatic_exact(oscillation_io_zero_nsi, energy, density)
 
     torch.testing.assert_close(w_numerical, w_analytic, rtol=0.0, atol=1.0e-4)
 
@@ -315,7 +318,7 @@ def test_tei_numerical_path_io_zero_nsi_matches_analytic_path():
 def test_solar_probability_state_sterile_null_mixing_reduces_to_sm_active_sector_io():
     # Same "sterile null-mixing reduces to plain SM" check as above, but
     # under inverted ordering -- the scenario that used to be silently
-    # wrong (the sterile path always takes Tei's numerical/eigh branch
+    # wrong (the sterile path always takes the exact numerical/eigh branch
     # regardless of theta14/24/34).
     context = make_context()
     oscillation_sm = make_inverted_ordering(make_oscillation(context=context))
@@ -326,22 +329,21 @@ def test_solar_probability_state_sterile_null_mixing_reduces_to_sm_active_sector
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     p_sm = solar_probability_state(oscillation_sm, energy, profile, "8B")
-    p_st = solar_probability_state(oscillation_st, energy, profile, "8B")
+    p_st = solar_probability_state(oscillation_st, energy, profile, "8B", method="adiabatic_exact")
 
     assert p_st.shape == (3, 4)
     torch.testing.assert_close(p_st[..., 3], torch.zeros(3, device=DEVICE, dtype=DTYPE), rtol=0.0, atol=1.0e-12)
     torch.testing.assert_close(p_st[..., :3], p_sm, rtol=0.0, atol=1.0e-4)
 
 
-def test_solar_probability_state_io_sterile_adiabatic_matches_numerical_method():
-    # Cross-validates the (now fixed) eigh-based numerical sub-path of
-    # method="adiabatic" against the independent method="numerical"
-    # coherent-evolutor path, which never had this labelling issue (it
-    # projects directly with the real PMNS matrix, not eigh's sorted
-    # columns). For weak sterile mixing and standard LMA-like splittings
-    # the propagation stays close to adiabatic, so the two independent
-    # methods should agree -- before the fix they disagreed well beyond
-    # this tolerance under inverted ordering.
+def test_solar_probability_state_io_sterile_adiabatic_exact_matches_numerical_method():
+    # Cross-validates the (now fixed) eigh-based method="adiabatic_exact"
+    # path against the independent method="numerical" coherent-evolutor
+    # path, which never had this labelling issue (it projects directly with
+    # the real PMNS matrix, not eigh's sorted columns). For weak sterile
+    # mixing and standard LMA-like splittings the propagation stays close to
+    # adiabatic, so the two independent methods should agree -- before the
+    # fix they disagreed well beyond this tolerance under inverted ordering.
     context = make_context()
     oscillation = make_inverted_ordering(
         make_sterile_oscillation("sterile_3p1_null_mixing", context=context)
@@ -349,7 +351,7 @@ def test_solar_probability_state_io_sterile_adiabatic_matches_numerical_method()
     profile = make_profile()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_adiabatic = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic")
+    p_adiabatic = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_exact")
     p_numerical = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
 
     torch.testing.assert_close(p_adiabatic, p_numerical, rtol=0.0, atol=5.0e-3)
@@ -360,13 +362,15 @@ def test_solar_probability_mass_include_matter_nc_changes_result_for_sterile():
     profile = make_profile()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    weights_cc_only = solar_probability_mass(oscillation, energy, profile, "8B", include_matter_nc=False)
+    weights_cc_only = solar_probability_mass(
+        oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=False,
+    )
     weights_with_nc = solar_probability_mass(
-        oscillation, energy, profile, "8B", include_matter_nc=True,
+        oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=True,
     )
     # include_matter_nc=None (the default) auto-resolves to True here since
     # the profile carries neutron-density data and sterile is active.
-    weights_default = solar_probability_mass(oscillation, energy, profile, "8B")
+    weights_default = solar_probability_mass(oscillation, energy, profile, "8B", method="adiabatic_exact")
 
     assert weights_cc_only.shape == weights_with_nc.shape == weights_default.shape == (3, 4)
     for weights in (weights_cc_only, weights_with_nc, weights_default):
@@ -401,26 +405,44 @@ def test_solar_probability_mass_include_matter_nc_requires_density_n():
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="density_n"):
-        solar_probability_mass(oscillation, energy, profile, "8B", include_matter_nc=True)
+        solar_probability_mass(
+            oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=True,
+        )
 
 
-def test_tei_warns_when_p_lz_supplied_on_sterile_diagonalization_path():
+def test_adiabatic_exact_has_no_p_lz_parameter():
+    # mass_weights_adiabatic_exact structurally cannot accept a Landau-Zener
+    # correction (unlike the old Tei, which accepted p_lz on every path and
+    # only warned-and-ignored it here) -- passing it is a TypeError, not a
+    # runtime warning.
     oscillation = make_sterile_oscillation()
     energy = torch.tensor([5.0], device=DEVICE, dtype=DTYPE)
     density = torch.tensor([10.0], device=DEVICE, dtype=DTYPE)
     p_lz = torch.tensor([0.1], device=DEVICE, dtype=DTYPE)
 
-    with pytest.warns(RuntimeWarning, match="p_lz is ignored"):
-        Tei(oscillation, energy, density, p_lz=p_lz)
+    with pytest.raises(TypeError):
+        mass_weights_adiabatic_exact(oscillation, energy, density, p_lz=p_lz)
 
 
-def test_solar_probability_mass_rejects_lz_with_sterile():
+def test_solar_probability_mass_rejects_sterile_with_adiabatic_approximated():
+    # Default/explicit method="adiabatic_approximated" now rejects any BSM
+    # extension outright (see solar_probability_mass), independent of
+    # profile.use_LZ.
+    oscillation = make_sterile_oscillation()
+    profile = make_profile(use_lz=False)
+    energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="only supports the plain 3-flavour Standard Model"):
+        solar_probability_mass(oscillation, energy, profile, "8B", method="adiabatic_approximated")
+
+
+def test_solar_probability_mass_rejects_lz_with_adiabatic_exact():
     oscillation = make_sterile_oscillation()
     profile_lz = make_profile(use_lz=True)
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="use_LZ=True is not supported"):
-        solar_probability_mass(oscillation, energy, profile_lz, "8B")
+        solar_probability_mass(oscillation, energy, profile_lz, "8B", method="adiabatic_exact")
 
 
 def test_solar_probability_mass_rejects_lz_with_numerical_method():
@@ -453,7 +475,7 @@ def test_solar_probability_state_nsi_alone_changes_result_and_stays_three_flavou
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     p_sm = solar_probability_state(oscillation_sm, energy, profile, "8B")
-    p_nsi = solar_probability_state(oscillation_nsi, energy, profile, "8B")
+    p_nsi = solar_probability_state(oscillation_nsi, energy, profile, "8B", method="adiabatic_exact")
 
     assert p_nsi.shape == (3, 3)
     assert torch.isfinite(p_nsi).all()
@@ -471,7 +493,7 @@ def test_solar_probability_state_nsi_and_sterile_combined_does_not_crash():
     profile = make_profile()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B")
+    probabilities = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_exact")
 
     assert probabilities.shape == (3, 4)
     assert torch.isfinite(probabilities).all()
@@ -487,7 +509,7 @@ def test_solar_probability_state_nsi_and_sterile_with_matter_nc_does_not_crash()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     probabilities = solar_probability_state(
-        oscillation, energy, profile, "8B", include_matter_nc=True,
+        oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=True,
     )
 
     assert probabilities.shape == (3, 4)
@@ -510,16 +532,17 @@ def test_solar_probability_mass_rejects_unknown_method():
         solar_probability_mass(oscillation, energy, profile, "8B", method="bogus")
 
 
-def test_solar_probability_state_numerical_matches_adiabatic_in_sm_limit():
+def test_solar_probability_state_numerical_matches_adiabatic_approximated_in_sm_limit():
     # method="numerical" makes no adiabatic assumption at all, so it is not
-    # expected to agree with method="adiabatic" to floating-point precision
-    # -- only to the level that the adiabatic approximation itself is good,
-    # which is excellent for standard LMA parameters.
+    # expected to agree with method="adiabatic_approximated" to
+    # floating-point precision -- only to the level that the adiabatic
+    # approximation itself is good, which is excellent for standard LMA
+    # parameters.
     oscillation = make_oscillation()
     profile = make_profile()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_adiabatic = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic")
+    p_adiabatic = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_approximated")
     p_numerical = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
 
     assert p_numerical.shape == p_adiabatic.shape == (3, 3)

@@ -218,7 +218,7 @@ class PMNS_sterile(PMNS):
     Inherits the 3-flavor Standard Model sector from ``PMNS`` and extends it
     with one sterile neutrino. ``n_flavours = 4`` automatically sizes the
     inherited ``R12``/``R13``/``R23``/``Delta`` builders; ``pmns_matrix``,
-    ``reduced``, and ``flavour_basis`` are overridden here with the
+    ``reduced``, and ``outer_block`` are overridden here with the
     3+1 product structure so that ``PMNS_sterile`` can be passed directly to
     the existing Hamiltonian and evolutor functions.
 

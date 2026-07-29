@@ -63,8 +63,9 @@ Usage
     from tpeanuts.config.propagation import PropagationConfig
 
     # Usual path: attach the NSI preset directly to OscillationParameters
-    # (this builds the NSIConfig internally, including its precomputed
-    # epsilon tensor) so every downstream builder --
+    # (this builds the NSIConfig internally; epsilon is always recomputed
+    # automatically from the eps_* fields in __post_init__) so every
+    # downstream builder --
     # core.common.hamiltonian.hamiltonian_reduced/hamiltonian_flavour,
     # core.numerical.evolutor.evolutor_numerical,
     # core.perturbative.evolutor.evolutor_perturbative_segment -- reads
@@ -87,19 +88,23 @@ available preset names and their physics justification.
 Module contents
 ---------------
 NSIConfig
-    Frozen dataclass storing all NSI parameters.  Provides
-    ``epsilon_tensor_base`` to build the complex 3×3 ε matrix on demand, and
-    the ``from_preset`` classmethod for named parameter sets, which
-    additionally precomputes it into the ``epsilon`` field. ``epsilon_tensor``
-    embeds ``self.epsilon`` for a Hamiltonian of arbitrary flavour count
-    (used by ``tpeanuts.core.common.hamiltonian.hamiltonian_matter_reduced``
-    for the 3+1 sterile extension). To list available preset names, call
+    Frozen dataclass storing all NSI parameters.  ``__post_init__`` always
+    recomputes the complex 3×3 ``epsilon`` field from the ``eps_*`` fields
+    (via ``epsilon_tensor_base``), on every construction and every
+    ``dataclasses.replace(...)`` call, so ``eps_*`` is always the single
+    source of truth and ``epsilon`` can never silently go stale.
+    ``from_preset`` builds a named parameter set the same way;
+    ``from_raw_epsilon`` is the one escape hatch for an arbitrary epsilon
+    tensor that does not decompose into the scalar parametrization.
+    ``epsilon_tensor`` embeds ``self.epsilon`` for a Hamiltonian of arbitrary
+    flavour count (used by
+    ``tpeanuts.core.common.hamiltonian.hamiltonian_matter_reduced`` for the
+    3+1 sterile extension). To list available preset names, call
     ``tpeanuts.config.presets.list_presets(NSI_PRESETS)`` directly.
 """
 
 from __future__ import annotations
 
-import dataclasses
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -148,13 +153,24 @@ class NSIConfig:
         Short identifier string (e.g. the preset name).
     description : str
         Human-readable description and literature reference.
+    device : Optional[torch.device]
+        Target torch device for the auto-computed ``epsilon`` tensor.
+        Defaults to CPU.
+    real_dtype : torch.dtype
+        Real base dtype for the auto-computed ``epsilon`` tensor; the
+        complex dtype is inferred (float32 -> complex64, float64 ->
+        complex128).
     epsilon : Optional[torch.Tensor]
-        Precomputed complex 3x3 epsilon tensor. ``None`` for a directly
-        constructed ``NSIConfig`` (call ``epsilon_tensor_base()`` explicitly
-        in that case); populated automatically by ``from_preset`` via
-        ``self.epsilon_tensor_base()``. Excluded from equality comparisons
-        since tensor ``==`` does not reduce to a bool. This is the field
-        ``OscillationParameters.nsi.epsilon`` exposes.
+        Complex 3x3 epsilon tensor. Recomputed automatically in
+        ``__post_init__`` from the ``eps_*`` fields (via
+        ``epsilon_tensor_base()``) on *every* construction, including every
+        ``dataclasses.replace(...)`` call -- so ``eps_*`` is always the
+        single source of truth and this field can never silently diverge
+        from it. Any value passed explicitly to the constructor is
+        discarded and overwritten; use ``NSIConfig.from_raw_epsilon`` for
+        the rare case of an arbitrary epsilon tensor that does not
+        decompose into the standard scalar parametrization. This is the
+        field ``OscillationParameters.nsi.epsilon`` exposes.
     """
 
     # Diagonal entries (real)
@@ -178,8 +194,29 @@ class NSIConfig:
     label:       str = ""
     description: str = ""
 
-    # Precomputed tensor (populated by from_preset; None otherwise)
+    # Device/dtype used to build epsilon in __post_init__.
+    device: Optional[torch.device] = None
+    real_dtype: torch.dtype = torch.float64
+
+    # Derived tensor: always recomputed from eps_* in __post_init__ (see
+    # from_raw_epsilon for the one legitimate way to override it).
     epsilon: Optional[torch.Tensor] = field(default=None, compare=False)
+
+    def __post_init__(self) -> None:
+        """Recompute ``epsilon`` from the ``eps_*`` fields.
+
+        Runs on every construction, including every ``dataclasses.replace``
+        call (which re-invokes ``__init__``/``__post_init__``). This makes
+        ``eps_*`` the single source of truth for ``epsilon``: tweaking a
+        single field via ``replace`` can never leave a stale ``epsilon``
+        behind, closing the divergence risk that a merely-cached ``epsilon``
+        field would otherwise allow.
+        """
+        object.__setattr__(
+            self,
+            "epsilon",
+            self.epsilon_tensor_base(device=self.device, real_dtype=self.real_dtype),
+        )
 
     # ------------------------------------------------------------------
     # Preset interface
@@ -193,27 +230,60 @@ class NSIConfig:
         device: Optional[torch.device] = None,
         real_dtype: torch.dtype = torch.float64,
     ) -> "NSIConfig":
-        """Build an ``NSIConfig`` from a named preset, with ``epsilon`` precomputed.
+        """Build an ``NSIConfig`` from a named preset.
 
         Args:
             name: Preset identifier.  Call
                 ``tpeanuts.config.presets.list_presets(NSI_PRESETS)``
                 for all names.
-            device: Target torch device for the precomputed ``epsilon``
+            device: Target torch device for the auto-computed ``epsilon``
                 tensor.  Defaults to CPU (see ``epsilon_tensor``).
             real_dtype: Real base dtype for ``epsilon``; the complex dtype is
                 inferred (float32 -> complex64, float64 -> complex128).
 
         Returns:
-            Fully initialized ``NSIConfig`` instance with ``epsilon`` already
-            built by calling ``self.epsilon_tensor_base(device, real_dtype)``.
+            Fully initialized ``NSIConfig`` instance; ``epsilon`` is built
+            automatically by ``__post_init__``.
 
         Raises:
             ValueError: If ``name`` is not in ``tpeanuts.config.presets.NSI_PRESETS``.
         """
-        cfg = cls(**get_preset(NSI_PRESETS, name, kind="NSI preset"))
-        epsilon = cfg.epsilon_tensor_base(device=device, real_dtype=real_dtype)
-        return dataclasses.replace(cfg, epsilon=epsilon)
+        return cls(
+            **get_preset(NSI_PRESETS, name, kind="NSI preset"),
+            device=device,
+            real_dtype=real_dtype,
+        )
+
+    @classmethod
+    def from_raw_epsilon(
+        cls,
+        epsilon: torch.Tensor,
+        *,
+        label: str = "",
+        description: str = "",
+    ) -> "NSIConfig":
+        """Build an ``NSIConfig`` from an arbitrary epsilon tensor.
+
+        Bypasses the ``eps_*`` scalar parametrization entirely: the ``eps_*``
+        fields are left at their defaults (0.0) and do NOT reflect
+        ``epsilon``'s actual entries. Use this only when ``epsilon`` does not
+        decompose into the standard 3x3 Hermitian parametrization (e.g. a
+        precomputed matrix, or a non-3x3 shape for ``epsilon_tensor``
+        embedding tests) -- for every other case, prefer the ``eps_*``
+        fields (directly or via ``from_preset``), which keep ``epsilon``
+        self-consistent automatically.
+
+        Args:
+            epsilon: Tensor stored as-is on the returned config.
+            label: Optional short identifier string.
+            description: Optional human-readable description.
+
+        Returns:
+            ``NSIConfig`` with ``epsilon`` set to exactly the given tensor.
+        """
+        cfg = cls(label=label, description=description)
+        object.__setattr__(cfg, "epsilon", epsilon)
+        return cfg
 
     # ------------------------------------------------------------------
     # Tensor builder
@@ -238,9 +308,7 @@ class NSIConfig:
         Returns:
             Complex tensor shaped (3, 3) representing ε.
         """
-        cdtype = (
-            torch.complex128 if real_dtype == torch.float64 else torch.complex64
-        )
+        cdtype = cdtype_from_real(real_dtype)
 
         eps_emu   = complex(self.eps_emu_re,   self.eps_emu_im)
         eps_etau  = complex(self.eps_etau_re,  self.eps_etau_im)

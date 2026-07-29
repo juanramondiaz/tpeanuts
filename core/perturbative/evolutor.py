@@ -64,6 +64,7 @@ def evolutor_zero_order(
     trace_H: torch.Tensor | None = None,
     zero_mask: torch.Tensor | None = None,
     return_spectral: bool = False,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor | tuple[torch.Tensor, dict[str, torch.Tensor]]:
     """Compute the exact zeroth-order operator for the average Hamiltonian.
 
@@ -79,12 +80,18 @@ def evolutor_zero_order(
         trace_H: Optional precomputed trace of H.
         zero_mask: Optional mask selecting segments that must return identity.
         return_spectral: Return ``(U0, spectral_data)`` when True.
+        analytic_eigenvalues: If True, compute H's eigenvalues with the
+            closed-form Cardano (N=3) or Ferrari (N=4) solution instead of
+            ``torch.linalg.eigvalsh``. See
+            ``core.perturbative.spectral.hamiltonian_traceless_eigenvalues``.
 
     Returns:
         U0 shaped (..., N, N), optionally paired with its spectral data.
     """
     N = H.shape[-1]
-    spectral = hamiltonian_spectral_data(H, trace_H=trace_H)
+    spectral = hamiltonian_spectral_data(
+        H, trace_H=trace_H, analytic_eigenvalues=analytic_eigenvalues,
+    )
     lam = spectral["lam"]
     trace = spectral["trace"].to(dtype=lam.dtype)
     length = L.to(dtype=lam.dtype)
@@ -228,6 +235,7 @@ def evolutor_perturbative_from_H(
     legacy_precision: bool = False,
     P: torch.Tensor | None = None,
     P_nc: torch.Tensor | None = None,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor:
     """Combine zeroth- and first-order evolution for one density segment.
 
@@ -248,6 +256,9 @@ def evolutor_perturbative_from_H(
         P_nc: Optional neutral-current direction matrix forwarded to
             ``evolutor_first_order``. None (the default) omits the NC
             correction entirely.
+        analytic_eigenvalues: If True, compute H's eigenvalues with the
+            closed-form Cardano (N=3) or Ferrari (N=4) solution instead of
+            ``torch.linalg.eigvalsh``, forwarded to ``evolutor_zero_order``.
 
     Returns:
         Perturbative segment operator U0 + U1 shaped (..., N, N).
@@ -257,6 +268,7 @@ def evolutor_perturbative_from_H(
         L,
         trace_H=trace_H,
         return_spectral=True,
+        analytic_eigenvalues=analytic_eigenvalues,
     )
 
     known_any_perturbation = getattr(profile_model, "any_perturbation", None)
@@ -319,6 +331,7 @@ def evolutor_perturbative_segment(
     evolution_scale_m: TensorLike = R_E,
     legacy_precision: bool = False,
     include_matter_nc: bool = False,
+    analytic_eigenvalues: bool = False,
 ) -> torch.Tensor:
     """Build a reduced Hamiltonian for one profile model and evolve it perturbatively.
 
@@ -362,6 +375,11 @@ def evolutor_perturbative_segment(
             profile was built with neutron-density coefficients); raises
             ValueError otherwise. False (the default) reproduces the
             pre-existing CC-only behaviour exactly.
+        analytic_eigenvalues: If True, compute the reduced Hamiltonian's
+            eigenvalues with the closed-form Cardano (N=3) or Ferrari (N=4,
+            i.e. the 3+1 sterile extension) solution instead of
+            ``torch.linalg.eigvalsh``, forwarded to
+            ``evolutor_perturbative_from_H``.
 
     Returns:
         Complex segment evolutor shaped (..., N, N), N in {3, 4}.
@@ -522,4 +540,5 @@ def evolutor_perturbative_segment(
         legacy_precision=legacy_precision,
         P=P,
         P_nc=P_nc,
+        analytic_eigenvalues=analytic_eigenvalues,
     )

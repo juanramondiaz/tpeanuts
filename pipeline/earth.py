@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, cast
 
 import torch
 
@@ -70,7 +70,16 @@ def propagate_earth_to_detector(
     earth_profile: Optional[EarthProfile] = None,
     eta: Optional[TensorLike] = None,
 ) -> EarthDetectorResult:
-    """Propagate an incident state over an explicit or configured eta grid."""
+    """Propagate an incident state over an explicit or configured eta grid.
+
+    ``config.earth.chunk_eta`` is honoured here the same way
+    ``propagate_earth_to_detector_exposure``/``earth_probability_exposure``
+    already do: it splits the eta axis into sub-batches evaluated one at a
+    time (``None`` or a non-positive value evaluates the full grid at once),
+    to control memory usage for large energy-angle grids. Previously this
+    field had no effect at all through this entry point -- only through the
+    ``_exposure`` variant.
+    """
     state, energy, profile = _earth_inputs(
         incident_state, E_MeV, config, earth_profile
     )
@@ -84,20 +93,35 @@ def propagate_earth_to_detector(
     # make both axes explicit even when N_E == N_eta.
     energy_grid = energy[:, None]
     eta_evaluation_grid = eta_grid[None, :]
-    probabilities = earth_probability_state(
-        nustate=state,
-        profile_earth=profile,
-        oscillation=config.oscillation,
-        E_MeV=energy_grid,
-        eta=eta_evaluation_grid,
-        depth_m=config.detector_depth_m,
-        method=config.earth.method,
-        massbasis=incident_basis == "mass",
-        nsteps=config.earth.nsteps,
-        ode_method=config.earth.ode_method,
-        context=config.runtime,
-        reunitarize=config.reunitarize_earth,
-    )
+
+    n_eta = eta_grid.numel()
+    chunk_eta = config.earth.chunk_eta
+    if chunk_eta is None or chunk_eta <= 0:
+        chunk_eta = n_eta
+
+    chunks = [
+        cast(
+            torch.Tensor,
+            earth_probability_state(
+                nustate=state,
+                profile_earth=profile,
+                oscillation=config.oscillation,
+                E_MeV=energy_grid,
+                eta=eta_evaluation_grid[:, start:start + chunk_eta],
+                depth_m=config.detector_depth_m,
+                method=config.earth.method,
+                massbasis=incident_basis == "mass",
+                nsteps=config.earth.nsteps,
+                ode_method=config.earth.ode_method,
+                context=config.runtime,
+                reunitarize=config.reunitarize_earth,
+                analytic_eigenvalues=config.analytic_eigenvalues,
+            ),
+        )
+        for start in range(0, n_eta, chunk_eta)
+    ]
+    probabilities = chunks[0] if len(chunks) == 1 else torch.cat(chunks, dim=1)
+
     return EarthDetectorResult(
         incident_state=state,
         incident_basis=incident_basis,
@@ -137,6 +161,7 @@ def propagate_earth_to_detector_exposure(
         reunitarize=config.reunitarize_earth,
         nsteps=config.earth.nsteps,
         ode_method=config.earth.ode_method,
+        analytic_eigenvalues=config.analytic_eigenvalues,
     )
     return EarthDetectorResult(
         incident_state=state,

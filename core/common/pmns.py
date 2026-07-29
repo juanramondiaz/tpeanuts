@@ -48,13 +48,13 @@ Module contents:
         and the 4x4 (or larger) BSM cases,
         
         and implements the flavour-count-agnostic parts of the public interface:
-          (``refresh``, ``reduced_basis``,
+          (``refresh``, ``flavour_basis``, ``reduced_basis``,
           ``select_antinu``, ``__getitem__``, ``conjugate``, ``transpose``,
           ``dagger``, ``reduced_conjugate``, ``reduced_transpose``,
           ``reduced_dagger``).
 
         Concrete subclasses must implement:
-          ``pmns_matrix``, ``reduced``, and ``flavour_basis``,
+          ``pmns_matrix``, ``reduced``, and ``outer_block``,
         since the product structure of the full  mixing matrix is genuinely
         different per scenario (extra active-sterile rotations are inserted
         at specific points that follow from a scenario-specific commutation
@@ -67,7 +67,7 @@ The neutrino reduced matrix is available through
 while ``antinu=True`` returns its complex conjugate. A neutrino-only cached
 copy remains stored as ``pmns.U`` for backwards compatibility.
 
-    H = U_red diag(k_i) U_red^T + diag(V, 0, 0).
+    H = U_red diag(k_i) U_red^dagger + diag(V, 0, 0).
 
 Main attributes after initialization:
 

@@ -545,7 +545,15 @@ def make_eta_grid(
     Returns:
         One-dimensional tensor of nadir angles in radians, uniformly spaced
         over ``[0, pi]`` (or the requested day/night half).
+
+    Raises:
+        ValueError: If ``ns < 2``. A single-point grid has no spacing, and
+            (for ``daynight`` other than ``None``) ``_daynight_slice`` would
+            silently return an empty tensor rather than raising.
     """
+    if ns < 2:
+        raise ValueError(f"ns must be at least 2 to define a grid with a spacing; got {ns!r}.")
+
     eta_full = torch.linspace(
         0.0,
         float(torch.pi),

@@ -225,6 +225,92 @@ def test_atmosphere_analytical_matches_fine_numerical_exponential_profile():
     assert_unitary(analytical, atol=2.0e-11, rtol=2.0e-11)
 
 
+def test_atmosphere_analytical_cardano_eigenvalues_matches_default():
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    atmosphere = make_atmosphere(
+        nsteps=800,
+        matter=True,
+        perturbative_segments=6,
+        perturbative_degree=3,
+    )
+    args = dict(
+        E_MeV=5000.0,
+        h_km=80.0,
+        theta_deg=89.0,
+        depth_km=1.0,
+        atmosphere=atmosphere,
+        context=context,
+    )
+    default, x = atmosphere_evolutor(oscillation, **args, method="analytical")
+    cardano, _ = atmosphere_evolutor(
+        oscillation, **args, method="analytical", analytic_eigenvalues=True,
+    )
+
+    torch.testing.assert_close(cardano, default, atol=1.0e-10, rtol=1.0e-10)
+    assert_unitary(cardano, atol=2.0e-11, rtol=2.0e-11)
+
+
+@pytest.mark.parametrize("method", ["analytical", "numerical"])
+def test_atmosphere_evolutor_reunitarize_stays_close_and_unitary(method):
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    atmosphere = make_atmosphere(
+        nsteps=200,
+        matter=True,
+        perturbative_segments=6,
+        perturbative_degree=3,
+    )
+    args = dict(
+        E_MeV=5000.0,
+        h_km=80.0,
+        theta_deg=85.0,
+        depth_km=1.0,
+        atmosphere=atmosphere,
+        context=context,
+        method=method,
+    )
+
+    default, _ = atmosphere_evolutor(oscillation, **args)
+    reunitarized, _ = atmosphere_evolutor(oscillation, **args, reunitarize=True)
+
+    assert_unitary(reunitarized, atol=1.0e-12, rtol=1.0e-12)
+    torch.testing.assert_close(reunitarized, default, atol=1.0e-6, rtol=1.0e-6)
+
+
+def test_atmosphere_evolutor_rejects_analytic_eigenvalues_with_numerical_method():
+    # analytic_eigenvalues only applies to the perturbative/analytical
+    # evolutor; method="numerical" used to silently ignore it (it has no
+    # such parameter at all) instead of raising.
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    atmosphere = make_atmosphere(nsteps=32)
+
+    with pytest.raises(ValueError, match="analytic_eigenvalues=True has no effect"):
+        atmosphere_evolutor(
+            oscillation, E_MeV=1000.0, h_km=20.0, theta_deg=30.0,
+            atmosphere=atmosphere, context=context,
+            method="numerical", analytic_eigenvalues=True,
+        )
+
+
+@pytest.mark.parametrize("theta_bad", [-50.0, -1.0e-6, 180.0 + 50.0, 180.0 + 1.0e-6])
+@pytest.mark.parametrize("method", ["analytical", "numerical"])
+def test_atmosphere_evolutor_rejects_theta_outside_physical_range(method, theta_bad):
+    # sin/cos are periodic and never raise outside [0, 180] degrees, so an
+    # unphysical theta_deg used to be silently accepted and propagated,
+    # producing a finite but meaningless evolutor instead of an error.
+    context = make_context()
+    oscillation = make_oscillation(context=context)
+    atmosphere = make_atmosphere(nsteps=32)
+
+    with pytest.raises(ValueError, match="theta_deg must be between 0 and 180"):
+        atmosphere_evolutor(
+            oscillation, E_MeV=1000.0, h_km=20.0, theta_deg=theta_bad,
+            atmosphere=atmosphere, context=context, method=method,
+        )
+
+
 def test_atmosphere_analytical_broadcasts_energy_and_geometry():
     context = make_context()
     oscillation = make_oscillation(context=context)

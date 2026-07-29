@@ -39,13 +39,20 @@ Submodules:
         and the dimensionless matter-potential ratio V_k.
     medium.solar.landau_zener
         Landau-Zener transition probability P_LZ(E) and supporting helpers
-        (density gradient, resonance radius).
+        (density gradient, resonance radius, spatial correction).
+    medium.solar.adiabatic
+        Pointwise adiabatic mass-eigenstate production weights:
+        ``mass_weights_adiabatic_approximated`` (closed-form, plain SM only)
+        and ``mass_weights_adiabatic_exact`` (pointwise diagonalisation,
+        SM/NSI/sterile).
     medium.solar.probability
-        Adiabatic mass-basis production weights and final flavour
-        probabilities built from ``matter_mixing``, with optional LZ
-        corrections dispatched via ``SolarProfile.use_LZ``. This medium has
-        no transition function (no coherent evolutor exists in the adiabatic
-        solar model).
+        Single entry point (``solar_probability_mass``) dispatching between
+        ``method="numerical"`` (``medium.solar.evolutor``),
+        ``method="adiabatic_approximated"``, and
+        ``method="adiabatic_exact"`` (``medium.solar.adiabatic``), with every
+        method/use_LZ/BSM-extension compatibility check centralised there.
+        This medium has no transition function (no coherent evolutor exists
+        in the adiabatic solar model).
     medium.solar.flux
         Combines ``probability.solar_probability_state`` with total source
         fluxes and optional spectra to produce flavour-resolved solar
@@ -78,9 +85,13 @@ from tpeanuts.medium.solar.landau_zener import (
     density_gradient,
     resonance_radius,
     plz,
+    landau_zener_spatial_correction,
+)
+from tpeanuts.medium.solar.adiabatic import (
+    mass_weights_adiabatic_approximated,
+    mass_weights_adiabatic_exact,
 )
 from tpeanuts.medium.solar.probability import (
-    Tei,
     solar_probability_mass,
     solar_probability_state,
     solar_probability_integrated,
@@ -105,7 +116,9 @@ __all__ = [
     "density_gradient",
     "resonance_radius",
     "plz",
-    "Tei",
+    "landau_zener_spatial_correction",
+    "mass_weights_adiabatic_approximated",
+    "mass_weights_adiabatic_exact",
     "solar_probability_mass",
     "solar_probability_state",
     "solar_probability_integrated",

@@ -38,7 +38,8 @@ Module functions:
     chord_length_case_b(...)
         Compute the shallow case-B path length inside Earth.
     build_earth_trajectory(...)
-        Build a scalar sampled Earth trajectory for numerical propagation.
+        Build a sampled Earth trajectory (scalar or batched eta) for
+        numerical propagation.
     classify_eta_regions(...)
         Split nadir angles into above-horizon, case-A, and case-B masks.
     validate_eta_range(...)
@@ -187,12 +188,22 @@ def build_earth_trajectory(
     dtype,
     evolution_scale_m,
 ):
-    """Build a sampled scalar trajectory for numerical Earth propagation.
+    """Build a sampled Earth trajectory for numerical propagation.
+
+    Scalar and batched ``eta`` are both supported: case A (earth-crossing,
+    ``eta < pi/2``) and case B (local-constant, shallow near-detector,
+    ``eta >= pi/2``) trajectories are selected per batch entry with
+    ``torch.where`` rather than a Python ``if`` on a single converted-to-CPU
+    float, so a batch spanning both regimes builds one rectangular grid in a
+    single call -- no Python-level loop over ``eta`` is needed upstream (see
+    ``medium.earth.exposure_integration.earth_probability_exposure``, whose
+    ``method="numerical"`` branch used to loop scalar-by-scalar over the eta
+    grid precisely because of this function's former scalar-only
+    restriction).
 
     Args:
         profile_earth: Earth profile_earth object exposing ``shells_x``.
-        eta: Detector nadir angle in radians. Only scalar trajectories are
-            supported by this helper.
+        eta: Detector nadir angle(s) in radians. Scalar or any batch shape.
         depth_m: Detector depth below the Earth surface in metres.
         nsteps: Number of numerical trajectory segments.
         method: Segment sampling rule passed to ``segment_sample_points``.
@@ -202,16 +213,16 @@ def build_earth_trajectory(
             radius units into dimensionless evolution lengths.
 
     Returns:
-        ``Trajectory`` with Earth-radius coordinates ``x``, segment samples,
-        dimensionless ``dx_evolution``, and metadata containing the trajectory
-        mode, ``eta_prime``, and detector radius.
+        ``Trajectory`` with Earth-radius coordinates ``x`` shaped
+        ``(*eta.shape, nsteps+1)``, segment samples and ``dx_evolution``
+        shaped ``(*eta.shape, nsteps)``, and metadata containing the
+        per-entry case-A mask (``is_earth_crossing``), ``eta_prime``, and
+        detector radius.
     """
     if nsteps < 1:
         raise ValueError("nsteps must be at least 1.")
 
     eta = as_tensor(eta, device=device, dtype=dtype)
-    if eta.numel() != 1:
-        raise ValueError("build_earth_trajectory only supports scalar eta.")
 
     evolution_scale = as_tensor(
             evolution_scale_m,
@@ -226,32 +237,31 @@ def build_earth_trajectory(
     delta_x = chord_length_case_b(eta, r_d)
     eta_prime = eta_prime_from_eta(eta, r_d)
 
-    eta_float = float(eta.detach().cpu())
-    eta_prime_float = float(eta_prime.detach().cpu())
+    is_earth_crossing = (eta >= 0.0) & (eta < torch.pi / 2.0)
 
-    if 0.0 <= eta_float < torch.pi / 2.0:
-        xj_all, crossed, _ = profile_earth.shells_x(eta_prime)
-        xj_crossed = torch.where(crossed, xj_all, torch.zeros_like(xj_all))
+    # Case A (earth-crossing): x1 is the outermost crossed-shell coordinate,
+    # x2 is the detector coordinate. Computed for every entry regardless of
+    # ``is_earth_crossing`` -- cheap batched tensor ops, no Python branching
+    # -- and selected per entry below, mirroring how
+    # ``medium.earth.evolutor`` already splits case A/B via masks rather
+    # than per-element Python control flow.
+    xj_all, crossed, _ = profile_earth.shells_x(eta_prime)
+    xj_crossed = torch.where(crossed, xj_all, torch.zeros_like(xj_all))
+    x1_a = -xj_crossed.amax(dim=-1)
+    x2_a = x_d
 
-        x1 = -float(torch.max(xj_crossed).detach().cpu())
-        x2 = float(x_d.detach().cpu())
-        mode = "earth_crossing"
+    # Case B (local-constant, shallow): starts at the surface (x1=0) and
+    # ends at the case-B chord length.
+    x1_b = torch.zeros_like(delta_x)
+    x2_b = delta_x
 
-    else:
-        x1 = 0.0
-        x2 = float(delta_x.detach().cpu())
-        mode = "local_constant"
+    x1 = torch.where(is_earth_crossing, x1_a, x1_b)
+    x2 = torch.where(is_earth_crossing, x2_a, x2_b)
 
-    x = torch.linspace(
-        x1,
-        x2,
-        nsteps + 1,
-        device=device,
-        dtype=dtype,
-    )
-  
-    
-    dx_evolution = (x[1:] - x[:-1]) * (R_E / evolution_scale)
+    u = torch.linspace(0.0, 1.0, nsteps + 1, device=device, dtype=dtype)
+    x = x1[..., None] + (x2 - x1)[..., None] * u
+
+    dx_evolution = (x[..., 1:] - x[..., :-1]) * (R_E / evolution_scale)
 
     sample_x = segment_sample_points(x, method)
 
@@ -261,10 +271,9 @@ def build_earth_trajectory(
         sample_x=sample_x,
         meta={
             "kind": "earth",
-            "mode": mode,
+            "is_earth_crossing": is_earth_crossing,
             "eta": eta,
             "eta_prime": eta_prime,
-            "eta_prime_float": eta_prime_float,
             "r_d": r_d,
         },
     )

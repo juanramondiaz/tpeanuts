@@ -140,6 +140,24 @@ def test_case_a_scalar_evolutor_is_finite_and_unitary():
     assert torch.max(_unitarity_error(U)) < 5.0e-10
 
 
+def test_case_a_analytic_eigenvalues_matches_default():
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+
+    kwargs = dict(
+        profile_earth=profile,
+        oscillation=oscillation,
+        E=torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
+        eta=torch.tensor(0.40, device=DEVICE, dtype=DTYPE),
+        depth_m=DEPTH_SURFACE_M,
+        reunitarize=True,
+    )
+    U_default = earth_evolutor(**kwargs)
+    U_cardano = earth_evolutor(**kwargs, analytic_eigenvalues=True)
+
+    assert_close(U_cardano, U_default, atol=1.0e-10, rtol=1.0e-10, name="case A Cardano vs eigvalsh")
+
+
 def test_case_b_underground_evolutor_is_finite_and_unitary():
     profile = _two_shell_profile()
     oscillation = _oscillation()
@@ -156,6 +174,24 @@ def test_case_b_underground_evolutor_is_finite_and_unitary():
     assert U.shape == (3, 3)
     assert torch.all(torch.isfinite(U.real)) and torch.all(torch.isfinite(U.imag))
     assert torch.max(_unitarity_error(U)) < 5.0e-10
+
+
+def test_case_b_analytic_eigenvalues_matches_default():
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+
+    kwargs = dict(
+        profile_earth=profile,
+        oscillation=oscillation,
+        E=torch.tensor(2500.0, device=DEVICE, dtype=DTYPE),
+        eta=torch.tensor(2.40, device=DEVICE, dtype=DTYPE),
+        depth_m=DEPTH_UNDERGROUND_M,
+        reunitarize=True,
+    )
+    U_default = earth_evolutor(**kwargs)
+    U_cardano = earth_evolutor(**kwargs, analytic_eigenvalues=True)
+
+    assert_close(U_cardano, U_default, atol=1.0e-10, rtol=1.0e-10, name="case B Cardano vs eigvalsh")
 
 
 def test_sterile_case_a_scalar_evolutor_is_finite_and_unitary():
@@ -192,6 +228,30 @@ def test_sterile_case_b_underground_evolutor_is_finite_and_unitary():
     assert U.shape == (4, 4)
     assert torch.all(torch.isfinite(U.real)) and torch.all(torch.isfinite(U.imag))
     assert torch.max(_unitarity_error(U)) < 5.0e-10
+
+
+def test_sterile_case_a_analytic_eigenvalues_flag_matches_default():
+    # N=4 now uses the closed-form Ferrari solver
+    # (core.perturbative.spectral._hamiltonian_traceless_eigenvalues_ferrari),
+    # not a silent eigvalsh fallback. It is an independent computation
+    # composed over several trajectory segments, so it need not be
+    # bit-identical to the eigvalsh-based default -- only physically
+    # equivalent to a tight tolerance.
+    profile = _two_shell_profile()
+    oscillation = _sterile_oscillation()
+
+    kwargs = dict(
+        profile_earth=profile,
+        oscillation=oscillation,
+        E=torch.tensor(1000.0, device=DEVICE, dtype=DTYPE),
+        eta=torch.tensor(0.40, device=DEVICE, dtype=DTYPE),
+        depth_m=DEPTH_SURFACE_M,
+        reunitarize=True,
+    )
+    U_default = earth_evolutor(**kwargs)
+    U_flagged = earth_evolutor(**kwargs, analytic_eigenvalues=True)
+
+    assert_close(U_flagged, U_default, atol=1.0e-5, rtol=1.0e-5, name="N=4 Ferrari flag matches eigvalsh default")
 
 
 def test_energy_eta_grid_output_shape_and_identity_region():

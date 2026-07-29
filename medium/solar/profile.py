@@ -502,10 +502,12 @@ class SolarProfile:
     ) -> Tensor:
         """Reduce per-radius mass-basis weights against a production distribution.
 
-        Used identically by the adiabatic (``Tei``) and numerical mass-weight
-        computations in ``medium.solar.probability``, which both produce
-        ``weights_r`` on this profile's ``production_radius`` grid in the
-        same ``(..., n_r, N)`` shape convention.
+        Used identically by the adiabatic (``medium.solar.adiabatic``) and
+        numerical (``medium.solar.evolutor.mass_weights_numerical``)
+        mass-weight computations dispatched from
+        ``medium.solar.probability.solar_probability_mass``, which all
+        produce ``weights_r`` on this profile's ``production_radius`` grid
+        in the same ``(..., n_r, N)`` shape convention.
 
         ``self.production_measure`` selects how ``fractions`` reduce over
         radius (see the class docstring):

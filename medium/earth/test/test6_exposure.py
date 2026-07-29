@@ -121,6 +121,20 @@ def test_make_eta_grid_endpoints_and_sorted():
     assert torch.all(torch.diff(eta_full) > 0)
 
 
+@pytest.mark.parametrize("ns", [0, 1])
+def test_make_eta_grid_rejects_degenerate_ns(ns):
+    # A single-point (or empty) grid has no spacing; downstream consumers
+    # like earth_probability_exposure need eta[1] - eta[0] and would
+    # otherwise fail with a raw, confusing IndexError instead.
+    with pytest.raises(ValueError, match="at least 2"):
+        make_eta_grid(ns, device=DEVICE, dtype=DTYPE)
+
+
+def test_exposure_parameters_rejects_degenerate_exposure_ns():
+    with pytest.raises(ValueError, match="exposure_ns must be at least 2"):
+        ExposureParameters(detector_latitude_rad=0.5, exposure_ns=1)
+
+
 def test_csqrt_real_and_negative_branch():
     positive = csqrt(torch.tensor(4.0, device=DEVICE, dtype=DTYPE))
     negative = csqrt(torch.tensor(-4.0, device=DEVICE, dtype=DTYPE))
@@ -437,6 +451,101 @@ def test_earth_probability_exposure_chunk_eta_matches_full_batch():
     assert_close(P_chunked, P_full, atol=1.0e-10, rtol=1.0e-10, name="chunked eta integration matches full-batch result")
 
 
+def test_earth_probability_exposure_numerical_scalar_energy_sums_to_one():
+    """method="numerical" used to loop scalar-by-scalar over (energy, eta)
+    pairs because build_earth_trajectory only accepted a scalar eta; now it
+    batches the full grid in one call, same as method="analytical"."""
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
+
+    P_int = earth_probability_exposure(
+        weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+        method="numerical", massbasis=True, exposure=exposure, context=ctx, normalized_exposure=True,
+        nsteps=30,
+    )
+
+    assert P_int.shape == (3,)
+    assert_close(torch.sum(P_int), torch.tensor(1.0, dtype=DTYPE), atol=1.0e-8, rtol=1.0e-8,
+                 name="numerical normalized-exposure-averaged probabilities sum to one")
+
+
+def test_earth_probability_exposure_numerical_vector_energy_preserves_dimension():
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
+    E = torch.tensor([800.0, 2000.0], device=DEVICE, dtype=DTYPE)
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
+
+    P_int = earth_probability_exposure(
+        weights, profile, oscillation, E, DEPTH_SURFACE_M,
+        method="numerical", massbasis=True, exposure=exposure, context=ctx, nsteps=30,
+    )
+
+    assert P_int.shape == (2, 3)
+    assert torch.all(torch.isfinite(P_int))
+
+
+def test_earth_probability_exposure_numerical_chunk_eta_matches_full_batch():
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
+
+    P_full = earth_probability_exposure(
+        weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+        method="numerical", massbasis=True, exposure=exposure, context=ctx, chunk_eta=None, nsteps=30,
+    )
+    P_chunked = earth_probability_exposure(
+        weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+        method="numerical", massbasis=True, exposure=exposure, context=ctx, chunk_eta=3, nsteps=30,
+    )
+
+    assert_close(P_chunked, P_full, atol=1.0e-10, rtol=1.0e-10, name="chunked eta numerical integration matches full-batch result")
+
+
+def test_earth_probability_exposure_numerical_matches_analytical():
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
+
+    P_analytical = earth_probability_exposure(
+        weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+        method="analytical", massbasis=True, exposure=exposure, context=ctx,
+    )
+    P_numerical = earth_probability_exposure(
+        weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+        method="numerical", massbasis=True, exposure=exposure, context=ctx, nsteps=200,
+    )
+
+    assert_close(P_numerical, P_analytical, atol=5.0e-4, rtol=5.0e-4, name="numerical exposure matches analytical")
+
+
+def test_earth_probability_exposure_numerical_rejects_reunitarize():
+    """reunitarize is only meaningful for method="analytical"; the numerical
+    branch used to silently drop it instead of forwarding it to
+    earth_probability_state, which is where the "has no effect" check
+    actually lives."""
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    weights = torch.tensor([0.5, 0.3, 0.2], device=DEVICE, dtype=DTYPE)
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
+
+    with pytest.raises(ValueError, match="reunitarize=True has no effect"):
+        earth_probability_exposure(
+            weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+            method="numerical", massbasis=True, exposure=exposure, context=ctx, nsteps=30,
+            reunitarize=True,
+        )
+
+
 def test_earth_probability_exposure_rejects_invalid_method():
     profile = _two_shell_profile()
     oscillation = _oscillation()
@@ -449,3 +558,49 @@ def test_earth_probability_exposure_rejects_invalid_method():
             weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
             method="bogus", massbasis=True, exposure=exposure, context=ctx,
         )
+
+
+def test_earth_probability_exposure_rejects_nonuniform_eta_grid(monkeypatch):
+    # earth_probability_exposure integrates with a single shared 'deta'
+    # (a rectangle-sum rule matching legacy peanuts, see the module
+    # docstring); a non-uniform eta grid must be rejected rather than
+    # silently integrated with the wrong spacing. None of the built-in
+    # exposure sources actually produce a non-uniform grid, so this is
+    # exercised by monkeypatching build_nadir_exposure directly.
+    import tpeanuts.medium.earth.exposure_integration as exposure_integration_module
+
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    weights = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=DTYPE)
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=0.5, exposure_ns=9, exposure_use_cache=False)
+
+    nonuniform_eta = torch.tensor([0.0, 0.1, 0.35, 0.9, math.pi], device=DEVICE, dtype=DTYPE)
+    nonuniform_table = NadirExposureTable(eta=nonuniform_eta, exposure=torch.ones_like(nonuniform_eta))
+    monkeypatch.setattr(
+        exposure_integration_module, "build_nadir_exposure", lambda **kwargs: nonuniform_table
+    )
+
+    with pytest.raises(ValueError, match="uniformly spaced"):
+        earth_probability_exposure(
+            weights, profile, oscillation, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), DEPTH_SURFACE_M,
+            method="analytical", massbasis=True, exposure=exposure, context=ctx,
+        )
+
+
+def test_prepare_nadir_exposure_math_source_is_always_normalized():
+    # build_nadir_exposure defaults to normalized=False (config.
+    # earth_normalized_exposure); prepare_nadir_exposure must still return a
+    # normalized table for the "math"/"cache"/"legacy"/"csv" branch, matching
+    # both its own docstring and its "normalized": True metadata.
+    ctx = RuntimeContext.resolve(DEVICE, DTYPE)
+    exposure = ExposureParameters(detector_latitude_rad=LATITUDE_RAD, exposure_ns=15, exposure_use_cache=False)
+
+    eta_grid, exposure_weights, meta = prepare_nadir_exposure(None, exposure=exposure, context=ctx)
+
+    integral = torch.trapezoid(exposure_weights, x=eta_grid)
+    assert_close(
+        integral, torch.tensor(1.0, dtype=DTYPE), atol=1.0e-8, rtol=1.0e-8,
+        name="math-source exposure from prepare_nadir_exposure is normalized",
+    )
+    assert meta["normalized"] is True

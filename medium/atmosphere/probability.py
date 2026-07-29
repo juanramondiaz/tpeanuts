@@ -111,6 +111,8 @@ def atmosphere_probability_transition(
     atmosphere: Optional[AtmosphereParameters] = None,
     context: Optional[RuntimeContext] = None,
     legacy_precision: bool = False,
+    analytic_eigenvalues: bool = False,
+    reunitarize: bool = False,
 ) -> torch.Tensor:
     """
     Compute all atmosphere flavour-transition probabilities.
@@ -128,6 +130,16 @@ def atmosphere_probability_transition(
             from the tensor inputs.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in atmosphere propagation.
+        analytic_eigenvalues: If True, compute the analytical evolutor's
+            eigenvalues with the closed-form Cardano/Ferrari solution
+            instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Only
+            meaningful with ``method="analytical"``; raises if combined with
+            ``method="numerical"``.
+        reunitarize: If True, project the atmosphere evolutor onto the
+            nearest unitary matrix (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Applies to
+            either method.
 
     Returns:
         Real tensor ``P=|S_atm|^2`` with shape ``(..., N, N)``, N in {3, 4}.
@@ -143,6 +155,8 @@ def atmosphere_probability_transition(
         method=method,
         context=context,
         legacy_precision=legacy_precision,
+        analytic_eigenvalues=analytic_eigenvalues,
+        reunitarize=reunitarize,
     )
 
     return probability_transition(S_atm, real_dtype=context.dtype if context is not None else None)
@@ -162,6 +176,8 @@ def atmosphere_probability_state(
     atmosphere: Optional[AtmosphereParameters] = None,
     context: Optional[RuntimeContext] = None,
     legacy_precision: bool = False,
+    analytic_eigenvalues: bool = False,
+    reunitarize: bool = False,
 ) -> torch.Tensor:
     """
     Compute final atmosphere-surface flavour probabilities.
@@ -186,6 +202,15 @@ def atmosphere_probability_state(
             from the tensor inputs.
         legacy_precision: If True, use the legacy peanuts matter-potential
             prefactor in atmosphere propagation.
+        analytic_eigenvalues: If True, use the closed-form Cardano/Ferrari
+            eigenvalues instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Only
+            meaningful with ``method="analytical"``; raises if combined with
+            ``method="numerical"``.
+        reunitarize: If True, project the atmosphere evolutor onto the
+            nearest unitary matrix (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Applies to
+            either method.
 
     Returns:
         Real tensor of final flavour probabilities at the Earth surface, with
@@ -208,6 +233,8 @@ def atmosphere_probability_state(
         method=method,
         context=resolved_context,
         legacy_precision=legacy_precision,
+        analytic_eigenvalues=analytic_eigenvalues,
+        reunitarize=reunitarize,
     )
 
     if massbasis:
@@ -251,6 +278,8 @@ def atmosphere_probability_integrated(
     integrate_height: bool = False,
     height_weight: TensorLike | None = None,
     height_dim: int = -2,
+    analytic_eigenvalues: bool = False,
+    reunitarize: bool = False,
 ) -> torch.Tensor:
     """Average final atmosphere flavour probabilities over energy.
 
@@ -290,6 +319,13 @@ def atmosphere_probability_integrated(
             ``integrate_height=True``.
         height_dim: Axis holding the height grid at the time the height
             reduction runs.
+        analytic_eigenvalues: If True, use the closed-form Cardano/Ferrari
+            eigenvalues instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Only
+            meaningful with ``method="analytical"``; raises if combined with
+            ``method="numerical"``.
+        reunitarize: If True, project the atmosphere evolutor onto the
+            nearest unitary matrix. Applies to either method.
 
     Returns:
         Probability tensor with the energy axis removed, and the height
@@ -307,6 +343,8 @@ def atmosphere_probability_integrated(
         atmosphere=atmosphere,
         context=context,
         legacy_precision=legacy_precision,
+        analytic_eigenvalues=analytic_eigenvalues,
+        reunitarize=reunitarize,
     )
 
     result = probability_integrated(result, E_MeV, spectrum, energy_dim=energy_dim)
@@ -339,6 +377,8 @@ def atmosphere_probability_integrated_angular(
     context: Optional[RuntimeContext] = None,
     legacy_precision: bool = False,
     angular_dim: int = -2,
+    analytic_eigenvalues: bool = False,
+    reunitarize: bool = False,
 ) -> torch.Tensor:
     """Average final atmosphere flavour probabilities over the full zenith range.
 
@@ -364,6 +404,13 @@ def atmosphere_probability_integrated_angular(
             prefactor in atmosphere propagation.
         angular_dim: Axis of the resulting probability tensor holding the
             angle grid.
+        analytic_eigenvalues: If True, use the closed-form Cardano/Ferrari
+            eigenvalues instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Only
+            meaningful with ``method="analytical"``; raises if combined with
+            ``method="numerical"``.
+        reunitarize: If True, project the atmosphere evolutor onto the
+            nearest unitary matrix. Applies to either method.
 
     Returns:
         Solid-angle-weighted average probability, with the angular axis
@@ -381,6 +428,8 @@ def atmosphere_probability_integrated_angular(
         atmosphere=atmosphere,
         context=context,
         legacy_precision=legacy_precision,
+        analytic_eigenvalues=analytic_eigenvalues,
+        reunitarize=reunitarize,
     )
 
     return probability_integrated_angular(probabilities, theta_deg, angular_dim=angular_dim)
@@ -402,6 +451,8 @@ def atmosphere_probability_integrated_height(
     context: Optional[RuntimeContext] = None,
     legacy_precision: bool = False,
     height_dim: int = -2,
+    analytic_eigenvalues: bool = False,
+    reunitarize: bool = False,
 ) -> torch.Tensor:
     """Average final atmosphere flavour probabilities over production height.
 
@@ -433,6 +484,13 @@ def atmosphere_probability_integrated_height(
             prefactor in atmosphere propagation.
         height_dim: Axis of the resulting probability tensor holding the
             height grid.
+        analytic_eigenvalues: If True, use the closed-form Cardano/Ferrari
+            eigenvalues instead of ``torch.linalg.eigvalsh`` (see
+            ``medium.atmosphere.evolutor.atmosphere_evolutor``). Only
+            meaningful with ``method="analytical"``; raises if combined with
+            ``method="numerical"``.
+        reunitarize: If True, project the atmosphere evolutor onto the
+            nearest unitary matrix. Applies to either method.
 
     Returns:
         Production-flux-weighted average probability, with the height axis
@@ -450,6 +508,8 @@ def atmosphere_probability_integrated_height(
         atmosphere=atmosphere,
         context=context,
         legacy_precision=legacy_precision,
+        analytic_eigenvalues=analytic_eigenvalues,
+        reunitarize=reunitarize,
     )
 
     return probability_weighted_average(

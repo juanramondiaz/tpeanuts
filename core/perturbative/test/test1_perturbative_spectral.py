@@ -30,6 +30,7 @@ from tpeanuts.core.perturbative.spectral import (
     hamiltonian_traceless_c0,
     hamiltonian_traceless_c1,
     hamiltonian_traceless_e3,
+    hamiltonian_traceless_e4,
     hamiltonian_traceless_eigenvalues,
     spectral_projector_residuals,
     _spectral_degeneracy_mask,
@@ -116,6 +117,180 @@ def test_traceless_eigenvalues_reject_nan_or_inf():
 
     with pytest.raises(FloatingPointError, match="NaN or Inf"):
         hamiltonian_traceless_eigenvalues(T)
+
+
+# ---------------------------------------------------------------------------
+# Analytic (Cardano) eigenvalues, N=3
+# ---------------------------------------------------------------------------
+
+def test_traceless_eigenvalues_analytic_matches_eigvalsh():
+    H = make_hermitian()
+    T, _ = hamiltonian_traceless(H)
+
+    lam_analytic = hamiltonian_traceless_eigenvalues(T, analytic=True)
+    lam_numeric = hamiltonian_traceless_eigenvalues(T, analytic=False)
+
+    assert lam_analytic.shape == (3,)
+    assert torch.isfinite(lam_analytic.real).all()
+    assert_close(lam_analytic, lam_numeric, name="Cardano vs eigvalsh eigenvalues")
+    assert_close(
+        lam_analytic.sum(), torch.zeros((), device=DEVICE, dtype=CDTYPE),
+        name="Cardano sum eigenvalues",
+    )
+
+
+def test_traceless_eigenvalues_analytic_matches_eigvalsh_batched():
+    H0 = make_hermitian()
+    H = torch.stack([H0, 1.7 * H0 + 0.2 * eye3(), 0.05 * H0], dim=0)
+    T, _ = hamiltonian_traceless(H)
+
+    lam_analytic = hamiltonian_traceless_eigenvalues(T, analytic=True)
+    lam_numeric = hamiltonian_traceless_eigenvalues(T, analytic=False)
+
+    assert lam_analytic.shape == (3, 3)
+    assert_close(lam_analytic, lam_numeric, name="batched Cardano vs eigvalsh eigenvalues")
+
+
+def test_traceless_eigenvalues_analytic_zero_matrix():
+    T = torch.zeros((3, 3), device=DEVICE, dtype=CDTYPE)
+
+    lam = hamiltonian_traceless_eigenvalues(T, analytic=True)
+
+    assert_close(lam, torch.zeros(3, device=DEVICE, dtype=CDTYPE), name="Cardano zero-matrix eigenvalues")
+
+
+def test_traceless_eigenvalues_analytic_reuses_precomputed_invariants():
+    H = make_hermitian()
+    T, _ = hamiltonian_traceless(H)
+    c1 = hamiltonian_traceless_c1(T)
+    c0 = hamiltonian_traceless_c0(T)
+
+    lam_precomputed = hamiltonian_traceless_eigenvalues(T, analytic=True, c1=c1, c0=c0)
+    lam_recomputed = hamiltonian_traceless_eigenvalues(T, analytic=True)
+
+    assert_close(lam_precomputed, lam_recomputed, name="Cardano with precomputed c1/c0")
+
+
+def test_traceless_eigenvalues_analytic_ferrari_matches_eigvalsh_n4():
+    H = make_hermitian4(seed=2)
+    T, _ = hamiltonian_traceless(H)
+
+    lam_ferrari = hamiltonian_traceless_eigenvalues(T, analytic=True)
+    lam_numeric = hamiltonian_traceless_eigenvalues(T, analytic=False)
+
+    # N=4 now uses the closed-form Ferrari solver
+    # (_hamiltonian_traceless_eigenvalues_ferrari), not a silent eigvalsh
+    # fallback; it should independently reproduce eigvalsh to floating-point
+    # precision.
+    assert lam_ferrari.shape == (4,)
+    assert torch.isfinite(lam_ferrari.real).all()
+    assert_close(lam_ferrari, lam_numeric, name="Ferrari vs eigvalsh eigenvalues")
+    assert_close(
+        lam_ferrari.sum(), torch.zeros((), device=DEVICE, dtype=CDTYPE),
+        name="Ferrari sum eigenvalues",
+    )
+
+
+@pytest.mark.parametrize("seed", range(10))
+def test_traceless_eigenvalues_ferrari_matches_eigvalsh_batched_and_random(seed):
+    H0 = make_hermitian4(seed=seed)
+    H = torch.stack([H0, 1.7 * H0 + 0.2 * eye4(), 0.05 * H0], dim=0)
+    T, _ = hamiltonian_traceless(H)
+
+    lam_ferrari = hamiltonian_traceless_eigenvalues(T, analytic=True)
+    lam_numeric = hamiltonian_traceless_eigenvalues(T, analytic=False)
+
+    assert lam_ferrari.shape == (3, 4)
+    assert_close(lam_ferrari, lam_numeric, name=f"batched Ferrari vs eigvalsh eigenvalues (seed={seed})")
+
+
+def test_traceless_eigenvalues_ferrari_zero_matrix():
+    T = torch.zeros((4, 4), device=DEVICE, dtype=CDTYPE)
+
+    lam = hamiltonian_traceless_eigenvalues(T, analytic=True)
+
+    assert torch.isfinite(lam.real).all()
+    assert_close(lam, torch.zeros(4, device=DEVICE, dtype=CDTYPE), name="Ferrari zero-matrix eigenvalues")
+
+
+def test_traceless_eigenvalues_ferrari_reuses_precomputed_invariants():
+    H = make_hermitian4(seed=3)
+    T, _ = hamiltonian_traceless(H)
+    c1 = hamiltonian_traceless_c1(T)
+    e3 = hamiltonian_traceless_e3(T)
+    e4 = hamiltonian_traceless_e4(T)
+
+    lam_precomputed = hamiltonian_traceless_eigenvalues(T, analytic=True, c1=c1, e3=e3, e4=e4)
+    lam_recomputed = hamiltonian_traceless_eigenvalues(T, analytic=True)
+
+    assert_close(lam_precomputed, lam_recomputed, name="Ferrari with precomputed c1/e3/e4")
+
+
+def test_traceless_eigenvalues_ferrari_handles_paired_degenerate_spectrum():
+    """lambda = (4, 1, -2, -3) is the hand-worked example from the Ferrari
+    docstring; lambda = (a, a, -a, -a) is the "symmetric pairing" case where
+    two of the three resolvent-cubic roots collapse to zero, which the
+    largest-root selection must route around (see the function docstring)."""
+    for lam_expected in (
+        torch.tensor([4.0, 1.0, -2.0, -3.0], device=DEVICE, dtype=DTYPE),
+        torch.tensor([2.5, 2.5, -2.5, -2.5], device=DEVICE, dtype=DTYPE),
+    ):
+        T = torch.diag(lam_expected).to(dtype=CDTYPE)
+
+        lam = hamiltonian_traceless_eigenvalues(T, analytic=True)
+
+        assert_close(
+            torch.sort(lam.real).values, torch.sort(lam_expected).values,
+            name=f"Ferrari hand-worked spectrum {lam_expected.tolist()}",
+        )
+
+
+def test_hamiltonian_traceless_e4_matches_det_and_hand_worked_example():
+    lam_expected = torch.tensor([4.0, 1.0, -2.0, -3.0], device=DEVICE, dtype=DTYPE)
+    T = torch.diag(lam_expected).to(dtype=CDTYPE)
+
+    e4 = hamiltonian_traceless_e4(T)
+
+    assert_close(e4.real, torch.tensor(24.0, device=DEVICE, dtype=DTYPE), name="e4 hand-worked value")
+    assert_close(e4, torch.linalg.det(T), name="e4 == det(T)")
+
+    H = make_hermitian4(seed=4)
+    T_random, _ = hamiltonian_traceless(H)
+    assert_close(
+        hamiltonian_traceless_e4(T_random), torch.linalg.det(T_random),
+        name="e4 == det(T) for a random traceless Hamiltonian",
+    )
+
+
+def test_hamiltonian_spectral_data_analytic_eigenvalues_matches_default():
+    H = make_hermitian()
+
+    data_numeric = hamiltonian_spectral_data(H, analytic_eigenvalues=False)
+    data_analytic = hamiltonian_spectral_data(H, analytic_eigenvalues=True)
+
+    assert_close(data_analytic["lam"], data_numeric["lam"], name="spectral data Cardano eigenvalues")
+    assert_close(data_analytic["M"], data_numeric["M"], name="spectral data Cardano projectors")
+
+    residuals = spectral_projector_residuals(data_analytic["M"], data_analytic["T"], data_analytic["lam"])
+    tol = 1.0e-10
+    for name, value in residuals.items():
+        assert float(value) < tol, f"{name} residual too large: {float(value):.3e}"
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_hamiltonian_spectral_data_analytic_eigenvalues_matches_default_n4(seed):
+    H = make_hermitian4(seed=seed)
+
+    data_numeric = hamiltonian_spectral_data(H, analytic_eigenvalues=False)
+    data_analytic = hamiltonian_spectral_data(H, analytic_eigenvalues=True)
+
+    assert_close(data_analytic["lam"], data_numeric["lam"], name=f"N=4 spectral data Ferrari eigenvalues (seed={seed})")
+    assert_close(data_analytic["M"], data_numeric["M"], name=f"N=4 spectral data Ferrari projectors (seed={seed})")
+
+    residuals = spectral_projector_residuals(data_analytic["M"], data_analytic["T"], data_analytic["lam"])
+    tol = 1.0e-9
+    for name, value in residuals.items():
+        assert float(value) < tol, f"{name} residual too large: {float(value):.3e}"
 
 
 def test_spectral_projectors_are_complete_orthogonal_and_reconstruct_T():
