@@ -99,7 +99,6 @@ from tpeanuts.util.type import (
 )
 
 
-@torch.no_grad()
 def atmosphere_probability_transition(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -162,7 +161,6 @@ def atmosphere_probability_transition(
     return probability_transition(S_atm, real_dtype=context.dtype if context is not None else None)
 
 
-@torch.no_grad()
 def atmosphere_probability_state(
     nustate: TensorLike,
     oscillation: OscillationParameters,
@@ -257,7 +255,6 @@ def atmosphere_probability_state(
     )
 
 
-@torch.no_grad()
 def atmosphere_probability_integrated(
     nustate: TensorLike,
     oscillation: OscillationParameters,
@@ -362,7 +359,6 @@ def atmosphere_probability_integrated(
     return result
 
 
-@torch.no_grad()
 def atmosphere_probability_integrated_angular(
     nustate: TensorLike,
     oscillation: OscillationParameters,
@@ -435,7 +431,6 @@ def atmosphere_probability_integrated_angular(
     return probability_integrated_angular(probabilities, theta_deg, angular_dim=angular_dim)
 
 
-@torch.no_grad()
 def atmosphere_probability_integrated_height(
     nustate: TensorLike,
     oscillation: OscillationParameters,

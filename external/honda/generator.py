@@ -79,7 +79,7 @@ from tpeanuts.medium.atmosphere.geometry import (
     alpha_surface_to_theta_detector,
     theta_detector_to_alpha_surface,
 )
-from tpeanuts.medium.atmosphere.io import (
+from tpeanuts.source.atmosphere.io import (
     build_angle_output_path,
     OutputConfig,
     save_phi_Eh_theta_result,
@@ -181,7 +181,7 @@ def generate_flux_for_particle_angle(
     f(h|E,alpha) (see module docstring) from the loaded Honda tables, forms
     Phi(E,h) = Phi(E; X_obs) * f(h|E,alpha), and optionally saves the
     result as a tpeanuts torch flux file using
-    ``medium.atmosphere.io.save_phi_Eh_theta_result``.
+    ``sources.atmosphere.io.save_phi_Eh_theta_result``.
 
     Args:
         particle: tpeanuts particle/flavour name (e.g. "numu", "antinue").

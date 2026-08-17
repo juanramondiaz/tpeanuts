@@ -34,7 +34,8 @@ from tpeanuts.medium.solar.evolutor import (
     solar_evolutor_numerical_history,
 )
 from tpeanuts.medium.solar.adiabatic import mass_weights_adiabatic_approximated
-from tpeanuts.medium.solar.profile import build_solar_profile
+from tpeanuts.medium.solar.profile import build_solar_medium
+from tpeanuts.source.solar import build_solar_source
 from tpeanuts.util.context import RuntimeContext
 
 
@@ -60,44 +61,45 @@ def make_sterile_oscillation(*, context: RuntimeContext | None = None) -> Oscill
     )
 
 
-def make_profile():
-    return build_solar_profile(None, context=make_context())
+def make_medium_source():
+    context = make_context()
+    return build_solar_medium(None, context=context), build_solar_source(None, context=context)
 
 
 def test_build_solar_trajectory_covers_full_density_range_and_matches_production_points():
-    profile = make_profile()
+    medium, source = make_medium_source()
 
-    trajectory = build_solar_trajectory(profile)
+    trajectory = build_solar_trajectory(medium, source.production_radius)
 
     # Every boundary point is unique and sorted.
     assert bool(torch.all(torch.diff(trajectory.x) > 0.0))
     # The merged grid spans (at least) the full density table's own range,
     # not just the narrower production-point range.
-    assert float(trajectory.x[0]) <= float(profile.radius[0])
-    assert float(trajectory.x[-1]) >= float(profile.radius[-1])
+    assert float(trajectory.x[0]) <= float(medium.radius[0])
+    assert float(trajectory.x[-1]) >= float(medium.radius[-1])
     # Some providers tabulate production only in the core (strictly shorter
     # than the density grid); SF-III tabulates both products through r=1.
-    assert float(trajectory.x[-1]) >= float(profile.production_radius[-1])
+    assert float(trajectory.x[-1]) >= float(source.production_radius[-1])
     # Every production point is an *exact* boundary of the merged grid.
     production_index = trajectory.meta["production_index"]
     torch.testing.assert_close(
-        trajectory.x[production_index], profile.production_radius, rtol=0.0, atol=0.0,
+        trajectory.x[production_index], source.production_radius, rtol=0.0, atol=0.0,
     )
 
 
 def test_build_solar_trajectory_uses_full_radius_and_production_radius():
-    profile = make_profile()
-    trajectory = build_solar_trajectory(profile)
-    assert trajectory.x[0] == profile.radius[0]
-    assert trajectory.x[-1] == profile.radius[-1]
+    medium, source = make_medium_source()
+    trajectory = build_solar_trajectory(medium, source.production_radius)
+    assert trajectory.x[0] == medium.radius[0]
+    assert trajectory.x[-1] == medium.radius[-1]
 
 
 def test_solar_evolutor_numerical_history_is_unitary():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    S_history, trajectory = solar_evolutor_numerical_history(oscillation, energy, profile)
+    S_history, trajectory = solar_evolutor_numerical_history(oscillation, energy, medium, source.production_radius)
 
     assert S_history.shape[0] == 3
     assert S_history.shape[-2:] == (3, 3)
@@ -115,12 +117,12 @@ def test_solar_evolutor_numerical_history_is_unitary():
 
 def test_solar_evolutor_numerical_shape_and_unitarity():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    S = solar_evolutor_numerical(oscillation, energy, profile)
+    S = solar_evolutor_numerical(oscillation, energy, medium, source.production_radius)
 
-    assert S.shape == (3, profile.production_radius.numel(), 3, 3)
+    assert S.shape == (3, source.production_radius.numel(), 3, 3)
     identity = torch.eye(3, device=DEVICE, dtype=torch.complex128)
     unitarity_error = (S.conj().transpose(-1, -2) @ S - identity).abs().max()
     assert float(unitarity_error) < 1.0e-8
@@ -128,12 +130,12 @@ def test_solar_evolutor_numerical_shape_and_unitarity():
 
 def test_solar_evolutor_numerical_sterile_shape_and_unitarity():
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([5.0], device=DEVICE, dtype=DTYPE)
 
-    S = solar_evolutor_numerical(oscillation, energy, profile)
+    S = solar_evolutor_numerical(oscillation, energy, medium, source.production_radius)
 
-    assert S.shape == (1, profile.production_radius.numel(), 4, 4)
+    assert S.shape == (1, source.production_radius.numel(), 4, 4)
     identity = torch.eye(4, device=DEVICE, dtype=torch.complex128)
     unitarity_error = (S.conj().transpose(-1, -2) @ S - identity).abs().max()
     assert float(unitarity_error) < 1.0e-6
@@ -141,26 +143,38 @@ def test_solar_evolutor_numerical_sterile_shape_and_unitarity():
 
 def test_solar_evolutor_numerical_include_matter_nc_requires_density_n():
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
-    profile.density_n = None
+    medium, source = make_medium_source()
+    medium.density_n = None
     energy = torch.tensor([5.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="density_n"):
-        solar_evolutor_numerical(oscillation, energy, profile, include_matter_nc=True)
+        solar_evolutor_numerical(oscillation, energy, medium, source.production_radius, include_matter_nc=True)
 
 
 def test_mass_weights_numerical_shape_and_normalization():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    weights = mass_weights_numerical(oscillation, energy, profile)
+    weights = mass_weights_numerical(oscillation, energy, medium, source.production_radius)
 
-    assert weights.shape == (3, profile.production_radius.numel(), 3)
+    assert weights.shape == (3, source.production_radius.numel(), 3)
     assert torch.isfinite(weights).all()
     torch.testing.assert_close(
         weights.sum(dim=-1), torch.ones_like(weights[..., 0]), rtol=1.0e-6, atol=1.0e-6,
     )
+
+
+def test_solar_evolutor_numerical_preserves_autograd_graph():
+    oscillation = make_oscillation()
+    medium, source = make_medium_source()
+    energy = torch.tensor([5.0], device=DEVICE, dtype=DTYPE, requires_grad=True)
+
+    weights = mass_weights_numerical(oscillation, energy, medium, source.production_radius)
+    weights[..., 0].mean().backward()
+
+    assert energy.grad is not None
+    assert torch.isfinite(energy.grad).all()
 
 
 def test_mass_weights_numerical_matches_adiabatic_approximated_at_production_points_in_sm_limit():
@@ -170,14 +184,14 @@ def test_mass_weights_numerical_matches_adiabatic_approximated_at_production_poi
     # not exact, and the numerical path adds its own trajectory-discretization
     # error on top.
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    weights_numerical = mass_weights_numerical(oscillation, energy, profile)
+    weights_numerical = mass_weights_numerical(oscillation, energy, medium, source.production_radius)
     weights_adiabatic = mass_weights_adiabatic_approximated(
         oscillation,
         energy[:, None],
-        profile.electron_density(profile.production_radius)[None, :],
+        medium.electron_density(source.production_radius)[None, :],
     )
 
     assert weights_numerical.shape == weights_adiabatic.shape

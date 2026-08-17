@@ -654,10 +654,30 @@ def hamiltonian_spectral_projectors_traceless(
     replaced wholesale by ``M_a = v_a v_a^dagger`` built from a single
     ``torch.linalg.eigh(T)`` call -- exact and stable by construction,
     independent of the closed-form formula's conditioning. This eigh call is
-    only made when at least one batch entry needs it. The module runs under
-    ``@torch.no_grad()`` (see ``core/perturbative/evolutor.py``), so the
-    well-known gradient instability of degenerate eigenvectors does not
-    apply here.
+    only made when at least one batch entry needs it.
+
+    **Gradient note (2026-08, no longer no_grad-protected):** this module
+    and its callers (``core/perturbative/evolutor.py``) used to run entirely
+    under ``@torch.no_grad()``. That decorator has since been removed (along
+    with 10 others across ``medium.atmosphere``/``core.numerical.evolutor``/
+    ``core.common.evolutor``) to enable direct-gradient fits through matter
+    propagation. The non-degenerate closed-form ``M_a`` path above (a
+    polynomial in ``T``/``lam``) has been verified end-to-end through
+    ``medium.atmosphere.probability.atmosphere_probability_state`` (matter,
+    method="analytical") against a central finite-difference derivative --
+    autograd and finite differences agree to ~8 significant figures for
+    d(P)/d(theta12)/d(theta13) at a representative (non-degenerate)
+    benchmark point. (An earlier version of this note reported a spurious
+    near-zero gradient; that was a test-methodology artifact -- summing a
+    quantity that is analytically constant regardless of theta, such as
+    ``lam.sum()`` (== tr(T) == 0 by construction) or a bare probability sum
+    (== 1 by unitarity), rather than a genuine bug.) The
+    ``torch.linalg.eigh`` degeneracy fallback just below, used only for
+    batch entries with a nearly degenerate spectrum, has *not* been
+    separately gradient-verified -- raw eigenvector-based projectors are the
+    textbook case where autograd gradients become unstable near degenerate
+    eigenvalues, and no test here currently exercises that branch under
+    gradient tracking.
 
     Args:
         T: Traceless Hermitian Hamiltonian tensor shaped (..., N, N), N in {3, 4}.

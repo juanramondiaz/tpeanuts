@@ -417,7 +417,6 @@ class PMNS(torch.nn.Module, abc.ABC):
         """
         raise NotImplementedError
 
-    @torch.no_grad()
     def select_antinu(
         self,
         U: torch.Tensor,
@@ -481,7 +480,6 @@ class PMNS(torch.nn.Module, abc.ABC):
         """
         raise NotImplementedError
 
-    @torch.no_grad()
     def flavour_basis(
         self,
         operator_reduced: torch.Tensor,

@@ -17,23 +17,28 @@
 # =============================================================================
 
 """
-Torch-native solar neutrino utilities.
+Torch-native solar neutrino propagation utilities.
 
 This package implements the incoherent (adiabatic, MSW-resonance) treatment
-of solar neutrino propagation: electron neutrinos are assumed to be produced
-in the solar interior, project onto matter-modified mass eigenstates that
-evolve adiabatically as the electron density drops from the production
-point to the solar surface, and then propagate to Earth as an incoherent
-mixture of vacuum mass eigenstates.
+of solar neutrino propagation: electron neutrinos are produced in the solar
+interior (``source.solar.SolarNeutrinoSource``, production physics), project
+onto matter-modified mass eigenstates that evolve adiabatically as the
+electron density drops from the production point to the solar surface
+(this package, propagation physics), and then propagate to Earth as an
+incoherent mixture of vacuum mass eigenstates. Every probability/flux
+function here takes a ``medium`` (this package's ``SolarMediumProfile``) and
+a ``source`` (``source.solar.SolarNeutrinoSource``) as two separate
+arguments; this package depends on ``source.solar``, never the reverse.
 
 Submodules:
     medium.solar.io
-        CSV loaders for the configured solar model, source fluxes,
-        production spectra, and Sun-Earth distance table.
+        CSV loaders for the configured solar density/composition tables and
+        the Sun-Earth distance table.
     medium.solar.profile
-        SolarProfile container and interpolation helpers built on top of
-        ``medium.solar.io``. The ``use_LZ`` flag on SolarProfile enables
-        Landau-Zener corrections throughout the adiabatic pipeline.
+        SolarMediumProfile container and interpolation helpers built on top
+        of ``medium.solar.io``. ``config.solar.SolarParameters`` composes
+        ``SolarMediumParameters`` with ``source.solar.SolarSourceParameters``
+        for pipeline-level configuration.
     medium.solar.matter_mixing
         Matter-modified mixing angles theta12^M, theta13^M (MSW resonance)
         and the dimensionless matter-potential ratio V_k.
@@ -54,8 +59,8 @@ Submodules:
         This medium has no transition function (no coherent evolutor exists
         in the adiabatic solar model).
     medium.solar.flux
-        Combines ``probability.solar_probability_state`` with total source
-        fluxes and optional spectra to produce flavour-resolved solar
+        Combines ``probability.solar_probability_state`` with the source's
+        total fluxes and optional spectra to produce flavour-resolved solar
         fluxes, and integrates them over energy.
     medium.solar.validation
         Helpers comparing this package's output against the legacy peanuts
@@ -65,16 +70,15 @@ Submodules:
 
 
 from tpeanuts.medium.solar.io import (
+    load_solar_composition,
     load_solar_density,
-    load_solar_fluxes,
-    load_solar_probability,
-    load_solar_production,
-    load_spectrum_csv,
-    load_solar_spectrum,
-    solar_spectrum_path,
     solar_provider_path,
 )
-from tpeanuts.medium.solar.profile import SolarProfile, SolarSpectrum
+from tpeanuts.medium.solar.profile import (
+    SolarMediumParameters,
+    SolarMediumProfile,
+    build_solar_medium,
+)
 from tpeanuts.medium.solar.matter_mixing import (
     Vk,
     DeltamSqee,
@@ -99,16 +103,12 @@ from tpeanuts.medium.solar.probability import (
 from tpeanuts.medium.solar.flux import solar_flux_state, solar_flux_integrated
 
 __all__ = [
+    "load_solar_composition",
     "load_solar_density",
-    "load_solar_fluxes",
-    "load_solar_probability",
-    "load_solar_production",
-    "load_spectrum_csv",
-    "load_solar_spectrum",
-    "solar_spectrum_path",
     "solar_provider_path",
-    "SolarProfile",
-    "SolarSpectrum",
+    "SolarMediumParameters",
+    "SolarMediumProfile",
+    "build_solar_medium",
     "Vk",
     "DeltamSqee",
     "th13_M",

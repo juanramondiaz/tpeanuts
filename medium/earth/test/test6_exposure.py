@@ -27,14 +27,17 @@ file keeps only fast numerical sanity checks that can run automatically.
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 import torch
 
+import tpeanuts.config.default as default
 from tpeanuts.medium.earth.exposure_io import (
     _convert_csv_angle_mode,
     nadir_exposure_from_cache,
     nadir_exposure_from_csv,
+    resolve_exposure_cache_dir,
     save_nadir_exposure_to_cache,
 )
 from tpeanuts.medium.earth.exposure_math import (
@@ -331,6 +334,26 @@ def test_cache_roundtrip_save_and_load(tmp_path):
 
     assert_close(eta_loaded, eta, name="cached eta round-trips")
     assert_close(exposure_loaded, exposure, name="cached exposure round-trips")
+
+
+def test_default_exposure_cache_is_absolute_and_independent_of_cwd(tmp_path, monkeypatch):
+    expected = Path(default.earth_cache_dir)
+    assert expected.is_absolute()
+
+    monkeypatch.chdir(tmp_path)
+    configured = Path(ExposureParameters().exposure_cache_dir)
+
+    assert configured == expected
+    assert configured != tmp_path / "cache_exposure"
+
+
+def test_relative_cache_dir_is_resolved_from_package_root(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    resolved = resolve_exposure_cache_dir("data/exposure_cache_test")
+    expected = Path(__file__).resolve().parents[3] / "data" / "exposure_cache_test"
+
+    assert resolved == expected.resolve()
+    assert not (tmp_path / "data" / "exposure_cache_test").exists()
 
 
 def test_nadir_exposure_from_cache_missing_file_raises(tmp_path):

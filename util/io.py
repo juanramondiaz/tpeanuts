@@ -36,6 +36,16 @@ Module functions:
         or None.
     ensure_output_directory(...): Create an output directory if missing.
     list_torch_files(...): List and sort torch tensor files in a directory.
+    require_columns(...): Reject a table missing required columns or empty.
+    numeric_column(...): Return one finite numeric column or raise.
+    validate_radial_grid(...): Validate a canonical r/R_sun grid column.
+    validate_nonnegative_column(...): Return one finite, non-negative
+        numeric column.
+
+The last four table-validation helpers are shared by every CSV-tabulated
+physics table in the project (e.g. ``medium.solar.io``/``source.solar.io``'s
+density, composition, production, and flux tables) so the same column/value
+checks are not duplicated per loader.
 """
 
 from __future__ import annotations
@@ -44,6 +54,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import numpy as np
+import pandas as pd
 import torch
 
 import tpeanuts.config.default as default
@@ -310,3 +322,103 @@ def list_torch_files(directory: str) -> list[str]:
     files.sort()
 
     return files
+
+
+def require_columns(table: pd.DataFrame, required: set[str], *, table_name: str) -> None:
+    """
+    Reject a table that is empty or lacks canonical columns.
+
+    Args:
+        table: Loaded CSV table.
+        required: Column names that must be present.
+        table_name: Human-readable table name for error messages.
+
+    Raises:
+        ValueError: If any required column is missing or the table is empty.
+    """
+    missing = required.difference(table.columns)
+    if missing:
+        raise ValueError(
+            f"{table_name} is missing required columns: "
+            + ", ".join(sorted(missing))
+        )
+    if table.empty:
+        raise ValueError(f"{table_name} contains no data rows.")
+
+
+def numeric_column(table: pd.DataFrame, column: str, *, table_name: str) -> pd.Series:
+    """
+    Return one finite numeric column or raise a descriptive error.
+
+    Args:
+        table: Loaded CSV table.
+        column: Column name to coerce and validate.
+        table_name: Human-readable table name for error messages.
+
+    Returns:
+        The column coerced to numeric.
+
+    Raises:
+        ValueError: If the column contains non-finite or non-numeric values.
+    """
+    values = pd.to_numeric(table[column], errors="coerce")
+    if values.isna().any() or not bool(np.isfinite(values.to_numpy()).all()):
+        raise ValueError(f"{table_name} column {column!r} contains non-finite or non-numeric values.")
+    return values
+
+
+def validate_radial_grid(
+    table: pd.DataFrame,
+    *,
+    table_name: str,
+    radius_column: str = "radius",
+) -> pd.Series:
+    """
+    Validate a canonical r/R_sun grid without sorting or deduplicating it.
+
+    Args:
+        table: Loaded CSV table.
+        table_name: Human-readable table name for error messages.
+        radius_column: Name of the radial-grid column.
+
+    Returns:
+        The validated radius column.
+
+    Raises:
+        ValueError: If the radius column is too short, not strictly
+            increasing, or outside ``[0, 1]``.
+    """
+    radius = numeric_column(table, radius_column, table_name=table_name)
+    if len(radius) < 2:
+        raise ValueError(f"{table_name} radius must contain at least two points.")
+    if not bool((radius.diff().iloc[1:] > 0.0).all()):
+        raise ValueError(f"{table_name} radius must be strictly increasing with no duplicates.")
+    if not bool(((radius >= 0.0) & (radius <= 1.0)).all()):
+        raise ValueError(f"{table_name} radius must satisfy 0 <= r/R_sun <= 1.")
+    return radius
+
+
+def validate_nonnegative_column(
+    table: pd.DataFrame,
+    column: str,
+    *,
+    table_name: str,
+) -> pd.Series:
+    """
+    Return one finite, non-negative numeric column.
+
+    Args:
+        table: Loaded CSV table.
+        column: Column name to validate.
+        table_name: Human-readable table name for error messages.
+
+    Returns:
+        The validated column.
+
+    Raises:
+        ValueError: If any value is negative.
+    """
+    values = numeric_column(table, column, table_name=table_name)
+    if not bool((values >= 0.0).all()):
+        raise ValueError(f"{table_name} column {column!r} must be non-negative.")
+    return values

@@ -123,3 +123,34 @@ def test_mass_spectrum_bsm_missing_deltamsq41_raises():
 
     with pytest.raises(ValueError, match="requires DeltamSq41"):
         spectrum.difference_vector(context=ctx)
+
+
+def test_absolute_mass_squared_vector_normal_ordering():
+    dm21 = torch.tensor(7.42e-5, device=DEVICE, dtype=DTYPE)
+    dm3l = torch.tensor(2.517e-3, device=DEVICE, dtype=DTYPE)
+    spectrum = MassSpectrum_SM(DeltamSq21=dm21, DeltamSq3l=dm3l)
+
+    m_lightest = 0.01  # eV, m_1 for NO
+    m_sq = spectrum.absolute_mass_squared_vector(m_lightest)
+
+    expected = torch.tensor(
+        [m_lightest**2, m_lightest**2 + dm21.item(), m_lightest**2 + dm3l.item()],
+        device=DEVICE, dtype=DTYPE,
+    )
+    assert_close(m_sq, expected, name="NO absolute mass-squared vector")
+
+
+def test_absolute_mass_squared_vector_inverted_ordering():
+    dm21 = torch.tensor(7.42e-5, device=DEVICE, dtype=DTYPE)
+    dm3l = torch.tensor(-2.498e-3, device=DEVICE, dtype=DTYPE)  # Delta m^2_32 < 0
+    spectrum = MassSpectrum_SM(DeltamSq21=dm21, DeltamSq3l=dm3l)
+
+    m_lightest = 0.01  # eV, m_3 for IO
+    m_sq = spectrum.absolute_mass_squared_vector(m_lightest)
+
+    m3_sq = m_lightest**2
+    m2_sq = m3_sq - dm3l.item()   # m_3^2 - m_2^2 = dm3l  ->  m_2^2 = m_3^2 - dm3l
+    m1_sq = m2_sq - dm21.item()   # m_2^2 - m_1^2 = dm21  ->  m_1^2 = m_2^2 - dm21
+
+    expected = torch.tensor([m1_sq, m2_sq, m3_sq], device=DEVICE, dtype=DTYPE)
+    assert_close(m_sq, expected, name="IO absolute mass-squared vector")

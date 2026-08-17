@@ -27,7 +27,10 @@ from tpeanuts.core.common.probability import (
     probability_transition,
     probability_weighted_average,
 )
-from tpeanuts.medium.earth.evolutor import earth_evolutor_from_zenith
+from tpeanuts.medium.earth.evolutor import (
+    EarthPerturbativeDiagnostics,
+    earth_evolutor_from_zenith,
+)
 from tpeanuts.medium.earth.profile import EarthProfile, build_earth_profile
 from tpeanuts.pipeline.atmosphere import (
     AtmosphereSurfaceResult,
@@ -51,6 +54,7 @@ class AtmosphereEarthDetectorResult:
     detector_flux_Eh: Optional[torch.Tensor] = None
     detector_flux_height_integrated_E: Optional[torch.Tensor] = None
     detector_flux_energy_height_integrated: Optional[torch.Tensor] = None
+    perturbative_diagnostics: Optional[EarthPerturbativeDiagnostics] = None
 
 
 @dataclass(frozen=True)
@@ -78,8 +82,13 @@ def propagate_surface_to_detector(
     *,
     profile_earth: Optional[EarthProfile] = None,
     integrate_energy: bool = False,
+    return_diagnostics: bool = False,
 ) -> AtmosphereEarthDetectorResult:
-    """Continue a coherent atmospheric surface state through the Earth."""
+    """Continue a coherent atmospheric surface state through the Earth.
+
+    ``return_diagnostics=True`` attaches the analytical Earth first-order
+    diagnostics to the returned detector result.
+    """
     context = config.runtime
     production = surface.production
     energy_GeV = as_tensor(
@@ -97,7 +106,7 @@ def propagate_surface_to_detector(
         params=config.earth,
         context=context,
     )
-    S_earth = earth_evolutor_from_zenith(
+    earth_result = earth_evolutor_from_zenith(
         profile_earth=resolved_profile,
         oscillation=config.oscillation,
         E_MeV=1.0e3 * energy_GeV,
@@ -105,7 +114,13 @@ def propagate_surface_to_detector(
         depth_m=float(config.detector_depth_m),
         reunitarize=config.reunitarize_earth,
         analytic_eigenvalues=config.analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        S_earth, diagnostics = earth_result
+    else:
+        S_earth = earth_result
+        diagnostics = None
     surface_states = as_tensor(
         surface.surface_states,
         device=context.device,
@@ -155,6 +170,7 @@ def propagate_surface_to_detector(
         detector_flux_Eh=detector_flux_Eh,
         detector_flux_height_integrated_E=detector_flux_height,
         detector_flux_energy_height_integrated=detector_flux_energy_height,
+        perturbative_diagnostics=diagnostics,
     )
 
 
@@ -168,12 +184,15 @@ def propagate_atmosphere_grid_to_detector(
     trajectory_steps: int = 200,
     integrate_angular: bool = False,
     integrate_energy: bool = False,
+    return_diagnostics: bool = False,
 ) -> AtmosphereDetectorGridResult:
     """Propagate aligned flavour-production tables over a zenith grid.
 
     Each mapping value is a sequence with one production dictionary per
     zenith angle. Energy, height and angle grids must agree across flavours.
-    Missing flavours are represented by zero production flux.
+    Missing flavours are represented by zero production flux. When requested,
+    each item in ``detector_results`` carries its Earth perturbative
+    diagnostics.
     """
     if not production_by_flavour:
         raise ValueError("production_by_flavour cannot be empty.")
@@ -208,6 +227,7 @@ def propagate_atmosphere_grid_to_detector(
             surface,
             config,
             profile_earth=resolved_profile,
+            return_diagnostics=return_diagnostics,
         )
         resolved_profile = detector.earth_profile
         detector_results.append(detector)

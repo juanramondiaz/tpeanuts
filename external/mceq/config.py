@@ -73,17 +73,17 @@ from tpeanuts.util.parallel import ParallelConfig
 from tpeanuts.util.type import as_tensor
 
 if TYPE_CHECKING:
-    from tpeanuts.medium.atmosphere.io import OutputConfig
+    from tpeanuts.source.atmosphere.io import OutputConfig
 
 
 def _default_output_config():
-    from tpeanuts.medium.atmosphere.io import OutputConfig
+    from tpeanuts.source.atmosphere.io import OutputConfig
 
     return OutputConfig()
 
 
 def _make_output_config(**kwargs):
-    from tpeanuts.medium.atmosphere.io import OutputConfig
+    from tpeanuts.source.atmosphere.io import OutputConfig
 
     return OutputConfig(**kwargs)
 # ============================================================

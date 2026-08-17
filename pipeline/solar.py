@@ -10,7 +10,8 @@ import torch
 from tpeanuts.config.propagation import PropagationConfig
 from tpeanuts.core.common.probability import probability_incoherent
 from tpeanuts.medium.solar.probability import solar_probability_mass
-from tpeanuts.medium.solar.profile import SolarProfile, build_solar_profile
+from tpeanuts.medium.solar.profile import SolarMediumProfile, build_solar_medium
+from tpeanuts.source.solar import SolarNeutrinoSource, build_solar_source
 from tpeanuts.util.torch_util import as_1d_tensor
 from tpeanuts.util.type import cdtype_from_real
 
@@ -19,9 +20,10 @@ from tpeanuts.util.type import cdtype_from_real
 class SolarSurfaceResult:
     """Incoherent mass mixture produced inside the Sun at its surface."""
 
-    source: str
+    source_name: str
     E_MeV: torch.Tensor
-    profile: SolarProfile
+    medium: SolarMediumProfile
+    source: SolarNeutrinoSource
     production_distribution: torch.Tensor
     mass_weights: torch.Tensor
     flavour_probabilities: torch.Tensor
@@ -33,7 +35,8 @@ def propagate_solar_to_surface(
     E_MeV,
     config: PropagationConfig,
     source: str,
-    solar_profile: Optional[SolarProfile] = None,
+    solar_medium: Optional[SolarMediumProfile] = None,
+    solar_source: Optional[SolarNeutrinoSource] = None,
     method: str = "adiabatic_approximated",
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
@@ -43,11 +46,14 @@ def propagate_solar_to_surface(
     Args:
         E_MeV: Neutrino energy in MeV.
         config: Propagation configuration bundling ``oscillation``, the
-            solar profile construction settings (``config.solar``), and the
+            solar medium/source construction settings
+            (``config.solar.medium``/``config.solar.source``), and the
             runtime device/dtype.
         source: Solar source key.
-        solar_profile: Optional pre-built ``SolarProfile``; None loads the
-            default/configured one.
+        solar_medium: Optional pre-built ``SolarMediumProfile``; None loads
+            the default/configured one.
+        solar_source: Optional pre-built ``SolarNeutrinoSource``; None loads
+            the default/configured one.
         method: ``"numerical"``, ``"adiabatic_approximated"`` (default), or
             ``"adiabatic_exact"`` (see
             ``medium.solar.probability.solar_probability_mass``).
@@ -57,7 +63,7 @@ def propagate_solar_to_surface(
         include_matter_nc: If True/False, applied/not applied. If ``None``
             (the default), auto-resolved per-call: the 3+1 sterile
             extension's neutral-current matter term is included whenever
-            ``config.oscillation`` is sterile and the profile has
+            ``config.oscillation`` is sterile and the medium has
             neutron-density data available, and omitted otherwise (with a
             ``RuntimeWarning`` if sterile was requested but the data is
             missing) -- see ``core.common.oscillation.
@@ -71,16 +77,22 @@ def propagate_solar_to_surface(
         device=context.device,
         dtype=context.dtype,
     )
-    profile = build_solar_profile(
-        solar_profile,
-        params=config.solar,
+    medium = build_solar_medium(
+        solar_medium,
+        params=config.solar.medium,
         context=context,
     )
-    fraction = profile.production_distribution(source)
+    source_model = build_solar_source(
+        solar_source,
+        params=config.solar.source,
+        context=context,
+    )
+    fraction = source_model.production_distribution(source)
     mass_weights = solar_probability_mass(
         config.oscillation,
         energy,
-        profile,
+        medium,
+        source_model,
         source,
         method=method,
         legacy_precision=legacy_precision,
@@ -99,9 +111,10 @@ def propagate_solar_to_surface(
         real_dtype=mass_weights.dtype,
     )
     return SolarSurfaceResult(
-        source=source,
+        source_name=source,
         E_MeV=energy,
-        profile=profile,
+        medium=medium,
+        source=source_model,
         production_distribution=fraction,
         mass_weights=mass_weights,
         flavour_probabilities=flavour_probabilities,

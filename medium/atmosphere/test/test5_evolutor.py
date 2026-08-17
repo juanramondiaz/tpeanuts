@@ -5,11 +5,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import warnings
 
 import pytest
 import torch
 
+from tpeanuts.core.BSM.bsm_nsi import NSIConfig
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.config.propagation import PropagationConfig
 from tpeanuts.medium.atmosphere.evolutor import atmosphere_evolutor
@@ -530,6 +532,72 @@ def test_atmosphere_analytical_vs_numerical_include_matter_nc_agree():
     S_n, _ = atmosphere_evolutor(
         oscillation, **args, method="numerical",
         atmosphere=make_atmosphere(matter=True, nsteps=800, include_matter_nc=True),
+    )
+
+    assert torch.max(torch.abs(S_a - S_n)) < 1.0e-6
+    assert_unitary(S_a, atol=1.0e-6, rtol=1.0e-6)
+
+
+def test_atmosphere_evolutor_numerical_epsilon_n_changes_three_flavour_result_without_include_matter_nc():
+    """NSI composition (NSIConfig.eps_*_n) must change a plain 3-flavour
+    result even with include_matter_nc left at its default False: the
+    neutron-density sample it needs is auto-fetched independently of that
+    sterile-specific flag (oscillation_needs_neutron_composition)."""
+    ctx = make_context()
+    osc_sm = make_oscillation(context=ctx)
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.30, device=DEVICE, real_dtype=DTYPE)
+    osc_eps_n = dataclasses.replace(osc_sm, nsi=nsi)
+    args = dict(E_MeV=2000.0, h_km=20.0, theta_deg=45.0, depth_km=1.0, context=ctx)
+
+    S_sm, _ = atmosphere_evolutor(
+        osc_sm, **args, method="numerical", atmosphere=make_atmosphere(nsteps=64, matter=True),
+    )
+    S_eps_n, _ = atmosphere_evolutor(
+        osc_eps_n, **args, method="numerical", atmosphere=make_atmosphere(nsteps=64, matter=True),
+    )
+
+    assert S_eps_n.shape == (3, 3)
+    assert torch.isfinite(S_eps_n.real).all() and torch.isfinite(S_eps_n.imag).all()
+    assert_unitary(S_eps_n, atol=1.0e-9, rtol=1.0e-9)
+    assert torch.max(torch.abs(S_eps_n - S_sm)) > 0.0
+
+
+def test_atmosphere_evolutor_analytical_epsilon_n_changes_three_flavour_result_without_include_matter_nc():
+    ctx = make_context()
+    osc_sm = make_oscillation(context=ctx)
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.30, device=DEVICE, real_dtype=DTYPE)
+    osc_eps_n = dataclasses.replace(osc_sm, nsi=nsi)
+    args = dict(E_MeV=2000.0, h_km=20.0, theta_deg=45.0, depth_km=1.0, context=ctx)
+
+    S_sm, _ = atmosphere_evolutor(
+        osc_sm, **args, method="analytical",
+        atmosphere=make_atmosphere(matter=True, perturbative_segments=4, perturbative_degree=2),
+    )
+    S_eps_n, _ = atmosphere_evolutor(
+        osc_eps_n, **args, method="analytical",
+        atmosphere=make_atmosphere(matter=True, perturbative_segments=4, perturbative_degree=2),
+    )
+
+    assert S_eps_n.shape == (3, 3)
+    assert torch.isfinite(S_eps_n.real).all() and torch.isfinite(S_eps_n.imag).all()
+    assert_unitary(S_eps_n, atol=1.0e-6, rtol=1.0e-6)
+    assert torch.max(torch.abs(S_eps_n - S_sm)) > 0.0
+
+
+def test_atmosphere_analytical_vs_numerical_epsilon_n_agree():
+    ctx = make_context()
+    osc_sm = make_oscillation(context=ctx)
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.30, device=DEVICE, real_dtype=DTYPE)
+    osc_eps_n = dataclasses.replace(osc_sm, nsi=nsi)
+    args = dict(E_MeV=5000.0, h_km=80.0, theta_deg=89.0, depth_km=1.0, context=ctx)
+
+    S_a, _ = atmosphere_evolutor(
+        osc_eps_n, **args, method="analytical",
+        atmosphere=make_atmosphere(matter=True, perturbative_segments=6, perturbative_degree=3),
+    )
+    S_n, _ = atmosphere_evolutor(
+        osc_eps_n, **args, method="numerical",
+        atmosphere=make_atmosphere(matter=True, nsteps=800),
     )
 
     assert torch.max(torch.abs(S_a - S_n)) < 1.0e-6

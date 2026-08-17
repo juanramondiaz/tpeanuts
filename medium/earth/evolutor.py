@@ -46,6 +46,7 @@ Module functions:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional, Union
 
 import torch
@@ -62,7 +63,10 @@ from tpeanuts.util.torch_util import (
 from tpeanuts.util.constant import R_E
 
 from tpeanuts.core.common.evolutor import compose_segment_evolutors
-from tpeanuts.core.perturbative.evolutor import evolutor_perturbative_segment
+from tpeanuts.core.perturbative.evolutor import (
+    PerturbativeDiagnostics,
+    evolutor_perturbative_segment,
+)
 from tpeanuts.core.perturbative.models import PerturbativeSegmentBatch
 
 from tpeanuts.medium.earth.geometry import (
@@ -74,7 +78,73 @@ from tpeanuts.medium.earth.geometry import (
     validate_eta_range,
 )
 
-@torch.no_grad()
+
+@dataclass(frozen=True)
+class EarthPerturbativeDiagnostics:
+    """First-order validity diagnostics over complete Earth trajectories.
+
+    ``max_first_order_norm`` is the worst local segment correction and
+    ``accumulated_first_order_norm`` is their conservative sum.  The
+    unitarity defect is evaluated on the complete raw trajectory operator,
+    before optional reunitarization.
+    """
+
+    max_first_order_norm: torch.Tensor
+    accumulated_first_order_norm: torch.Tensor
+    max_probability_correction: torch.Tensor
+    unitarity_defect: torch.Tensor
+    validity_code: torch.Tensor
+
+    @property
+    def validity_labels(self) -> tuple[str, str, str]:
+        return ("safe", "caution", "unreliable")
+
+
+def _earth_diagnostics_from_segments(
+    U: torch.Tensor,
+    diagnostics: tuple[PerturbativeDiagnostics, ...],
+    masks: tuple[torch.Tensor | None, ...],
+) -> EarthPerturbativeDiagnostics:
+    """Aggregate local diagnostics without hiding a bad Earth segment."""
+    norms = []
+    probability_corrections = []
+    for diagnostic, mask in zip(diagnostics, masks):
+        norm = diagnostic.first_order_norm
+        probability = diagnostic.probability_correction
+        if mask is not None:
+            norm = torch.where(mask, norm, torch.zeros_like(norm))
+            probability = torch.where(mask, probability, torch.zeros_like(probability))
+        norms.append(norm.reshape(norm.shape[0], -1))
+        probability_corrections.append(probability.reshape(probability.shape[0], -1))
+
+    all_norms = torch.cat(norms, dim=-1)
+    all_probability = torch.cat(probability_corrections, dim=-1)
+    maximum = all_norms.amax(dim=-1)
+    accumulated = all_norms.sum(dim=-1)
+    n = U.shape[-1]
+    identity = torch.eye(n, device=U.device, dtype=U.dtype)
+    unitarity = torch.linalg.matrix_norm(
+        U.conj().transpose(-1, -2) @ U - identity,
+        ord=2,
+    )
+    control = torch.maximum(maximum, accumulated)
+    validity = torch.where(
+        control < 0.1,
+        torch.zeros_like(control, dtype=torch.int8),
+        torch.where(
+            control < 0.3,
+            torch.ones_like(control, dtype=torch.int8),
+            torch.full_like(control, 2, dtype=torch.int8),
+        ),
+    )
+    return EarthPerturbativeDiagnostics(
+        max_first_order_norm=maximum,
+        accumulated_first_order_norm=accumulated,
+        max_probability_correction=all_probability.amax(dim=-1),
+        unitarity_defect=unitarity,
+        validity_code=validity,
+    )
+
 def _earth_evolutor_case_a_batched(
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -92,7 +162,8 @@ def _earth_evolutor_case_a_batched(
     legacy_precision: bool = False,
     include_matter_nc: bool = False,
     analytic_eigenvalues: bool = False,
-) -> torch.Tensor:
+    return_diagnostics: bool = False,
+) -> torch.Tensor | tuple[torch.Tensor, EarthPerturbativeDiagnostics]:
     """
     Compute Earth evolution operators for trajectories crossing Earth shells.
 
@@ -143,7 +214,14 @@ def _earth_evolutor_case_a_batched(
     batch_size = eta_b.numel()
 
     if batch_size == 0:
-        return torch.empty((0, n_flavours, n_flavours), device=device, dtype=cdtype)
+        empty_u = torch.empty((0, n_flavours, n_flavours), device=device, dtype=cdtype)
+        if return_diagnostics:
+            empty = torch.empty((0,), device=device, dtype=rdtype)
+            return empty_u, EarthPerturbativeDiagnostics(
+                empty, empty, empty, empty,
+                torch.empty((0,), device=device, dtype=torch.int8),
+            )
+        return empty_u
 
     # Move the detector from the surface radius to its actual underground
     # radius. All subsequent chord coordinates are expressed in Earth-radius
@@ -218,7 +296,7 @@ def _earth_evolutor_case_a_batched(
         dtype=rdtype,
         legacy_precision=legacy_precision,
     )
-    U_segments = evolutor_perturbative_segment(
+    segment_result = evolutor_perturbative_segment(
         oscillation,
         E_MeV=E_seg,
         profile_model=segment_model,
@@ -227,7 +305,12 @@ def _earth_evolutor_case_a_batched(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U_segments, diagnostics_segments = segment_result
+    else:
+        U_segments = segment_result
 
     I = identity3.view(1, 1, n_flavours, n_flavours)
 
@@ -256,7 +339,7 @@ def _earth_evolutor_case_a_batched(
         dtype=rdtype,
         legacy_precision=legacy_precision,
     )
-    U0_det = evolutor_perturbative_segment(
+    detector_result = evolutor_perturbative_segment(
         oscillation,
         E_MeV=E_b,
         profile_model=detector_model,
@@ -265,7 +348,12 @@ def _earth_evolutor_case_a_batched(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U0_det, diagnostics_detector = detector_result
+    else:
+        U0_det = detector_result
 
     # Compose the detector-side half path excluding the duplicated first segment
     # and prepend the detector segment.
@@ -311,7 +399,7 @@ def _earth_evolutor_case_a_batched(
         dtype=rdtype,
         legacy_precision=legacy_precision,
     )
-    U_segments_mirrored = evolutor_perturbative_segment(
+    mirrored_result = evolutor_perturbative_segment(
         oscillation,
         E_MeV=E_seg,
         profile_model=mirrored_segment_model,
@@ -320,7 +408,12 @@ def _earth_evolutor_case_a_batched(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U_segments_mirrored, diagnostics_mirrored = mirrored_result
+    else:
+        U_segments_mirrored = mirrored_result
     U_segments_mirrored = torch.where(
         segments.crossed.view(batch_size, ns, 1, 1),
         U_segments_mirrored,
@@ -362,10 +455,16 @@ def _earth_evolutor_case_a_batched(
         I_full,
     )
 
+    if return_diagnostics:
+        diagnostics = _earth_diagnostics_from_segments(
+            U,
+            (diagnostics_segments, diagnostics_detector, diagnostics_mirrored),
+            (segments.crossed, outer.has_any, segments.crossed),
+        )
+        return U, diagnostics
     return U
 
 
-@torch.no_grad()
 def _earth_evolutor_case_b_batched(
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -382,7 +481,8 @@ def _earth_evolutor_case_b_batched(
     legacy_precision: bool = False,
     include_matter_nc: bool = False,
     analytic_eigenvalues: bool = False,
-) -> torch.Tensor:
+    return_diagnostics: bool = False,
+) -> torch.Tensor | tuple[torch.Tensor, EarthPerturbativeDiagnostics]:
     """
     Compute Earth evolution operators for shallow detector-near trajectories.
 
@@ -429,7 +529,14 @@ def _earth_evolutor_case_b_batched(
     batch_size = eta_b.numel()
 
     if batch_size == 0:
-        return torch.empty((0, n_flavours, n_flavours), device=device, dtype=cdtype)
+        empty_u = torch.empty((0, n_flavours, n_flavours), device=device, dtype=cdtype)
+        if return_diagnostics:
+            empty = torch.empty((0,), device=device, dtype=rdtype)
+            return empty_u, EarthPerturbativeDiagnostics(
+                empty, empty, empty, empty,
+                torch.empty((0,), device=device, dtype=torch.int8),
+            )
+        return empty_u
 
     # Case B covers short trajectories from the surface to a shallow detector.
     # The detector radius determines the chord length inside matter.
@@ -482,7 +589,7 @@ def _earth_evolutor_case_b_batched(
         dtype=rdtype,
         legacy_precision=legacy_precision,
     )
-    U_red = evolutor_perturbative_segment(
+    segment_result = evolutor_perturbative_segment(
         oscillation,
         E_MeV=E_b,
         profile_model=segment_model,
@@ -491,7 +598,12 @@ def _earth_evolutor_case_b_batched(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U_red, segment_diagnostics = segment_result
+    else:
+        U_red = segment_result
 
     # Transform the reduced evolution operator to the full flavour basis.
     U = pmns.flavour_basis(
@@ -501,10 +613,15 @@ def _earth_evolutor_case_b_batched(
         dtype=cdtype,
     )
 
+    if return_diagnostics:
+        return U, _earth_diagnostics_from_segments(
+            U,
+            (segment_diagnostics,),
+            (None,),
+        )
     return U
 
 
-@torch.no_grad()
 def earth_evolutor(
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -518,7 +635,8 @@ def earth_evolutor(
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
     analytic_eigenvalues: bool = False,
-) -> torch.Tensor:
+    return_diagnostics: bool = False,
+) -> torch.Tensor | tuple[torch.Tensor, EarthPerturbativeDiagnostics]:
     """
     Compute the full Earth matter evolution operator in flavour basis.
 
@@ -566,6 +684,8 @@ def earth_evolutor(
             Ferrari (3+1 sterile extension) solution instead of
             ``torch.linalg.eigvalsh``, forwarded to
             both trajectory cases.
+        return_diagnostics: If True, also return trajectory-level first-order
+            diagnostics. They are evaluated before optional reunitarization.
     Returns:
         Complex tensor with shape `(*broadcast_shape(E, eta), N, N)`, N in
         {3, 4}. Entries above the Earth horizon remain the identity operator;
@@ -640,7 +760,7 @@ def earth_evolutor(
         as_tuple=False,
     ).squeeze(-1)
 
-    U_a = _earth_evolutor_case_a_batched(
+    result_a = _earth_evolutor_case_a_batched(
         profile_earth=profile_earth,
         oscillation=oscillation,
         E_b=E_flat[flat_idx_a],
@@ -657,7 +777,12 @@ def earth_evolutor(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U_a, diagnostics_a = result_a
+    else:
+        U_a = result_a
 
     if reunitarize:
         U_a = project_to_unitary(U_a)
@@ -671,7 +796,7 @@ def earth_evolutor(
         as_tuple=False,
     ).squeeze(-1)
 
-    U_b = _earth_evolutor_case_b_batched(
+    result_b = _earth_evolutor_case_b_batched(
         profile_earth=profile_earth,
         oscillation=oscillation,
         E_b=E_flat[flat_idx_b],
@@ -687,7 +812,12 @@ def earth_evolutor(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U_b, diagnostics_b = result_b
+    else:
+        U_b = result_b
 
     if reunitarize:
         U_b = project_to_unitary(U_b)
@@ -695,10 +825,35 @@ def earth_evolutor(
     # Insert the case-B subset. Entries in neither mask are still identities.
     flat_out[flat_idx_b] = U_b
 
-    return out
+    if not return_diagnostics:
+        return out
+
+    diagnostic_shape = eta_b.shape
+    flat_maximum = torch.zeros(eta_b.numel(), device=device, dtype=rdtype)
+    flat_accumulated = torch.zeros_like(flat_maximum)
+    flat_probability = torch.zeros_like(flat_maximum)
+    flat_unitarity = torch.zeros_like(flat_maximum)
+    flat_validity = torch.zeros(eta_b.numel(), device=device, dtype=torch.int8)
+
+    for indices, diagnostic in (
+        (flat_idx_a, diagnostics_a),
+        (flat_idx_b, diagnostics_b),
+    ):
+        flat_maximum[indices] = diagnostic.max_first_order_norm
+        flat_accumulated[indices] = diagnostic.accumulated_first_order_norm
+        flat_probability[indices] = diagnostic.max_probability_correction
+        flat_unitarity[indices] = diagnostic.unitarity_defect
+        flat_validity[indices] = diagnostic.validity_code
+
+    return out, EarthPerturbativeDiagnostics(
+        max_first_order_norm=flat_maximum.reshape(diagnostic_shape),
+        accumulated_first_order_norm=flat_accumulated.reshape(diagnostic_shape),
+        max_probability_correction=flat_probability.reshape(diagnostic_shape),
+        unitarity_defect=flat_unitarity.reshape(diagnostic_shape),
+        validity_code=flat_validity.reshape(diagnostic_shape),
+    )
 
 
-@torch.no_grad()
 def earth_evolutor_from_zenith(
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -712,7 +867,8 @@ def earth_evolutor_from_zenith(
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
     analytic_eigenvalues: bool = False,
-) -> torch.Tensor:
+    return_diagnostics: bool = False,
+) -> torch.Tensor | tuple[torch.Tensor, EarthPerturbativeDiagnostics]:
     """Build the Earth evolutor from zenith angles with configurable scales.
 
     Convenience wrapper around ``earth_evolutor`` for callers that work with
@@ -770,4 +926,5 @@ def earth_evolutor_from_zenith(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )

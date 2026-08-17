@@ -1,0 +1,40 @@
+{
+  "provider": "SNO Collaboration",
+  "publication": "B. Aharmim et al. (SNO Collaboration), \"Electron Energy Spectra, Fluxes, and Day-Night Asymmetries of 8B Solar Neutrinos from the 391-Day Salt Phase SNO Data Set\", Phys. Rev. C 72, 055502 (2005)",
+  "arxiv": "nucl-ex/0502021",
+  "source_url": "https://sno.phy.queensu.ca/sno/papers/0502021.pdf",
+  "retrieved": "2026-08-07",
+  "transcription_method": "manual, from the rendered PDF (no machine-readable data release exists for this paper, unlike the earlier flux-only salt paper's HOWTO at sno.phy.queensu.ca/sno/results_09_03/howto.pdf)",
+  "cross_checks_passed": [
+    "sum of the 17 CC day bins (observation/cc_spectrum_day_night.csv) = 1.7325e6, matches published day CC integral flux 1.73e6 (Table XXIV / observation/integrated_fluxes_day_night.csv)",
+    "sum of the 17 CC night bins = 1.6422e6, matches published night CC integral flux 1.64e6",
+    "statistical_correlation_day.csv / statistical_correlation_night.csv: diagonal = 1.0000, symmetric, all off-diagonal entries in [-1, 1], as printed in Tables XXXII/XXXIII",
+    "exposure/zenith_livetime.csv bin edges match the paper's own worked example ('the top bin has cos theta_z = -0.5 to -0.4667')",
+    "exposure/zenith_livetime.csv total livetime = 391.43 days, matches the paper's own '391-Day Salt Phase' title/dataset name"
+  ],
+  "known_source_rounding_artifact": "statistical_correlation_day.csv: the printed table has CC10-CC11 = 0.0000 (row CC10) but CC11-CC10 = 0.0001 (row CC11) -- a genuine 4-decimal rounding inconsistency in the original publication (Table XXXII), not a transcription error (verified against the rendered PDF twice). Symmetrized here to 0.0001 in both cells so the matrix is exactly symmetric for Cholesky use; the magnitude is negligible (~1e-4) either way.",
+  "known_source_typesetting_artifact": "systematics/cc_spectral_systematics.csv, beta14_width row, CC9_minus cell: the printed table itself shows '-0.' with no trailing digit (verified against the rendered PDF page 45 twice, at two different points in this session) -- almost certainly a zero-rounds-to-nothing typesetting drop, given the immediately adjacent CC9_plus cell in the same pair is '0.0' and the whole row's magnitudes are similarly small. Transcribed as -0.0 (parses to 0.0); flagged here rather than silently guessed.",
+  "needs_verification": [
+    "systematics/cc_spectral_systematics.csv (Table XXXIV): manually transcribed from a rendered PDF table image at high density (19 channels x 16 systematic sources x +/- pairs). The energy-scale/resolution/radial-bias/beta14/radial-scale rows were cross-read twice consistently; the vertex_x/vertex_y/vertex_z/internal_gamma/selection_efficiency/backgrounds rows (sub-1%-magnitude corrections, smallest print in the table) are LOWER CONFIDENCE and should be spot-checked against page 45 of the PDF before use in a real fit.",
+    "systematics/cc_spectral_systematics.csv, vertex_resolution and angular_resolution rows, CC9-CC17 columns: SET TO 0.0 (placeholder, not a real measurement). A value is missing partway through both rows in the rendered PDF (confirmed via column-count check: these two rows parsed to 38 columns instead of 39), which silently shifted every later column in two independent transcription attempts this session -- rather than propagate a misaligned reading, the whole CC9-CC17 block for these two systematics was zeroed and flagged here. Real values must be read directly from page 45 of the PDF (ideally at higher resolution/zoom than this session's rendering pipeline provided) before this systematic source is trusted for CC9-CC17 in a real fit."
+  ],
+  "not_yet_transcribed": [
+    "Table XIX / Table XX (NC-only systematics: internal neutron background, neutron capture efficiency uncertainty) -- explicitly required for a complete oscillation analysis per the paper's own Appendix A note ('NC-only systematics ... are not listed in Table XXXIV ... but are necessary to include in an oscillation analysis and can be found in Table XIX'), not yet added as a CSV.",
+      "Table XVII (fundamental constants g_A, G_F, L_1A, sin^2 theta_W; CC-on-O/Na/Cl correction factor 1.0081; radiative correction functions omega_CC/omega_NC/omega_ES, Eq. 14-16) -- precision cross-section corrections applied by SNO's own analysis, not yet transcribed.",
+    "hep flux: SNO's own analysis fixes it at 9.3e3 cm^-2 s^-1 (confirmed at the primary source, matches the value already used in this project's detector.sno_ii design), not yet in a data file -- likely belongs as a parameters.py constant instead, mirroring detector.sno.parameters."
+  ],
+  "channel_order": ["NC", "CC1", "CC2", "CC3", "CC4", "CC5", "CC6", "CC7", "CC8", "CC9", "CC10", "CC11", "CC12", "CC13", "CC14", "CC15", "CC16", "CC17", "ES"],
+  "units": {
+    "fluxes": "1e6 cm^-2 s^-1 (equivalent 8B flux, see Eq. A1 of the paper's Appendix A -- NOT a raw event count)",
+    "energy": "MeV (kinetic energy T_eff)",
+    "livetime": "seconds"
+  },
+  "formulas": {
+    "response_function_sigma_T_MeV": "sigma_T(Te) = -0.131 + 0.383*sqrt(Te) + 0.03731*Te  (Eq. A3, verified against the primary source; matches detector.sno_ii's design doc exactly)",
+    "cc_equivalent_flux_normalization": "Eq. A1: numerator integrates from the analysis threshold (5.5 MeV in T_eff), denominator normalizes to an undistorted 8B spectrum -- see the paper's Appendix A for the full double integral.",
+    "chi2": "chi2 = sum_ij (Y_i^data - Y_i^model) [sigma_ij^2(tot)]^-1 (Y_j^data - Y_j^model), sigma^2(tot) = sigma^2(stat) + sigma^2(syst)  (Eq. 19-20)",
+    "systematic_covariance": "sigma_ij^2(syst) = sum_k (dY_i/dS_k)(dY_j/dS_k)(Delta S_k)^2  (Eq. 21) -- the per-bin percent sensitivities in systematics/cc_spectral_systematics.csv are exactly the dY_i/dS_k inputs to this formula, treated as +/-1sigma pulls Delta S_k = 1."
+  },
+  "phi_b8_free_parameter": "SNO's own oscillation analysis (Section XIII) treats the total active 8B flux f_B as a free parameter in the chi2 minimization ('The 8B flux was free in the fit'), matching detector.sno_ii's proposed Phi_8B = Phi_8B_ref * exp(lambda_8B) parametrization.",
+  "hep_flux_cm2s": 9300.0
+}

@@ -69,7 +69,7 @@ from tpeanuts.external.mceq.config import (
 )
 from tpeanuts.util.parallel import ParallelConfig
 from tpeanuts.external.mceq.core import ensure_mceq_available
-from tpeanuts.medium.atmosphere.io import (
+from tpeanuts.source.atmosphere.io import (
     build_angle_output_path,
     OutputConfig,
     save_phi_Eh_theta_result,

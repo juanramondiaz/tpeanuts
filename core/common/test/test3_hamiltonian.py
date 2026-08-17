@@ -31,6 +31,8 @@ those scenarios; NSI-specific and sterile-specific physics checks live in
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 import torch
 
@@ -667,3 +669,71 @@ def test_hamiltonian_with_nc_term_is_hermitian_and_flavour_consistent():
     assert_hermitian(H_reduced, "H_reduced [sterile + NC]")
     assert_hermitian(H_flavour, "H_flavour [sterile + NC]")
     assert_close(H_flavour, expected, atol=1.0e-10, rtol=1.0e-10, name="flavour = flavour_basis(reduced) [sterile + NC]")
+
+
+# ---------------------------------------------------------------------------
+# hamiltonian_matter_reduced -- NSI composition term (epsilon_n)
+# ---------------------------------------------------------------------------
+#
+# Detailed NSIConfig/epsilon_n unit tests live in
+# core.BSM.test.test2_bsm_nsi; this section only checks the generic
+# builder's combination rule (all three additive pieces at once, for both
+# flavour counts) belongs here alongside the sterile-NC coverage above.
+
+
+def test_hamiltonian_matter_reduced_epsilon_n_and_sterile_nc_combine_additively():
+    ctx = make_context()
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.20, device=DEVICE, real_dtype=DTYPE)
+    osc4 = make_sterile_oscillation(theta14=0.15, theta24=0.10, DeltamSq41=1.7, context=ctx)
+    osc4 = dataclasses.replace(osc4, nsi=nsi)
+    n_e = torch.tensor(2.2, device=DEVICE, dtype=DTYPE)
+    n_n = torch.tensor(2.0, device=DEVICE, dtype=DTYPE)
+    V_cc = matter_potential_cc(n_e, antinu=osc4.antinu, context=ctx)
+    V_cc_n = matter_potential_cc(n_n, antinu=osc4.antinu, context=ctx)
+    V_nc = matter_potential_nc(n_n, antinu=osc4.antinu, context=ctx)
+
+    Hmat4 = hamiltonian_matter_reduced(osc4, n_e, n_n_mol_cm3=n_n, context=ctx)
+
+    eps_active = osc4.nsi.epsilon_tensor(n_flavours=4, context=ctx)
+    eps_active = osc4.pmns.select_antinu(eps_active, antinu=osc4.antinu)
+    eps_n_active = osc4.nsi.epsilon_n_tensor(n_flavours=4, context=ctx)
+    eps_n_active = osc4.pmns.select_antinu(eps_n_active, antinu=osc4.antinu)
+    Hmat_flavour = V_cc.to(dtype=CDTYPE) * eps_active + V_cc_n.to(dtype=CDTYPE) * eps_n_active
+    Hmat_flavour[..., 0, 0] += V_cc.to(dtype=CDTYPE)
+    Hmat_flavour[..., 3, 3] -= V_nc.to(dtype=CDTYPE)
+    O = osc4.pmns.outer_block(osc4.antinu)
+    expected = O.conj().transpose(-2, -1) @ Hmat_flavour @ O
+
+    assert_close(Hmat4, expected, name="epsilon, epsilon_n and the sterile NC term all compose additively before rotation")
+
+
+def test_hamiltonian_matter_reduced_epsilon_n_active_for_three_flavour():
+    """Unlike the sterile NC term, the epsilon_n composition term is not
+    sterile-specific: it must change H for a plain 3-flavour pmns too."""
+    ctx = make_context()
+    nsi = NSIConfig(eps_ee_n=0.15, device=DEVICE, real_dtype=DTYPE)
+    osc = make_sm_oscillation(context=ctx)
+    osc = dataclasses.replace(osc, nsi=nsi)
+    osc_zero_n = dataclasses.replace(osc, nsi=NSIConfig(device=DEVICE, real_dtype=DTYPE))
+    n_e = torch.tensor(2.2, device=DEVICE, dtype=DTYPE)
+    n_n = torch.tensor(2.0, device=DEVICE, dtype=DTYPE)
+
+    Hmat_with = hamiltonian_matter_reduced(osc, n_e, n_n_mol_cm3=n_n, context=ctx)
+    Hmat_zero_n = hamiltonian_matter_reduced(osc_zero_n, n_e, context=ctx)
+
+    assert torch.max(torch.abs(Hmat_with - Hmat_zero_n)) > 1.0e-8, (
+        "epsilon_n must change the 3-flavour matter Hamiltonian relative to the epsilon_n=0 baseline"
+    )
+
+
+def test_hamiltonian_matter_reduced_epsilon_n_without_n_n_raises():
+    """A non-zero eps_*_n is an explicit request for the composition term;
+    omitting n_n_mol_cm3 must raise, not silently reproduce the epsilon-only
+    Hamiltonian (unlike the sterile NC term's n_n_mol_cm3=None default)."""
+    ctx = make_context()
+    nsi = NSIConfig(eps_ee_n=0.15, device=DEVICE, real_dtype=DTYPE)
+    osc = dataclasses.replace(make_sm_oscillation(context=ctx), nsi=nsi)
+    n_e = torch.tensor(2.2, device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="eps_\\*_n"):
+        hamiltonian_matter_reduced(osc, n_e, context=ctx)

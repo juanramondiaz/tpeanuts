@@ -58,7 +58,6 @@ def apply_evolutor_to_state(
     return torch.matmul(evolutor, state[..., None]).squeeze(-1)
 
 
-@torch.no_grad()
 def compose_segment_evolutors(
     U_segments: torch.Tensor,
     *,

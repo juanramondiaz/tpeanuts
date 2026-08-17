@@ -58,7 +58,6 @@ from tpeanuts.util.type import (
 )
 
 
-@torch.no_grad()
 def vacuum_probability_transition(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -97,7 +96,6 @@ def vacuum_probability_transition(
     return probability_transition(S, real_dtype=context.dtype if context is not None else None)
 
 
-@torch.no_grad()
 def vacuum_probability_state(
     nustate: TensorLike,
     oscillation: OscillationParameters,
@@ -182,7 +180,6 @@ def vacuum_probability_state(
     )
 
 
-@torch.no_grad()
 def vacuum_probability_integrated(
     nustate: TensorLike,
     oscillation: OscillationParameters,

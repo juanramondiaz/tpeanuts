@@ -52,11 +52,17 @@ electron-flavour diagonal entry, ``diag(V_CC, 0, ..., 0)`` with
 ``V_CC = +-sqrt(2) G_F n_e`` (sign set by the neutrino/antineutrino
 convention), optionally extended by Non-Standard Interactions (NSI):
 
-    H_mat^NSI = V_CC * (diag(1, 0, ..., 0) + epsilon)
+    H_mat^NSI = V_CC(n_e) * (diag(1, 0, ..., 0) + epsilon) + V_CC(n_n) * epsilon_n
 
-where ``epsilon`` is the (possibly complex, Hermitian) NSI coupling matrix
-contributed by ``tpeanuts.core.BSM.bsm_nsi.NSIConfig.epsilon_tensor_base``,
-accessed only through the duck-typed ``oscillation.nsi.epsilon_tensor(...)``
+where ``epsilon`` is the (possibly complex, Hermitian) electron/proton-
+normalized NSI coupling matrix, and ``epsilon_n`` its neutron-normalized
+counterpart (zero by default -- see ``tpeanuts.core.BSM.bsm_nsi``'s
+"Composition dependence" section for the physics and
+``hamiltonian_matter_reduced`` for the ``V_CC(n_n) = matter_potential_cc``-
+on-neutron-density reformulation, which avoids ever dividing by ``n_e``).
+Both are contributed by ``tpeanuts.core.BSM.bsm_nsi.NSIConfig``
+(``epsilon_tensor_base``/``epsilon_n_tensor_base``), accessed only through
+the duck-typed ``oscillation.nsi.epsilon_tensor(...)``/``epsilon_n_tensor(...)``
 -- this module never imports ``core.BSM``.
 
 For 3+1 sterile-neutrino propagation (4-flavour PMNS objects), the
@@ -96,10 +102,14 @@ Which extension is active is controlled entirely by
 ``oscillation.pmns.n_flavours == 4``, and ``oscillation.BSM_extension_NSI``
 from whether ``oscillation.nsi`` is set. There is no separate ``epsilon``
 argument anywhere below -- there is exactly one place NSI configuration
-lives, so there is nothing left to validate for agreement. The
-neutral-current density ``n_n_mol_cm3`` remains a plain argument (not part
-of ``OscillationParameters``) since it describes the medium, not the
-oscillation scenario -- symmetric with ``n_e_mol_cm3``.
+lives, so there is nothing left to validate for agreement. The neutron
+density ``n_n_mol_cm3`` remains a plain argument (not part of
+``OscillationParameters``) since it describes the medium, not the
+oscillation scenario -- symmetric with ``n_e_mol_cm3``. It now feeds two
+independent, additive terms when supplied: the sterile NC term above
+(4-flavour ``pmns`` only) and the NSI composition term
+(``oscillation.nsi.epsilon_n``, any flavour count) -- see
+``hamiltonian_matter_reduced``'s docstring for both.
 
 Module functions:
     kinetic_eigenvalue_vector
@@ -154,7 +164,6 @@ from tpeanuts.util.torch_util import infer_device_dtype
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real
 
 
-@torch.no_grad()
 def kinetic_eigenvalue_vector(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -205,7 +214,6 @@ def kinetic_eigenvalue_vector(
     )
 
 
-@torch.no_grad()
 def hamiltonian_kinetic_reduced(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -296,15 +304,16 @@ def _matter_direction_reduced(
     *,
     antinu,
     include_nc: bool,
+    include_eps_n: bool = False,
     context: RuntimeContext,
-) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+) -> tuple[torch.Tensor, Optional[torch.Tensor], Optional[torch.Tensor]]:
     """Position-independent reduced-basis matter "direction" matrices.
 
     Decouples the reduced-basis matter Hamiltonian
-    ``Hmat = V_cc * P_cc [+ V_nc * P_nc]`` into its (V-independent)
-    direction matrices and their (position-dependent) potential magnitudes.
-    Used by ``hamiltonian_matter_reduced`` and by the perturbative
-    evolutor's first-order correction
+    ``Hmat = V_cc * P_cc [+ V_nc * P_nc] [+ V_cc(n_n) * P_eps_n]`` into its
+    (V-independent) direction matrices and their (position-dependent)
+    potential magnitudes. Used by ``hamiltonian_matter_reduced`` and by the
+    perturbative evolutor's first-order correction
     (``core.perturbative.evolutor.evolutor_first_order``), which needs the
     direction matrices on their own to sandwich the spectral projectors.
 
@@ -315,7 +324,11 @@ def _matter_direction_reduced(
     ``-diag_entry(1, n_flavours - 1)`` (see the module docstring for the
     sign) rotated into the reduced basis -- it never commutes with ``O``, so
     it always needs the rotation, independent of which branch built
-    ``P_cc``.
+    ``P_cc``. ``P_eps_n`` is None unless ``include_eps_n``, in which case it
+    is the flavour-basis ``epsilon_n`` (no ``diag(1,0,...,0)`` piece -- that
+    belongs to ``P_cc``/``V_cc`` alone) rotated the same way; see
+    ``hamiltonian_matter_reduced`` and ``core.BSM.bsm_nsi``'s "Composition
+    dependence" section for how it combines with ``V_cc(n_n)``.
 
     Args:
         oscillation: ``OscillationParameters`` supplying ``pmns`` and the
@@ -327,10 +340,14 @@ def _matter_direction_reduced(
             consistent with the potential magnitude's sign convention.
         include_nc: If True, also build and return ``P_nc``. Only meaningful
             when ``oscillation.pmns.n_flavours == 4``.
+        include_eps_n: If True, also build and return ``P_eps_n``. Only
+            meaningful when ``oscillation.BSM_extension_NSI`` and
+            ``oscillation.nsi.has_neutron_coupling``.
         context: Runtime device/dtype for the returned tensors.
 
     Returns:
-        ``(P_cc, P_nc)``, with ``P_nc`` None unless ``include_nc``.
+        ``(P_cc, P_nc, P_eps_n)``, with ``P_nc``/``P_eps_n`` None unless
+        ``include_nc``/``include_eps_n`` respectively.
     """
     pmns = oscillation.pmns
     n_flavours = int(pmns.n_flavours)
@@ -340,6 +357,7 @@ def _matter_direction_reduced(
     if not oscillation.BSM_extension_NSI and not include_nc:
         return (
             _diag_entry(torch.ones((), device=device, dtype=dtype), 0, n_flavours, cdtype),
+            None,
             None,
         )
 
@@ -359,10 +377,15 @@ def _matter_direction_reduced(
         Dn_flavour[n_flavours - 1, n_flavours - 1] = -1.0
         P_nc = O.conj().transpose(-2, -1) @ Dn_flavour @ O
 
-    return P_cc, P_nc
+    P_eps_n = None
+    if include_eps_n:
+        epsn_active = oscillation.nsi.epsilon_n_tensor(n_flavours=n_flavours, context=context)
+        epsn_active = pmns.select_antinu(epsn_active, antinu=antinu)
+        P_eps_n = O.conj().transpose(-2, -1) @ epsn_active @ O
+
+    return P_cc, P_nc, P_eps_n
 
 
-@torch.no_grad()
 def hamiltonian_matter_reduced(
     oscillation: OscillationParameters,
     n_e_mol_cm3: TensorLike,
@@ -388,7 +411,7 @@ def hamiltonian_matter_reduced(
     
     holds in general. 
     
-    That flavour-basis term has up to two independent, additive pieces:
+    That flavour-basis term has up to three independent, additive pieces:
 
         1. NSI, when ``oscillation.nsi`` is set:
            ``V_CC * (diag(1,0,...,0) + oscillation.nsi.epsilon)``, with the
@@ -397,7 +420,7 @@ def hamiltonian_matter_reduced(
            Setting ``epsilon = 0`` recovers the plain CC matter term
            exactly. See ``tpeanuts.core.BSM.bsm_nsi`` for the physical
            bounds on ``epsilon`` entries and named presets.
-           
+
         2. The sterile NC term, when ``pmns.n_flavours == 4`` and
            ``n_n_mol_cm3`` is supplied: ``-V_NC`` on the sterile diagonal
            entry (``core.common.potential.matter_potential_nc``; see the
@@ -406,25 +429,54 @@ def hamiltonian_matter_reduced(
            earlier phases of this project. Has no effect for a 3-flavour
            ``pmns`` (there ``V_NC`` is a pure common phase, so
            ``n_n_mol_cm3`` is silently ignored rather than raising, since
-           passing it is mathematically inert, not wrong).
+           passing it is mathematically inert, not wrong) *unless* piece 3
+           below is also active.
+
+        3. The NSI composition term, when ``oscillation.nsi`` is set with
+           ``oscillation.nsi.has_neutron_coupling`` (i.e. any ``eps_*_n``
+           field non-zero):
+           ``matter_potential_cc(n_n_mol_cm3, ...) * oscillation.nsi.epsilon_n``.
+           This is algebraically ``V_CC * (n_n/n_e) * epsilon_n`` (see
+           ``tpeanuts.core.BSM.bsm_nsi``'s "Composition dependence" section)
+           without ever dividing by ``n_e_mol_cm3``: ``matter_potential_cc``
+           is simply re-evaluated on the neutron density instead of the
+           electron density, reusing the exact same sign/scale convention.
+           Active for any ``pmns.n_flavours`` (unlike piece 2, this is not
+           sterile-specific). Omitted whenever ``epsilon_n`` is the default
+           zero matrix, exactly reproducing the pre-existing two-piece
+           Hamiltonian. Unlike piece 2, this piece is *not* optional once
+           requested: ``n_n_mol_cm3`` is required (raises ``ValueError`` if
+           omitted) whenever ``has_neutron_coupling`` is True, since a
+           non-zero ``eps_*_n`` is an explicit user request that this
+           function must not silently downgrade to the epsilon-only
+           Hamiltonian (contrast with piece 2, where omitting ``n_n_mol_cm3``
+           is itself the well-defined "CC-only" choice for the sterile term).
 
     Args:
         oscillation: ``OscillationParameters`` supplying ``pmns``, ``antinu``,
             and the optional ``nsi`` (NSIConfig) attribute.
         n_e_mol_cm3: Electron density in mol/cm^3.
         n_n_mol_cm3: Optional neutron density in mol/cm^3, enabling the
-            sterile neutral-current term above. Only meaningful when
-            ``pmns.n_flavours == 4``.
+            sterile neutral-current term (piece 2, only meaningful when
+            ``pmns.n_flavours == 4``) and/or the NSI composition term
+            (piece 3, meaningful for any ``pmns.n_flavours``). Required
+            (not optional) whenever ``oscillation.nsi.has_neutron_coupling``
+            is True; see ``Raises``.
         context: Optional runtime device/dtype. When omitted, both are
             inferred from the density and evolution scale.
         evolution_scale_m: Positive evolution length scale in metres.
         legacy_precision: If True, use the legacy charged-current
-            matter-potential prefactor. Has no NC counterpart (see
+            matter-potential prefactor for both ``V_CC(n_e)`` and
+            ``V_CC(n_n)`` (piece 3). Has no NC counterpart (see
             ``matter_potential_nc``), so it never affects the NC term.
 
     Returns:
         Complex reduced-basis matter Hamiltonian shaped
         (..., n_flavours, n_flavours).
+
+    Raises:
+        ValueError: If ``oscillation.nsi.has_neutron_coupling`` is True and
+            ``n_n_mol_cm3`` is not supplied.
     """
     pmns = oscillation.pmns
     antinu = oscillation.antinu
@@ -445,9 +497,26 @@ def hamiltonian_matter_reduced(
     )
 
     include_nc = n_n_mol_cm3 is not None and n_flavours == 4
+    needs_eps_n = oscillation.BSM_extension_NSI and oscillation.nsi.has_neutron_coupling
+    if needs_eps_n and n_n_mol_cm3 is None:
+        raise ValueError(
+            "oscillation.nsi has non-zero eps_*_n (composition-dependent NSI, "
+            "see core.BSM.bsm_nsi's 'Composition dependence' section) but "
+            "n_n_mol_cm3 was not supplied. Unlike the sterile neutral-current "
+            "term, this is not an optional refinement: eps_*_n was set "
+            "explicitly, so silently reproducing the epsilon-only Hamiltonian "
+            "would be a silent physical mismatch with the requested NSI "
+            "configuration, not a harmless approximation. Pass the medium's "
+            "neutron density as n_n_mol_cm3, or set eps_*_n back to zero."
+        )
+    include_eps_n = needs_eps_n
 
-    P_cc, P_nc = _matter_direction_reduced(
-        oscillation, antinu=antinu, include_nc=include_nc, context=resolved_context,
+    P_cc, P_nc, P_eps_n = _matter_direction_reduced(
+        oscillation,
+        antinu=antinu,
+        include_nc=include_nc,
+        include_eps_n=include_eps_n,
+        context=resolved_context,
     )
     Hmat = V_cc.to(dtype=cdtype)[..., None, None] * P_cc
 
@@ -460,10 +529,19 @@ def hamiltonian_matter_reduced(
         )
         Hmat = Hmat + V_nc.to(dtype=cdtype)[..., None, None] * P_nc
 
+    if include_eps_n:
+        V_cc_n = matter_potential_cc(
+            n_n_mol_cm3,
+            antinu=antinu,
+            evolution_scale_m=evolution_scale_m,
+            context=resolved_context,
+            legacy_precision=legacy_precision,
+        )
+        Hmat = Hmat + V_cc_n.to(dtype=cdtype)[..., None, None] * P_eps_n
+
     return Hmat
 
 
-@torch.no_grad()
 def hamiltonian_reduced(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -498,9 +576,11 @@ def hamiltonian_reduced(
         n_e_mol_cm3: Electron number density of the propagation medium, in
             mol/cm^3 (i.e. N_A * electrons/cm^3).
         n_n_mol_cm3: Optional neutron number density in mol/cm^3, enabling
-            the sterile neutral-current term (see
-            ``hamiltonian_matter_reduced``). Only meaningful for a
-            4-flavour ``oscillation.pmns``; omitted by default.
+            the sterile neutral-current term (4-flavour ``oscillation.pmns``
+            only) and/or the NSI composition term
+            (``oscillation.nsi.epsilon_n``, any flavour count) -- see
+            ``hamiltonian_matter_reduced``. Required (not optional) whenever
+            ``oscillation.nsi.has_neutron_coupling`` is True; see ``Raises``.
         context: Optional runtime device/dtype. When omitted, both are
             taken from ``oscillation.pmns``.
         evolution_scale_m: Positive evolution length scale in metres used
@@ -512,6 +592,10 @@ def hamiltonian_reduced(
         Dimensionless reduced Hamiltonian shaped
         (..., n_flavours, n_flavours), with n_flavours inferred from
         ``oscillation.pmns``.
+
+    Raises:
+        ValueError: If ``oscillation.nsi.has_neutron_coupling`` is True and
+            ``n_n_mol_cm3`` is not supplied (see ``hamiltonian_matter_reduced``).
     """
     pmns = oscillation.pmns
     antinu = oscillation.antinu
@@ -543,7 +627,6 @@ def hamiltonian_reduced(
     return Hkin + Hmat
 
 
-@torch.no_grad()
 def hamiltonian_flavour(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -572,9 +655,11 @@ def hamiltonian_flavour(
         n_e_mol_cm3: Electron number density of the propagation medium, in
             mol/cm^3.
         n_n_mol_cm3: Optional neutron number density in mol/cm^3, enabling
-            the sterile neutral-current term (see
-            ``hamiltonian_matter_reduced``). Only meaningful for a
-            4-flavour ``oscillation.pmns``; omitted by default.
+            the sterile neutral-current term (4-flavour ``oscillation.pmns``
+            only) and/or the NSI composition term
+            (``oscillation.nsi.epsilon_n``, any flavour count) -- see
+            ``hamiltonian_matter_reduced``. Required (not optional) whenever
+            ``oscillation.nsi.has_neutron_coupling`` is True; see ``Raises``.
         context: Optional runtime device/dtype. When omitted, both are
             taken from ``oscillation.pmns``.
         evolution_scale_m: Positive evolution length scale in metres used
@@ -585,6 +670,10 @@ def hamiltonian_flavour(
     Returns:
         Dimensionless flavour-basis Hamiltonian shaped
         (..., n_flavours, n_flavours).
+
+    Raises:
+        ValueError: If ``oscillation.nsi.has_neutron_coupling`` is True and
+            ``n_n_mol_cm3`` is not supplied (see ``hamiltonian_matter_reduced``).
     """
     H_reduced = hamiltonian_reduced(
         oscillation,

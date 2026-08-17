@@ -109,7 +109,6 @@ class PMNS_SM(PMNS):
     n_active: int = 3
     n_sterile: int = 0
 
-    @torch.no_grad()
     def outer_block(
         self,
         antinu: Union[bool, torch.Tensor] = False,
@@ -118,7 +117,6 @@ class PMNS_SM(PMNS):
         O = self.R23() @ self.Delta()
         return self.select_antinu(O, antinu)
 
-    @torch.no_grad()
     def reduced(
         self,
         antinu: Union[bool, torch.Tensor] = False,
@@ -144,7 +142,6 @@ class PMNS_SM(PMNS):
 
         return self.select_antinu(Ured, antinu)
 
-    @torch.no_grad()
     def pmns_matrix(
         self,
         antinu: Union[bool, torch.Tensor] = False,

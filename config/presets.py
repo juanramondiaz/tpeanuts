@@ -380,8 +380,8 @@ register_preset(
 # NSI presets
 # ---------------------------------------------------------------------------
 #
-# epsilon matrix structure and bounds (Biggio, Blennow, Fernandez-Martinez
-# 2009, arXiv:0907.0097):
+# epsilon matrix structure and illustrative one-parameter bounds collected by
+# Biggio, Blennow, Fernandez-Martinez (2009), arXiv:0907.0097:
 #   |eps_ee|  < 0.50    |eps_emu|  < 0.033
 #   |eps_mumu| < 0.078   |eps_etau|  < 0.27
 #   |eps_tautau| < 0.33    |eps_mutau|  < 0.040
@@ -402,12 +402,14 @@ register_preset(
     ),
 )
 
-# 2. Diagonal-only NSI - representative allowed values.
+# 2. Diagonal-only NSI - illustrative values.
 # Reference: Biggio, Blennow, Fernandez-Martinez (2009), JHEP 08:090,
 #   arXiv:0907.0097, Table 1.
-# Model-independent 90% CL upper bounds from CC universality and NC data:
+# The paper collects one-parameter limits from CC universality and NC data,
+# including the following values under its stated operator conventions:
 #   |eps_ee| < 0.50,  |eps_mumu| < 0.078,  |eps_tautau| < 0.33.
-# Chosen values are within bounds but sizable; eps_mumu = 0 (WLOG convention).
+# These are not universal bounds on the effective matter epsilon, whose
+# interpretation also depends on the matter fermion and normalization.
 register_preset(
     NSI_PRESETS,
     "nsi_diagonal_biggio2009",
@@ -416,8 +418,8 @@ register_preset(
     eps_tautau=0.15,
     label="nsi_diagonal_biggio2009",
     description=(
-        "Diagonal-only NSI at representative allowed values. "
-        "Within the model-independent 90% CL bounds of "
+        "Illustrative diagonal-only NSI values below the one-parameter "
+        "limits summarized by "
         "Biggio, Blennow, Fernandez-Martinez (2009), arXiv:0907.0097. "
         "eps_ee=0.30, eps_tautau=0.15, eps_mumu=0 (WLOG convention). "
         "All off-diagonal entries zero."
@@ -454,14 +456,11 @@ register_preset(
 
 # 4. Off-diagonal NSI in the mu-tau sector - IceCube DeepCore benchmark.
 # Reference: IceCube Collaboration (2022), Phys. Rev. D 106, 032009,
-#   arXiv:2112.09122.
+#   arXiv:2106.07755.
 #
-# IceCube DeepCore is primarily sensitive to eps_mutau and (eps_tautau -
-# eps_mumu) through their effect on atmospheric nu_mu survival. The 90% CL
-# bounds from the DeepCore analysis are approximately:
-#   |eps_mutau|        < 0.0060
-#   |eps_tautau - eps_mumu| < 0.018
-# This preset sits near the edge of the allowed region:
+# IceCube DeepCore constrains eps_mutau and (eps_tautau - eps_mumu) through
+# atmospheric nu_mu propagation. The selected values illustrate the scale
+# probed by that analysis; they are not a reproduced confidence-region point:
 #   eps_mutau  = 0.005 (real, Im = 0)
 #   eps_tautau = 0.015 (with eps_mumu = 0)
 register_preset(
@@ -471,28 +470,28 @@ register_preset(
     eps_mutau_re=0.005,
     label="nsi_offdiag_icecube2022",
     description=(
-        "Off-diagonal NSI in the mu-tau sector near the IceCube DeepCore "
-        "90% CL boundary. eps_mutau=0.005 (real), eps_tautau=0.015 "
+        "Illustrative off-diagonal NSI in the mu-tau sector. "
+        "eps_mutau=0.005 (real), eps_tautau=0.015 "
         "(with eps_mumu=0). Dominant NSI for atmospheric neutrinos. "
-        "IceCube Collaboration (2022), arXiv:2112.09122: "
-        "|eps_mutau| < 0.0060, |eps_tautau - eps_mumu| < 0.018."
+        "The sector and parameter scale are motivated by the IceCube "
+        "DeepCore analysis (2022), arXiv:2106.07755; this exact pair is "
+        "not claimed to be a published best fit or confidence-limit point."
     ),
 )
 
 # 5. DUNE flavour-changing propagation benchmark.
-# Reference:
-#   DUNE Collaboration, Abi et al. (2020),
-#   "Prospects for beyond the Standard Model physics searches at the DUNE
-#   Near Detector", Eur. Phys. J. C 81, 322 (2021),
-#   arXiv:2008.12769.
+# Reference: Agarwalla, Chatterjee, Palazzo (2016),
+#   "Degeneracy between theta23 octant and neutrino non-standard
+#   interactions at DUNE", Phys. Lett. B 762, 64 (2016),
+#   arXiv:1607.01745.
 #
 # A single flavour-changing NSI parameter eps_e_tau is introduced while
 # all remaining NSI couplings are set to zero. Values around |eps_e_tau|
-# = 0.1-0.2 are commonly adopted in DUNE sensitivity studies because this
+# = 0.1-0.2 are useful illustrative values in DUNE sensitivity studies because this
 # parameter generates the strongest degeneracies with delta_CP, the mass
 # ordering and the determination of theta23. The value eps_e_tau = 0.15
-# represents a realistic benchmark inside the region typically explored
-# by DUNE simulations, although it is not a global best-fit.
+# is an intentionally illustrative benchmark, not a published DUNE best-fit
+# point or a value endorsed by the DUNE Collaboration.
 register_preset(
     NSI_PRESETS,
     "nsi_dune_etau",
@@ -502,23 +501,23 @@ register_preset(
     description=(
         "Representative DUNE propagation NSI benchmark with "
         "eps_e_tau=0.15. Widely used to study CP-violation and mass-"
-        "ordering degeneracies. Inspired by DUNE Collaboration "
-        "sensitivity analyses (arXiv:2008.12769)."
+        "ordering degeneracies. Illustrative value motivated by propagation-"
+        "NSI sensitivity studies such as Agarwalla, Chatterjee and Palazzo "
+        "(2016), arXiv:1607.01745; it is not a published best-fit point."
     ),
 )
 
 # 6. Hyper-Kamiokande propagation NSI benchmark.
-# Reference:
-#   Hyper-Kamiokande Proto-Collaboration (Abe et al.),
-#   Prog. Theor. Exp. Phys. 2015, 053C02,
-#   arXiv:1502.05199.
+# References:
+#   Kelly (2017), "Searches for new physics at the Hyper-Kamiokande
+#   experiment", Phys. Rev. D 95, 115009, arXiv:1703.00448;
+#   Fukasawa, Yasuda (2017), "The possibility to observe the non-standard
+#   interaction by the Hyperkamiokande atmospheric neutrino experiment",
+#   Nucl. Phys. B 914, 99, arXiv:1608.05897.
 #
 # This benchmark combines a moderate diagonal matter correction with a
-# flavour-changing interaction. Hyper-K sensitivity studies frequently
-# investigate this combination because eps_ee modifies the MSW potential
-# while eps_e_tau introduces additional interference with the standard
-# oscillation parameters. The values below are representative benchmark
-# values rather than a preferred fit.
+# flavour-changing interaction. The values are deliberately illustrative;
+# neither cited study publishes this exact pair as a Hyper-K best-fit point.
 register_preset(
     NSI_PRESETS,
     "nsi_hyperk_etau",
@@ -530,7 +529,8 @@ register_preset(
         "Representative Hyper-K propagation NSI benchmark with "
         "eps_ee=0.20 and eps_e_tau=0.10. Illustrates the combined "
         "effect of diagonal and flavour-changing matter interactions. "
-        "Inspired by Hyper-K NSI sensitivity studies."
+        "Illustrative values motivated by Hyper-K NSI sensitivity studies "
+        "(arXiv:1703.00448 and arXiv:1608.05897), not a published best fit."
     ),
 )
 
@@ -540,12 +540,10 @@ register_preset(
 #   (2018), JHEP 08:180,
 #   arXiv:1805.04530.
 #
-# Recent global oscillation analyses including propagation NSI constrain
-# the allowed multidimensional epsilon parameter space. The values below
-# are representative of the currently allowed region and provide a realistic
-# benchmark for numerical simulations. They should not be interpreted as a
-# unique global best-fit, since significant parameter correlations and
-# degeneracies remain.
+# The values below form an illustrative multi-parameter stress test inspired
+# by the scales studied in the cited global analysis. They do not reproduce
+# one of its fit points or confidence regions; those depend on correlations,
+# matter-fermion conventions and composition assumptions.
 register_preset(
     NSI_PRESETS,
     "nsi_globalfit_esteban2018",
@@ -557,9 +555,9 @@ register_preset(
     label="nsi_globalfit_esteban2018",
     description=(
         "Propagation NSI benchmark inspired by the global analysis of "
-        "Esteban et al. (2018), arXiv:1805.04530. Representative values "
-        "within the allowed parameter space for realistic oscillation "
-        "simulations."
+        "Esteban et al. (2018), arXiv:1805.04530. The values are an "
+        "illustrative stress test, not a published best fit or an "
+        "allowed-region claim."
     ),
 )
 
@@ -583,23 +581,23 @@ register_preset(
         "Single-parameter propagation NSI benchmark with "
         "eps_ee=0.30. Modifies only the effective MSW matter potential "
         "while all flavour-changing NSI couplings remain zero. "
-        "Representative value within the Biggio et al. bounds."
+        "Illustrative value motivated by the one-parameter limits collected "
+        "by Biggio et al.; it is not a universal effective-matter bound."
     ),
 )
 
 # 9. Atmospheric mu-tau propagation benchmark.
-# Reference:
-#   IceCube Collaboration,
-#   Coloma et al.,
-#   Phys. Rev. D 96, 115007 (2017),
-#   arXiv:1708.02899.
+# Reference: IceCube Collaboration, "Search for Nonstandard Neutrino
+#   Interactions with IceCube DeepCore", Phys. Rev. D 97, 072009 (2018),
+#   arXiv:1709.07079.
 #
 # The flavour-changing parameter eps_mu_tau primarily affects atmospheric
 # neutrinos traversing the Earth. High-energy atmospheric experiments such
 # as IceCube and KM3NeT are particularly sensitive to this coupling because
 # it modifies nu_mu <-> nu_tau propagation through the Earth's matter.
-# The value eps_mu_tau = 0.01 represents a typical benchmark used in
-# sensitivity studies.
+# The value eps_mu_tau = 0.01 is an illustrative stress-test point. It lies
+# just outside the cited IceCube 90% CL interval (-0.0067, 0.0081), so it
+# must not be described as an allowed or experiment-endorsed benchmark.
 register_preset(
     NSI_PRESETS,
     "nsi_mutau_only",
@@ -607,7 +605,9 @@ register_preset(
     label="nsi_mutau_only",
     description=(
         "Atmospheric propagation NSI benchmark with eps_mu_tau=0.01. "
-        "Representative of IceCube and KM3NeT sensitivity studies of "
-        "flavour-changing mu-tau matter interactions."
+        "Illustrative stress-test for atmospheric mu-tau matter "
+        "interactions. It is not an allowed-point claim: the cited IceCube "
+        "DeepCore analysis gives -0.0067 < eps_mu_tau < 0.0081 at 90% CL "
+        "(arXiv:1709.07079)."
     ),
 )

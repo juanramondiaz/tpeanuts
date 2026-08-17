@@ -144,7 +144,7 @@ class ExposureParameters:
     exposure_d1: float = default.earth_d1
     exposure_d2: float = default.earth_d2
     exposure_ns: int = default.earth_exposure_ns
-    exposure_cache_dir: str = default.earth_legacy_cache_dir
+    exposure_cache_dir: str = default.earth_cache_dir
     exposure_use_cache: bool = default.earth_use_cache
     integrate_exposure: bool = True
     detector_latitude_rad: Optional[float] = None

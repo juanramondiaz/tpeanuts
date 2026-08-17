@@ -237,11 +237,16 @@ def mass_weights_adiabatic_exact(
     # ordering, required for inverted ordering.
     device = oscillation.mass_spectrum.DeltamSq21.device
     dtype = oscillation.mass_spectrum.DeltamSq21.dtype
+    # n_n_mol_cm3=0 (not None): physically correct for the n_e=n_n=0 vacuum
+    # limit either way (matter_potential_cc(0, ...) == 0, so the NSI
+    # composition term vanishes exactly regardless), but required rather
+    # than optional when oscillation.nsi.has_neutron_coupling is True (see
+    # hamiltonian_matter_reduced's docstring) -- None would raise there.
     H_vacuum = hamiltonian_flavour(
         oscillation,
         torch.ones((), device=device, dtype=dtype),
         torch.zeros((), device=device, dtype=dtype),
-        n_n_mol_cm3=None,
+        n_n_mol_cm3=torch.zeros((), device=device, dtype=dtype),
         evolution_scale_m=constant.R_SUN,
     )
     _, eigvec_vacuum = torch.linalg.eigh(H_vacuum)  # (N, N), ascending

@@ -42,12 +42,12 @@ from tpeanuts.util.math import interp1d_linear
 from tpeanuts.util.type import TensorLike
 
 
-def _full_density_grid(solar_profile: object) -> tuple[torch.Tensor, torch.Tensor]:
+def _full_density_grid(medium: object) -> tuple[torch.Tensor, torch.Tensor]:
     """Return the profile's full structural radius/density grid."""
-    return solar_profile.radius, solar_profile.density
+    return medium.radius, medium.density
 
 
-def density_gradient(solar_profile: object) -> torch.Tensor:
+def density_gradient(medium: object) -> torch.Tensor:
     """Compute dn_e/d(r_hat) on the solar profile's full density grid.
 
     Uses central differences at interior points and one-sided differences
@@ -55,14 +55,14 @@ def density_gradient(solar_profile: object) -> torch.Tensor:
     dimensionless solar radius (see ``_full_density_grid``).
 
     Args:
-        solar_profile: SolarProfile-like object exposing ``radius``/
+        medium: SolarMediumProfile-like object exposing ``radius``/
             ``density`` 1-D tensors of matching length.
 
     Returns:
         Tensor of shape ``(n_r,)`` with dn_e/dr_hat in mol/cm^3 per R_sun,
         on the same grid returned by ``_full_density_grid``.
     """
-    r, ne = _full_density_grid(solar_profile)  # (n_r,), (n_r,)
+    r, ne = _full_density_grid(medium)  # (n_r,), (n_r,)
 
     # Central differences at interior nodes
     interior = (ne[2:] - ne[:-2]) / (r[2:] - r[:-2])  # (n_r - 2,)
@@ -77,7 +77,7 @@ def density_gradient(solar_profile: object) -> torch.Tensor:
 def resonance_radius(
     oscillation: OscillationParameters,
     E: TensorLike,
-    solar_profile: object,
+    medium: object,
     *,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
@@ -91,7 +91,7 @@ def resonance_radius(
         oscillation: Oscillation parameters supplying theta_12, theta_13, and
             mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy or 1-D energy grid in MeV.
-        solar_profile: SolarProfile-like object with ``radius``/``density``
+        medium: SolarMediumProfile-like object with ``radius``/``density``
             1-D tensors.
         legacy_precision: If True, evaluate the internal ``Vk``/``th13_M``
             calls with the legacy peanuts combined prefactor for
@@ -109,7 +109,7 @@ def resonance_radius(
     dm_ee = DeltamSqee(oscillation)
     cos2th12 = torch.cos(2.0 * th12)  # scalar; negative for LMA-Dark
 
-    radius, density = _full_density_grid(solar_profile)  # (n_r,), (n_r,)
+    radius, density = _full_density_grid(medium)  # (n_r,), (n_r,)
 
     E_t = torch.as_tensor(E, device=radius.device, dtype=radius.dtype)
     scalar_in = E_t.ndim == 0
@@ -156,7 +156,7 @@ def resonance_radius(
 def plz(
     oscillation: OscillationParameters,
     E: TensorLike,
-    solar_profile: object,
+    medium: object,
     *,
     legacy_precision: bool = False,
 ) -> torch.Tensor:
@@ -174,7 +174,7 @@ def plz(
         oscillation: Oscillation parameters supplying theta_12, theta_13, and
             mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy or 1-D energy grid in MeV.
-        solar_profile: SolarProfile-like object exposing ``radius``/
+        medium: SolarMediumProfile-like object exposing ``radius``/
             ``density``.
         legacy_precision: If True, evaluate the internal ``resonance_radius``
             call (and its ``Vk``/``th13_M`` evaluations) with the legacy
@@ -190,15 +190,15 @@ def plz(
     sin2th12 = torch.sin(2.0 * th12)
     cos2th12 = torch.cos(2.0 * th12)
 
-    radius, density = _full_density_grid(solar_profile)
+    radius, density = _full_density_grid(medium)
 
     E_t = torch.as_tensor(E, device=radius.device, dtype=radius.dtype)
     scalar_in = E_t.ndim == 0
     E_1d = E_t.reshape(-1)  # (n_E,)
 
-    dne_dr = density_gradient(solar_profile)                       # (n_r,)
+    dne_dr = density_gradient(medium)                       # (n_r,)
     r_res = resonance_radius(
-        oscillation, E_1d, solar_profile, legacy_precision=legacy_precision,
+        oscillation, E_1d, medium, legacy_precision=legacy_precision,
     )  # (n_E,), NaN if absent
     has_res = torch.isfinite(r_res)                                # (n_E,)
 
@@ -216,7 +216,7 @@ def plz(
 
     # Density scale height at the resonance in metres:
     #   L_n [m] = |n_e / (dn_e / dr_hat)| * R_sun
-    # where r_hat = r / R_sun is dimensionless (stored in solar_profile.radius).
+    # where r_hat = r / R_sun is dimensionless (stored in medium.radius).
     tiny = torch.finfo(radius.dtype).tiny
     L_n_m = (ne_res.abs() / (dne_dr_res.abs() + tiny)) * constant.R_SUN
 
@@ -239,7 +239,7 @@ def plz(
 def landau_zener_spatial_correction(
     oscillation: OscillationParameters,
     E: TensorLike,
-    solar_profile: object,
+    medium: object,
     radius_samples: torch.Tensor,
     *,
     legacy_precision: bool = False,
@@ -256,7 +256,7 @@ def landau_zener_spatial_correction(
         oscillation: Oscillation parameters supplying theta_12, theta_13, and
             mass_spectrum.DeltamSq21/DeltamSq3l.
         E: Neutrino energy, scalar or 1-D grid in MeV.
-        solar_profile: SolarProfile-like object exposing the full structural
+        medium: SolarMediumProfile-like object exposing the full structural
             ``radius``/``density`` grid (see ``resonance_radius``/``plz``).
         radius_samples: Production radii in solar-radius units, shaped
             ``(n_r,)``.
@@ -273,10 +273,10 @@ def landau_zener_spatial_correction(
     E_1d = E_t.reshape(-1) if E_t.ndim == 1 else E_t.reshape(1)  # (n_E,)
 
     r_res = resonance_radius(
-        oscillation, E_1d, solar_profile, legacy_precision=legacy_precision,
+        oscillation, E_1d, medium, legacy_precision=legacy_precision,
     )  # (n_E,) NaN if absent
     p_lz_e = plz(
-        oscillation, E_1d, solar_profile, legacy_precision=legacy_precision,
+        oscillation, E_1d, medium, legacy_precision=legacy_precision,
     )  # (n_E,)
 
     # above_res[e, r]: True where r_prod < r_res(E) (above resonance

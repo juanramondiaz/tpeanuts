@@ -106,7 +106,6 @@ _MATTER_FACTOR_LEGACY: float = 3.868e-7
 _MATTER_FACTOR_NC: float = _MATTER_FACTOR / 2.0
 
 
-@torch.no_grad()
 def matter_potential_cc(
     n_mol_cm3: TensorLike,
     antinu: Union[bool, torch.Tensor],
@@ -166,7 +165,6 @@ def matter_potential_cc(
     )
 
 
-@torch.no_grad()
 def matter_potential_nc(
     n_n_mol_cm3: TensorLike,
     antinu: Union[bool, torch.Tensor],
@@ -263,7 +261,6 @@ def _positive_scale(
     return scale
 
 
-@torch.no_grad()
 def kinetic_potential(
     mSq_eV2: TensorLike,
     E_MeV: TensorLike,

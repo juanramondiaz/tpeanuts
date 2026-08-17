@@ -53,6 +53,12 @@ from tpeanuts.medium.vacuum.probability import (
     vacuum_probability_transition,
 )
 from tpeanuts.medium.vacuum.flux import vacuum_flux_integrated, vacuum_flux_state
+from tpeanuts.medium.vacuum.io import load_sun_earth_distance
+from tpeanuts.medium.vacuum.solar_geometry import (
+    sun_earth_distance_au,
+    sun_earth_distance_factor,
+    sun_earth_distance_factor_averaged,
+)
 from tpeanuts.medium.vacuum.validation import (
     compare_vacuum_probability_state_with_legacy,
     compare_vacuum_evolved_state_with_legacy,
@@ -66,6 +72,10 @@ __all__ = [
     "vacuum_evolved_state",
     "vacuum_evolutor",
     "vacuum_probability_transition",
+    "load_sun_earth_distance",
+    "sun_earth_distance_au",
+    "sun_earth_distance_factor",
+    "sun_earth_distance_factor_averaged",
     "compare_vacuum_probability_state_with_legacy",
     "compare_vacuum_evolved_state_with_legacy",
 ]

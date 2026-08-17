@@ -39,12 +39,14 @@ Package contents:
     flux
         Flux normalization helpers built on top of atmosphere probabilities,
         plus energy/angular/height-integrated variants.
-    io
-        Readers and writers for Atmosphere height-flux datasets.
 
 Atmosphere-plus-Earth flux workflows, including surface-to-detector
 composition, live in tpeanuts.pipeline (see
-``pipeline.atmosphere_earth``) rather than in this package.
+``pipeline.atmosphere_earth``) rather than in this package. Source flux
+datasets (MCEq/Honda height-differential tables) are not part of this
+package either -- they are production physics, independent of how this
+package propagates a neutrino from production to the Earth surface -- see
+``tpeanuts.source.atmosphere.io``.
 """
 
 from tpeanuts.medium.atmosphere.density import (
@@ -81,12 +83,6 @@ from tpeanuts.medium.atmosphere.flux import (
     atmosphere_flux_integrated_angular,
     atmosphere_flux_integrated_height,
 )
-from tpeanuts.medium.atmosphere.io import (
-    AtmosphericFluxTable,
-    OutputConfig,
-    load_atmospheric_flux,
-    load_directory,
-)
 
 __all__ = [
     "atmosphere_density",
@@ -111,8 +107,4 @@ __all__ = [
     "atmosphere_flux_integrated",
     "atmosphere_flux_integrated_angular",
     "atmosphere_flux_integrated_height",
-    "OutputConfig",
-    "AtmosphericFluxTable",
-    "load_atmospheric_flux",
-    "load_directory",
 ]

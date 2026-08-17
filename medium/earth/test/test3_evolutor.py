@@ -77,6 +77,21 @@ def _two_shell_profile() -> EarthProfile:
     return EarthProfile(params=params, context=RuntimeContext.resolve(DEVICE, DTYPE))
 
 
+def _varying_two_shell_profile() -> EarthProfile:
+    """Synthetic profile with a non-constant residual in both shells."""
+    rj = torch.tensor([0.5, 1.0], device=DEVICE, dtype=DTYPE)
+    coefficients = torch.tensor(
+        [[2.0, 0.20, 0.0], [1.0, 0.10, 0.0]],
+        device=DEVICE,
+        dtype=DTYPE,
+    )
+    params = EarthParameters(
+        profile_perturbative_name="even_power",
+        profile_perturbative_kwargs={"rj": rj, "coefficients": coefficients},
+    )
+    return EarthProfile(params=params, context=RuntimeContext.resolve(DEVICE, DTYPE))
+
+
 def _unitarity_error(U: torch.Tensor) -> torch.Tensor:
     identity = torch.eye(U.shape[-1], device=U.device, dtype=U.dtype)
     left = U.conj().transpose(-1, -2) @ U
@@ -326,6 +341,70 @@ def test_reunitarize_reduces_unitarity_error():
     err_projected = float(torch.max(_unitarity_error(U_projected)))
 
     assert err_projected <= err_raw + 1.0e-14
+
+
+def test_earth_evolutor_diagnostics_are_computed_before_reunitarization():
+    profile = _two_shell_profile()
+    oscillation = _oscillation()
+    energy = torch.tensor(2000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor([0.55, 2.0], device=DEVICE, dtype=DTYPE)
+
+    U_raw, diagnostics_raw = earth_evolutor(
+        profile,
+        oscillation,
+        energy,
+        eta,
+        DEPTH_SURFACE_M,
+        reunitarize=False,
+        return_diagnostics=True,
+    )
+    U_projected, diagnostics_projected = earth_evolutor(
+        profile,
+        oscillation,
+        energy,
+        eta,
+        DEPTH_SURFACE_M,
+        reunitarize=True,
+        return_diagnostics=True,
+    )
+
+    identity = torch.eye(3, device=DEVICE, dtype=U_raw.dtype)
+    expected_defect = torch.linalg.matrix_norm(
+        U_raw.conj().transpose(-1, -2) @ U_raw - identity,
+        ord=2,
+    )
+    assert_close(
+        diagnostics_raw.unitarity_defect,
+        expected_defect,
+        name="raw Earth diagnostic unitarity defect",
+    )
+    assert_close(
+        diagnostics_projected.unitarity_defect,
+        diagnostics_raw.unitarity_defect,
+        name="diagnostics independent of reunitarization",
+    )
+    assert diagnostics_raw.max_first_order_norm.shape == eta.shape
+    assert diagnostics_raw.accumulated_first_order_norm.shape == eta.shape
+    assert diagnostics_raw.validity_code.dtype == torch.int8
+    assert diagnostics_raw.validity_labels == ("safe", "caution", "unreliable")
+    assert_close(U_projected[1], identity, name="above-horizon projected identity")
+
+
+def test_earth_evolutor_diagnostics_detect_nonconstant_profile():
+    U, diagnostics = earth_evolutor(
+        _varying_two_shell_profile(),
+        _oscillation(),
+        torch.tensor(1500.0, device=DEVICE, dtype=DTYPE),
+        torch.tensor(0.4, device=DEVICE, dtype=DTYPE),
+        DEPTH_SURFACE_M,
+        reunitarize=False,
+        return_diagnostics=True,
+    )
+
+    assert torch.isfinite(U).all()
+    assert diagnostics.max_first_order_norm > 0
+    assert diagnostics.accumulated_first_order_norm >= diagnostics.max_first_order_norm
+    assert diagnostics.max_probability_correction > 0
 
 
 def test_legacy_precision_flag_runs_and_is_unitary():

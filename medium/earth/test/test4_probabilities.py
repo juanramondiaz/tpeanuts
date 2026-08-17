@@ -41,6 +41,7 @@ from tpeanuts.medium.earth.probability import (
     earth_probability_transition,
 )
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
+from tpeanuts.core.BSM.bsm_nsi import NSIConfig
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.core.BSM.bsm_mass_spectrum import MassSpectrum_BSM
 from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
@@ -401,6 +402,58 @@ def test_numerical_include_matter_nc_is_noop_for_three_flavour():
     )
 
     assert_close(P_nc, P_cc, atol=1.0e-13, rtol=1.0e-13, name="3-flavour ignores include_matter_nc")
+
+
+def test_numerical_epsilon_n_changes_three_flavour_result_without_include_matter_nc():
+    """NSI composition (NSIConfig.eps_*_n) must change a plain 3-flavour
+    Earth result even though include_matter_nc is left at its default
+    False: the profile already carries neutron-density coefficients (built
+    with coefficients_n, independent of include_matter_nc), and
+    evolutor_perturbative_segment auto-detects oscillation.nsi.
+    has_neutron_coupling on its own -- no pipeline flag needed."""
+    profile = _two_shell_even_power_neutron_profile()
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.30, device=DEVICE, real_dtype=DTYPE)
+    oscillation_sm = _oscillation()
+    oscillation_eps_n = _oscillation(nsi=nsi)
+    state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=torch.complex128)
+    E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.60, device=DEVICE, dtype=DTYPE)
+
+    P_sm = earth_probability_state_numerical(
+        state, profile, oscillation_sm, E, eta, DEPTH_SURFACE_M, massbasis=False,
+        nsteps=NSTEPS_COMPARE, ode_method="midpoint",
+        context=RuntimeContext.resolve(DEVICE, DTYPE),
+    )
+    P_eps_n = earth_probability_state_numerical(
+        state, profile, oscillation_eps_n, E, eta, DEPTH_SURFACE_M, massbasis=False,
+        nsteps=NSTEPS_COMPARE, ode_method="midpoint",
+        context=RuntimeContext.resolve(DEVICE, DTYPE),
+    )
+
+    assert P_sm.shape == (3,)
+    assert P_eps_n.shape == (3,)
+    _assert_probability_vector(P_sm)
+    _assert_probability_vector(P_eps_n)
+    assert torch.max(torch.abs(P_eps_n - P_sm)) > 0.0
+
+
+def test_analytical_epsilon_n_changes_three_flavour_result_without_include_matter_nc():
+    profile = _two_shell_even_power_neutron_profile()
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.30, device=DEVICE, real_dtype=DTYPE)
+    oscillation_sm = _oscillation()
+    oscillation_eps_n = _oscillation(nsi=nsi)
+    state = torch.tensor([1.0, 0.0, 0.0], device=DEVICE, dtype=torch.complex128)
+    E = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    eta = torch.tensor(0.60, device=DEVICE, dtype=DTYPE)
+
+    P_sm = _analytical(state, profile, oscillation_sm, E, eta, DEPTH_SURFACE_M, massbasis=False)
+    P_eps_n = _analytical(state, profile, oscillation_eps_n, E, eta, DEPTH_SURFACE_M, massbasis=False)
+
+    assert P_sm.shape == (3,)
+    assert P_eps_n.shape == (3,)
+    _assert_probability_vector(P_sm)
+    _assert_probability_vector(P_eps_n)
+    assert torch.max(torch.abs(P_eps_n - P_sm)) > 0.0
 
 
 def test_numerical_include_matter_nc_raises_for_even_power_without_include_neutron():

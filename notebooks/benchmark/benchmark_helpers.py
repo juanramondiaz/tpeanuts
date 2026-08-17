@@ -34,7 +34,8 @@ from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
 from tpeanuts.medium.earth.probability import earth_probability_state
-from tpeanuts.medium.solar.profile import SolarParameters, SolarProfile
+from tpeanuts.medium.solar.profile import SolarMediumParameters, SolarMediumProfile
+from tpeanuts.source.solar import SolarSourceParameters, SolarNeutrinoSource
 from tpeanuts.notebooks.notebooks_helper import FLAVOUR_NAMES, save_and_show, to_numpy
 from tpeanuts.util.context import RuntimeContext
 
@@ -535,7 +536,8 @@ def plot_grid_resource_scaling(
 _CONTEXT_CACHE: dict = {}
 _OSCILLATION_CACHE: dict = {}
 _EARTH_PROFILE_CACHE: dict = {}
-_SOLAR_PROFILE_CACHE: dict = {}
+_SOLAR_MEDIUM_CACHE: dict = {}
+_SOLAR_SOURCE_CACHE: dict = {}
 
 
 def _context_for(device):
@@ -581,14 +583,24 @@ def _earth_profile_for(device):
     return _EARTH_PROFILE_CACHE[device]
 
 
-def _solar_profile_for(device):
+def _solar_medium_for(device):
     if device == DEVICE:
-        return solar_profile
-    if device not in _SOLAR_PROFILE_CACHE:
-        _SOLAR_PROFILE_CACHE[device] = SolarProfile.default(
+        return solar_medium
+    if device not in _SOLAR_MEDIUM_CACHE:
+        _SOLAR_MEDIUM_CACHE[device] = SolarMediumProfile.default(
             context=_context_for(device),
         )
-    return _SOLAR_PROFILE_CACHE[device]
+    return _SOLAR_MEDIUM_CACHE[device]
+
+
+def _solar_source_for(device):
+    if device == DEVICE:
+        return solar_source
+    if device not in _SOLAR_SOURCE_CACHE:
+        _SOLAR_SOURCE_CACHE[device] = SolarNeutrinoSource.default(
+            context=_context_for(device),
+        )
+    return _SOLAR_SOURCE_CACHE[device]
 
 
 def torch_pearth_probability(state, E_MeV, eta, depth_m, *, massbasis=True, device=None):
@@ -660,7 +672,7 @@ def nusquids_vacuum_matrix(E_MeV, L_km):
 
 
 def tpeanuts_solar_point(E_MeV):
-    ne_r0 = solar_profile.electron_density(torch.tensor(SOLAR_R0, dtype=DTYPE, device=DEVICE))
+    ne_r0 = solar_medium.electron_density(torch.tensor(SOLAR_R0, dtype=DTYPE, device=DEVICE))
     return Tei(oscillation, E_MeV, ne_r0.unsqueeze(0).expand(E_MeV.numel()))
 
 
@@ -683,11 +695,12 @@ def nusquids_solar_point(E_MeV):
 def tpeanuts_solar_mass(E, device=None):
     dev = device if device is not None else DEVICE
     if BENCHMARK_BACKEND == "nusquids":
-        return solar_probability_mass(oscillation, E, solar_profile, SOLAR_SOURCE)
+        return solar_probability_mass(oscillation, E, solar_medium, solar_source, SOLAR_SOURCE)
     return solar_probability_mass(
         _oscillation_for(dev),
         torch.as_tensor(E, device=dev, dtype=DTYPE),
-        _solar_profile_for(dev),
+        _solar_medium_for(dev),
+        _solar_source_for(dev),
         SOLAR_SOURCE,
         legacy_precision=SOLAR_LEGACY_PRECISION,
     )
@@ -983,7 +996,8 @@ def nusquids_atm_matrix(E_1d, cosz_1d, *, initial_flavour="numu"):
 def _tpeanuts_solar_detector_device(E_1d, eta_1d, device):
     dev_ctx = RuntimeContext.resolve(device, DTYPE)
     osc_dev = PropagationConfig.oscillation_parameters_from_preset("_SM_NUFIT52_NO", antinu=False, context=dev_ctx)
-    prof_dev = SolarProfile.default(context=dev_ctx)
+    medium_dev = SolarMediumProfile.default(context=dev_ctx)
+    source_dev = SolarNeutrinoSource.default(context=dev_ctx)
     earth_dev = EarthProfile(
         params=EarthParameters(
             profile_perturbative_kwargs={
@@ -993,7 +1007,7 @@ def _tpeanuts_solar_detector_device(E_1d, eta_1d, device):
         ),
         context=dev_ctx,
     )
-    mass = solar_probability_mass(osc_dev, E_1d, prof_dev, SOLAR_SOURCE)
+    mass = solar_probability_mass(osc_dev, E_1d, medium_dev, source_dev, SOLAR_SOURCE)
     return earth_probability_state_analytical(mass, earth_dev, osc_dev, E_1d[:, None], eta_1d[None, :], SOLAR_DETECTOR_DEPTH_M, massbasis=True)
 
 

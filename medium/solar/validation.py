@@ -45,8 +45,9 @@ import numpy as np
 import torch
 
 from tpeanuts.core.common.oscillation import OscillationParameters
-from tpeanuts.medium.solar.profile import SolarParameters, SolarProfile
+from tpeanuts.medium.solar.profile import SolarMediumParameters, SolarMediumProfile
 from tpeanuts.medium.solar.probability import solar_probability_state
+from tpeanuts.source.solar import SolarSourceParameters, SolarNeutrinoSource
 import tpeanuts.config.default as default
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.io import package_dir
@@ -206,8 +207,8 @@ def compare_solar_probability_state_with_legacy(
     the two flavour-probability vectors can be compared directly.
 
     Args:
-        source: Solar source key available in both the torch profile
-            (``SolarProfile.default``) and the legacy ``SolarModel``
+        source: Solar source key available in both the torch source
+            (``SolarNeutrinoSource.default``) and the legacy ``SolarModel``
             (e.g. "8B", "pp", "hep").
         oscillation: Built pmns object plus mass splittings (DeltamSq21,
             DeltamSq3l in eV^2) and antinu selection.
@@ -229,23 +230,27 @@ def compare_solar_probability_state_with_legacy(
     """
     legacy_pmns_module, legacy_solar = legacy_modules()
 
-    # Always use the B16 AGSS09 profile here: the legacy peanuts reference
-    # was generated with B16, so the comparison must use the same model
-    # regardless of what the package-wide default profile is.
+    # Always use the B16 AGSS09 medium/source here: the legacy peanuts
+    # reference was generated with B16, so the comparison must use the same
+    # model regardless of what the package-wide defaults are.
     _solar_dir = package_dir() / default.solar_data_dir
     _zenodo_dir = _solar_dir / "zenodo"
-    _b16_params = SolarParameters(
+    _b16_medium_params = SolarMediumParameters(
         density_path=str(_zenodo_dir / "density" / "density_SF3_AGSS09.csv"),
+    )
+    _b16_source_params = SolarSourceParameters(
         production_path=str(
             _zenodo_dir / "production" / "production_SF3_AGSS09.csv"
         ),
         fluxes_path=str(_zenodo_dir / "flux" / "fluxes_SF3_AGSS09.csv"),
     )
-    profile = SolarProfile.default(params=_b16_params, context=context)
+    medium = SolarMediumProfile.default(params=_b16_medium_params, context=context)
+    solar_source = SolarNeutrinoSource.default(params=_b16_source_params, context=context)
     torch_p = solar_probability_state(
         oscillation,
-        torch.tensor(E_MeV, device=profile.device, dtype=profile.dtype),
-        profile,
+        torch.tensor(E_MeV, device=medium.device, dtype=medium.dtype),
+        medium,
+        solar_source,
         source,
         legacy_precision=legacy_precision,
     )

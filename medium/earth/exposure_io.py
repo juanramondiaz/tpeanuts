@@ -32,6 +32,7 @@ Module functions:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal, Optional, Union
 
 import os
@@ -46,6 +47,18 @@ from tpeanuts.util.math import interp1d_linear
 
 AngleMode = Literal["Nadir", "Zenith", "CosZenith"]
 DayNight = Optional[Literal["day", "night"]]
+
+
+def resolve_exposure_cache_dir(cache_dir: str | os.PathLike[str]) -> Path:
+    """Resolve a cache directory independently of the process working directory.
+
+    Absolute paths are preserved. Relative paths are interpreted from the
+    installed package/repository root, never from ``Path.cwd()``.
+    """
+    path = Path(cache_dir).expanduser()
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
+    return path.resolve()
 
 
 def _cache_filename(
@@ -66,7 +79,7 @@ def _cache_filename(
         f"{default.torch_default_extension}"
     )
 
-    return os.path.join(cache_dir, filename)
+    return str(resolve_exposure_cache_dir(cache_dir) / filename)
 
 
 @torch.no_grad()
@@ -149,10 +162,11 @@ def save_nadir_exposure_to_cache(
     ns: Optional[int] = None,
     *,
     daynight: DayNight = default.earth_daynight,
-    cache_dir: str = default.earth_legacy_cache_dir,
+    cache_dir: str = default.earth_cache_dir,
 ) -> str:
     """Save a nadir-exposure table to the standard torch cache format."""
-    os.makedirs(cache_dir, exist_ok=True)
+    resolved_cache_dir = resolve_exposure_cache_dir(cache_dir)
+    resolved_cache_dir.mkdir(parents=True, exist_ok=True)
 
     if ns is None:
         if daynight is None:
@@ -163,7 +177,7 @@ def save_nadir_exposure_to_cache(
             raise ValueError("daynight must be None, 'day', or 'night'.")
 
     path = _cache_filename(
-        cache_dir,
+        str(resolved_cache_dir),
         lam_rad,
         d1,
         d2,

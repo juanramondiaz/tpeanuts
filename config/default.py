@@ -34,6 +34,9 @@ reference values used to validate tpeanuts against those tools.
 # propagation helpers, and external Atmosphere backends.
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import torch
 
 
@@ -47,6 +50,7 @@ device = None
 data_dir = "data"
 # Directory containing solar model and flux reference tables.
 solar_data_dir = "data/solar"
+detector_data_dir = "data/detector"
 # Directory containing legacy PEANUTS reference data, used for comparisons.
 legacy_data_dir = "data/peanuts"
 # Filename of the solar neutrino production-point distribution table.
@@ -253,11 +257,30 @@ earth_d2 = 365.0
 # Default number of sample points used to evaluate the exposure
 # distribution over the time window.
 earth_exposure_ns = 1000
-# Default directory used to cache computed nadir-angle exposure
-# distributions.
-earth_cache_dir = "data/exposure_cache"
-# Default directory used for legacy-PEANUTS-compatible exposure caches.
-earth_legacy_cache_dir = "cache_exposure"
+# Absolute package root.  Cache paths must not depend on the process working
+# directory: notebook kernels may start in any directory.
+_package_dir = Path(__file__).resolve().parents[1]
+
+
+def _fixed_exposure_cache_dir() -> str:
+    """Return the configured exposure-cache directory as an absolute path."""
+    configured = Path(
+        os.environ.get(
+            "TPEANUTS_EXPOSURE_CACHE_DIR",
+            str(_package_dir / "data" / "exposure_cache"),
+        )
+    ).expanduser()
+    if not configured.is_absolute():
+        configured = _package_dir / configured
+    return str(configured.resolve())
+
+
+# Single default directory used by both current and legacy-compatible
+# nadir-exposure readers/writers.  TPEANUTS_EXPOSURE_CACHE_DIR can override
+# it, while relative override values are resolved against the package root.
+earth_cache_dir = _fixed_exposure_cache_dir()
+# Backward-compatible alias; do not let legacy callers select another root.
+earth_legacy_cache_dir = earth_cache_dir
 # Whether the exposure distribution is normalized to unit integral by
 # default.
 earth_normalized_exposure = False

@@ -32,7 +32,7 @@ from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.solar.landau_zener import density_gradient, plz, resonance_radius
 from tpeanuts.medium.solar.matter_mixing import DeltamSqee, Vk, th13_M
-from tpeanuts.medium.solar.profile import build_solar_profile
+from tpeanuts.medium.solar.profile import build_solar_medium
 from tpeanuts.util.context import RuntimeContext
 
 
@@ -210,7 +210,7 @@ def test_plz_shape_bounds_and_scalar_vector_consistency():
 def test_standard_solar_profile_lma_is_fully_adiabatic_to_float_precision():
     context = make_context()
     oscillation = PropagationConfig.oscillation_parameters_from_preset("_SM_NUFIT52_NO", context=context)
-    profile = build_solar_profile(None, context=context)
+    profile = build_solar_medium(None, context=context)
     energies = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     probabilities = plz(oscillation, energies, profile)

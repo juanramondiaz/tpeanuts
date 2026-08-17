@@ -45,7 +45,11 @@ import dataclasses
 from typing import Literal, Optional
 import torch
 
-from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
+from tpeanuts.core.common.oscillation import (
+    OscillationParameters,
+    oscillation_needs_neutron_composition,
+    resolve_include_matter_nc,
+)
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.math import project_to_unitary
 from tpeanuts.util.type import TensorLike, cdtype_from_real
@@ -72,7 +76,6 @@ from tpeanuts.medium.atmosphere.profile import AtmosphereParameters, AtmosphereP
 # Atmosphere evolution
 # ============================================================
 
-@torch.no_grad()
 def atmosphere_evolutor_numerical(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -96,11 +99,16 @@ def atmosphere_evolutor_numerical(
         theta_deg: Atmosphere zenith angle in degrees.
         depth_km: Detector depth below surface in km.
         atmosphere: Atmosphere density profile construction settings. None
-            uses ``AtmosphereParameters()`` defaults. When
-            ``atmosphere.include_matter_nc`` is True, neutron density is also
-            sampled and forwarded as ``n_n_mol_cm3``, enabling the 3+1
-            sterile extension's neutral-current matter term (only meaningful
-            when ``oscillation.pmns`` is 4-flavour).
+            uses ``AtmosphereParameters()`` defaults. Neutron density is
+            sampled and forwarded as ``n_n_mol_cm3`` whenever
+            ``atmosphere.include_matter_nc`` is True (enabling the 3+1
+            sterile extension's neutral-current matter term, only meaningful
+            when ``oscillation.pmns`` is 4-flavour) and/or
+            ``oscillation.nsi.has_neutron_coupling`` is True (enabling the
+            NSI composition term, any flavour count -- see
+            ``core.BSM.bsm_nsi``'s "Composition dependence" section); the
+            two are independent and both are auto-detected, so no separate
+            flag is needed for the second one.
         context: Optional runtime device/dtype. If omitted, both are inferred
             from the tensor inputs.
         legacy_precision: If True, use the legacy peanuts matter-potential
@@ -129,7 +137,15 @@ def atmosphere_evolutor_numerical(
         has_neutron_data=True,
         context_name="atmosphere_evolutor_numerical",
     )
-    atmosphere = dataclasses.replace(atmosphere, include_matter_nc=include_matter_nc)
+    # AtmosphereProfile only reads params.include_matter_nc to decide whether
+    # to sample n_n_molcm3 at all -- the sterile NC term and the NSI
+    # composition term (core.BSM.bsm_nsi's "Composition dependence" section)
+    # both need that same raw neutron-density sample, so both must be able
+    # to request it, independent of one another (evolutor_numerical/
+    # hamiltonian_reduced apply each term on its own once n_n_mol_cm3 is
+    # supplied -- see oscillation_needs_neutron_composition).
+    fetch_neutron_density = include_matter_nc or oscillation_needs_neutron_composition(oscillation)
+    atmosphere = dataclasses.replace(atmosphere, include_matter_nc=fetch_neutron_density)
 
     profile_atmosphere = AtmosphereProfile(
         h_km=h_km,
@@ -163,7 +179,6 @@ def atmosphere_evolutor_numerical(
     return S, profile_atmosphere.x
 
 
-@torch.no_grad()
 def atmosphere_evolutor_analytical(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -185,12 +200,15 @@ def atmosphere_evolutor_analytical(
         h_km: Production altitude in km.
         theta_deg: Detector zenith angle in degrees.
         depth_km: Detector depth below the surface in km.
-        atmosphere: Density source and perturbative fit configuration.
-            When ``atmosphere.include_matter_nc`` is True, a second
-            polynomial is fitted to a neutron-density sample at the same
-            nodes and added to each segment model, enabling the 3+1 sterile
-            extension's neutral-current matter term (only meaningful when
-            ``oscillation.pmns`` is 4-flavour).
+        atmosphere: Density source and perturbative fit configuration. A
+            second polynomial is fitted to a neutron-density sample at the
+            same nodes and added to each segment model whenever
+            ``atmosphere.include_matter_nc`` is True (3+1 sterile
+            neutral-current term, only meaningful when ``oscillation.pmns``
+            is 4-flavour) and/or ``oscillation.nsi.has_neutron_coupling`` is
+            True (NSI composition term, any flavour count -- see
+            ``core.BSM.bsm_nsi``'s "Composition dependence" section); both
+            are independent and auto-detected.
         context: Optional runtime device and real dtype.
         legacy_precision: Use the legacy matter-potential prefactor.
         analytic_eigenvalues: If True, compute each segment Hamiltonian's
@@ -220,6 +238,11 @@ def atmosphere_evolutor_analytical(
         has_neutron_data=True,
         context_name="atmosphere_evolutor_analytical",
     )
+    # Fitting a neutron-density polynomial is needed for the sterile NC term
+    # and/or the NSI composition term (see the analogous comment in
+    # atmosphere_evolutor_numerical); evolutor_perturbative_segment applies
+    # each independently once density_n/coefficients_n is available.
+    include_matter_nc = include_matter_nc or oscillation_needs_neutron_composition(oscillation)
 
     h = as_tensor(h_km, device=dev, dtype=dtype)
     theta = as_tensor(theta_deg, device=dev, dtype=dtype)
@@ -303,7 +326,6 @@ def atmosphere_evolutor_analytical(
     return S, boundaries
 
 
-@torch.no_grad()
 def atmosphere_evolutor(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,

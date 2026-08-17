@@ -64,6 +64,7 @@ class DummyProfileModel:
         perturbation: torch.Tensor | bool = False,
         n_flavours: int = 3,
         potential_n: torch.Tensor | None = None,
+        average_n: torch.Tensor | None = None,
         residual_scale_n: torch.Tensor | float = 0.0,
         perturbation_n: torch.Tensor | bool = False,
     ) -> None:
@@ -75,6 +76,7 @@ class DummyProfileModel:
         self.perturbation = torch.as_tensor(perturbation, device=average.device, dtype=torch.bool)
         self.n_flavours = n_flavours
         self.potential_n = potential_n
+        self.average_n = average_n
         self.residual_scale_n = torch.as_tensor(residual_scale_n, device=average.device, dtype=average.dtype)
         self.perturbation_n = torch.as_tensor(perturbation_n, device=average.device, dtype=torch.bool)
 
@@ -326,6 +328,68 @@ def test_perturbative_from_H_adds_first_order_when_perturbed():
     assert torch.max(torch.abs(U - U0)) > 0.0
 
 
+def test_perturbative_from_H_returns_first_order_diagnostics():
+    H = make_hamiltonian()
+    length = torch.tensor(0.37, device=DEVICE, dtype=DTYPE)
+    profile = DummyProfileModel(
+        average=torch.tensor(1.0, device=DEVICE, dtype=DTYPE),
+        potential=torch.tensor(0.2, device=DEVICE, dtype=DTYPE),
+        length=length,
+        zero_mask=torch.tensor(False, device=DEVICE),
+        residual_scale=1.0e-4,
+        perturbation=True,
+    )
+
+    U, diagnostics = evolutor_perturbative_from_H(
+        H, length, profile, return_diagnostics=True,
+    )
+    U0 = evolutor_zero_order(H, length)
+    U1 = U - U0
+    expected_norm = torch.linalg.matrix_norm(
+        U0.conj().transpose(-1, -2) @ U1, ord=2,
+    )
+    expected_unitarity = torch.linalg.matrix_norm(
+        U.conj().transpose(-1, -2) @ U - identity3(), ord=2,
+    )
+    expected_probability = (
+        U.abs().square() - U0.abs().square()
+    ).abs().max()
+
+    assert_close(diagnostics.first_order_norm, expected_norm, name="diagnostic first-order norm")
+    assert_close(diagnostics.unitarity_defect, expected_unitarity, name="diagnostic unitarity defect")
+    assert_close(
+        diagnostics.probability_correction,
+        expected_probability,
+        name="diagnostic probability correction",
+    )
+    assert diagnostics.validity_code.dtype == torch.int8
+    assert diagnostics.validity_labels == ("safe", "caution", "unreliable")
+
+
+def test_perturbative_diagnostics_are_zero_without_perturbation():
+    H = make_hamiltonian()
+    length = torch.tensor(0.37, device=DEVICE, dtype=DTYPE)
+    profile = DummyProfileModel(
+        average=torch.tensor(1.0, device=DEVICE, dtype=DTYPE),
+        potential=torch.tensor(0.2, device=DEVICE, dtype=DTYPE),
+        length=length,
+        perturbation=False,
+        zero_mask=torch.tensor(False, device=DEVICE),
+    )
+
+    _, diagnostics = evolutor_perturbative_from_H(
+        H, length, profile, return_diagnostics=True,
+    )
+
+    assert_close(diagnostics.first_order_norm, torch.zeros_like(diagnostics.first_order_norm), name="zero eta1")
+    assert_close(
+        diagnostics.probability_correction,
+        torch.zeros_like(diagnostics.probability_correction),
+        name="zero probability correction",
+    )
+    assert diagnostics.validity_code.item() == 0
+
+
 def test_perturbative_from_H_zero_length_is_identity():
     H = make_hamiltonian()
     length = torch.tensor(0.0, device=DEVICE, dtype=DTYPE)
@@ -417,6 +481,95 @@ def test_evolutor_perturbative_segment_zero_length_identity():
     assert_close(U, identity3(), name="segment zero length identity")
 
 
+def test_evolutor_perturbative_segment_epsilon_n_matches_hamiltonian_reduced():
+    """A constant (no first-order perturbation) N=3 segment with a non-zero
+    ``epsilon_n`` (NSIConfig.eps_*_n, composition-dependent NSI -- see
+    core.BSM.bsm_nsi) must build the exact same Hamiltonian as
+    ``core.common.hamiltonian.hamiltonian_reduced(..., n_n_mol_cm3=...)``,
+    for a plain 3-flavour pmns (unlike the sterile NC term, the composition
+    term is not sterile-specific)."""
+    ctx = make_context()
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.20, device=DEVICE, real_dtype=DTYPE)
+    osc = dataclasses.replace(make_oscillation(), nsi=nsi)
+    energy = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    average = torch.tensor(1.5, device=DEVICE, dtype=DTYPE)
+    average_n = torch.tensor(1.2, device=DEVICE, dtype=DTYPE)
+    potential = matter_potential_cc(average, antinu=False, context=ctx)
+    potential_n = matter_potential_nc(average_n, antinu=False, context=ctx)
+    length = torch.tensor(0.37, device=DEVICE, dtype=DTYPE)
+    profile = DummyProfileModel(
+        average=average,
+        potential=potential,
+        length=length,
+        zero_mask=torch.tensor(False, device=DEVICE),
+        residual_scale=0.0,
+        perturbation=False,
+        potential_n=potential_n,
+        average_n=average_n,
+    )
+
+    U = evolutor_perturbative_segment(osc, energy, profile)
+
+    H = hamiltonian_reduced(osc, energy, average, n_n_mol_cm3=average_n, context=ctx)
+    trace_H = torch.diagonal(H, dim1=-2, dim2=-1).sum(dim=-1)
+    U0 = evolutor_zero_order(H, length, trace_H=trace_H)
+
+    assert_close(U, U0, name="N=3 segment with epsilon_n constant profile equals hamiltonian_reduced-based U0", atol=1.0e-10, rtol=1.0e-10)
+
+
+def test_evolutor_perturbative_segment_epsilon_n_raises_without_potential_n():
+    ctx = make_context()
+    osc = dataclasses.replace(make_oscillation(), nsi=NSIConfig(eps_ee_n=0.05, device=DEVICE, real_dtype=DTYPE))
+    average = torch.tensor(1.5, device=DEVICE, dtype=DTYPE)
+    potential = matter_potential_cc(average, antinu=False, context=ctx)
+    profile = DummyProfileModel(
+        average=average,
+        potential=potential,
+        length=torch.tensor(0.37, device=DEVICE, dtype=DTYPE),
+        zero_mask=torch.tensor(False, device=DEVICE),
+        residual_scale=0.0,
+        perturbation=False,
+    )
+
+    with pytest.raises(ValueError, match="eps_\\*_n"):
+        evolutor_perturbative_segment(osc, torch.tensor(1000.0, device=DEVICE, dtype=DTYPE), profile)
+
+
+def test_evolutor_perturbative_segment_epsilon_n_and_sterile_nc_combine():
+    """A constant N=4 segment with both include_matter_nc=True and a
+    non-zero epsilon_n must match hamiltonian_reduced's additive combination
+    of the sterile NC term and the NSI composition term (see
+    core.common.test.test3_hamiltonian's analogous exact-Hamiltonian test)."""
+    ctx = make_context()
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.20, device=DEVICE, real_dtype=DTYPE)
+    osc = dataclasses.replace(make_sterile_oscillation(), nsi=nsi)
+    energy = torch.tensor(1000.0, device=DEVICE, dtype=DTYPE)
+    average = torch.tensor(1.5, device=DEVICE, dtype=DTYPE)
+    average_n = torch.tensor(1.2, device=DEVICE, dtype=DTYPE)
+    potential = matter_potential_cc(average, antinu=False, context=ctx)
+    potential_n = matter_potential_nc(average_n, antinu=False, context=ctx)
+    length = torch.tensor(0.37, device=DEVICE, dtype=DTYPE)
+    profile = DummyProfileModel(
+        average=average,
+        potential=potential,
+        length=length,
+        zero_mask=torch.tensor(False, device=DEVICE),
+        residual_scale=0.0,
+        perturbation=False,
+        n_flavours=4,
+        potential_n=potential_n,
+        average_n=average_n,
+    )
+
+    U = evolutor_perturbative_segment(osc, energy, profile, include_matter_nc=True)
+
+    H = hamiltonian_reduced(osc, energy, average, n_n_mol_cm3=average_n, context=ctx)
+    trace_H = torch.diagonal(H, dim1=-2, dim2=-1).sum(dim=-1)
+    U0 = evolutor_zero_order(H, length, trace_H=trace_H)
+
+    assert_close(U, U0, name="N=4 segment with NC + epsilon_n equals hamiltonian_reduced-based U0", atol=1.0e-10, rtol=1.0e-10)
+
+
 # ---------------------------------------------------------------------------
 # Fase 4: N-agnostic evolutor (3+1 sterile, NSI)
 # ---------------------------------------------------------------------------
@@ -504,6 +657,53 @@ def test_evolutor_first_order_p_nc_adds_independent_sandwich_term():
     )
 
     assert_close(U1_with_nc - U1_cc_only, expected_extra, name="P_nc contributes an independent sandwich term", atol=1.0e-10, rtol=1.0e-10)
+
+
+def test_evolutor_first_order_p_eps_n_adds_independent_sandwich_term():
+    """``P_eps_n`` must add a genuinely independent term on top of the CC
+    correction, reusing the profile's ``residual_integral_neutron`` (the
+    same integral P_nc uses) but converted with ``matter_potential_cc``
+    (not ``matter_potential_nc``)."""
+    H = make_hermitian4()
+    spectral = hamiltonian_spectral_data(H)
+    profile = DummyProfileModel(
+        average=torch.tensor(1.0, device=DEVICE, dtype=DTYPE),
+        potential=torch.tensor(0.2, device=DEVICE, dtype=DTYPE),
+        length=torch.tensor(0.37, device=DEVICE, dtype=DTYPE),
+        zero_mask=torch.tensor(False, device=DEVICE),
+        residual_scale=1.0e-4,
+        perturbation=True,
+        n_flavours=4,
+        residual_scale_n=2.0e-4,
+        perturbation_n=True,
+    )
+    P = torch.eye(4, device=DEVICE, dtype=CDTYPE)
+    P_eps_n = torch.diag(torch.tensor([0.1, 0.0, 0.0, 0.0], device=DEVICE, dtype=CDTYPE))
+
+    U1_cc_only = evolutor_first_order(spectral["M"], spectral["lam"], spectral["trace"], profile, P=P)
+    U1_with_eps_n = evolutor_first_order(spectral["M"], spectral["lam"], spectral["trace"], profile, P=P, P_eps_n=P_eps_n)
+
+    integral_n = profile.residual_integral_neutron(la=None, lb=None)
+    potential_correction_eps_n = matter_potential_cc(integral_n, antinu=False, evolution_scale_m=6371000.0).to(dtype=spectral["M"].dtype)
+    expected_extra = (-1j) * torch.einsum(
+        "...ab,...aik,...kl,...blj->...ij", potential_correction_eps_n, spectral["M"], P_eps_n, spectral["M"],
+    )
+
+    assert_close(U1_with_eps_n - U1_cc_only, expected_extra, name="P_eps_n contributes an independent sandwich term", atol=1.0e-10, rtol=1.0e-10)
+
+    # Combining P_nc and P_eps_n must be exactly additive (independent terms
+    # sharing the same underlying residual_integral_neutron).
+    P_nc = torch.diag(torch.tensor([0.0, 0.0, 0.0, -1.0], device=DEVICE, dtype=CDTYPE))
+    U1_with_both = evolutor_first_order(
+        spectral["M"], spectral["lam"], spectral["trace"], profile, P=P, P_nc=P_nc, P_eps_n=P_eps_n,
+    )
+    U1_with_nc_only = evolutor_first_order(spectral["M"], spectral["lam"], spectral["trace"], profile, P=P, P_nc=P_nc)
+    assert_close(
+        U1_with_both - U1_with_nc_only,
+        expected_extra,
+        name="P_eps_n contributes additively even when P_nc is also present",
+        atol=1.0e-10, rtol=1.0e-10,
+    )
 
 
 def test_evolutor_perturbative_segment_epsilon_zero_matches_epsilon_none_n3():

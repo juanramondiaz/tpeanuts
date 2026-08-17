@@ -28,7 +28,8 @@ import torch
 from tpeanuts.core.BSM.bsm_nsi import NSIConfig
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.config.propagation import PropagationConfig
-from tpeanuts.medium.solar.profile import build_solar_profile, SolarParameters
+from tpeanuts.medium.solar.profile import SolarMediumProfile, build_solar_medium
+from tpeanuts.source.solar import build_solar_source, SolarSourceParameters
 from tpeanuts.medium.solar.adiabatic import (
     mass_weights_adiabatic_approximated,
     mass_weights_adiabatic_exact,
@@ -106,11 +107,30 @@ def make_zero_nsi(oscillation: OscillationParameters) -> OscillationParameters:
     return dataclasses.replace(oscillation, nsi=zero_nsi)
 
 
-def make_profile(*, use_lz: bool = False):
+def make_medium_source():
     context = make_context()
-    profile = build_solar_profile(None, context=context)
-    profile.use_LZ = use_lz
-    return profile
+    medium = build_solar_medium(None, context=context)
+    source = build_solar_source(None, context=context)
+    return medium, source
+
+
+def test_probability_rejects_incompatible_source_medium_radial_domains():
+    medium, source = make_medium_source()
+    truncated = SolarMediumProfile(
+        radius=medium.radius[medium.radius >= 0.1],
+        density=medium.density[medium.radius >= 0.1],
+        density_n=None if medium.density_n is None else medium.density_n[medium.radius >= 0.1],
+        provider=medium.provider,
+    )
+    with pytest.raises(ValueError, match="production radii"):
+        solar_probability_mass(make_oscillation(), 1.0, truncated, source, "pp")
+
+
+def test_probability_rejects_mixed_source_medium_runtime_contexts():
+    medium = build_solar_medium(None, context=make_context(torch.float64))
+    source = build_solar_source(None, context=make_context(torch.float32))
+    with pytest.raises(ValueError, match="share device and dtype"):
+        solar_probability_mass(make_oscillation(), 1.0, medium, source, "8B")
 
 
 def test_adiabatic_approximated_returns_normalized_finite_weights_for_energy_density_grid():
@@ -127,18 +147,21 @@ def test_adiabatic_approximated_returns_normalized_finite_weights_for_energy_den
 
 
 def test_solar_probability_mass_bahcall_profile_uses_shell_fraction():
-    # End-to-end: a Bahcall-provider profile must route through the
+    # End-to-end: a Bahcall-provider source must route through the
     # discrete-sum branch, not silently fall back to trapz -- regardless of
     # which provider is currently configured as the package-wide default.
     oscillation = make_oscillation()
     context = make_context()
-    profile = build_solar_profile(
-        None, params=SolarParameters(provider="bahcall"), context=context,
+    medium = build_solar_medium(None, context=context)
+    source = build_solar_source(
+        None,
+        params=SolarSourceParameters(production_provider="bahcall", flux_provider="bahcall"),
+        context=context,
     )
-    assert profile.production_measure == "shell_fraction"
+    assert source.production_measure == "shell_fraction"
 
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
-    weights = solar_probability_mass(oscillation, energy, profile, "8B")
+    weights = solar_probability_mass(oscillation, energy, medium, source, "8B")
 
     assert torch.isfinite(weights).all()
     assert torch.all(weights >= 0.0)
@@ -149,10 +172,10 @@ def test_solar_probability_mass_bahcall_profile_uses_shell_fraction():
 
 def test_solar_probability_mass_single_source_shape_and_normalization():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    weights = solar_probability_mass(oscillation, energy, profile, "8B")
+    weights = solar_probability_mass(oscillation, energy, medium, source, "8B")
 
     assert weights.shape == (3, 3)
     assert torch.isfinite(weights).all()
@@ -162,13 +185,13 @@ def test_solar_probability_mass_single_source_shape_and_normalization():
 
 def test_solar_probability_mass_multiple_sources_preserves_source_order():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 10.0], device=DEVICE, dtype=DTYPE)
     sources = ("pp", "8B", "hep")
 
-    multi = solar_probability_mass(oscillation, energy, profile, sources)
+    multi = solar_probability_mass(oscillation, energy, medium, source, sources)
     stacked = torch.stack(
-        [solar_probability_mass(oscillation, energy, profile, source) for source in sources],
+        [solar_probability_mass(oscillation, energy, medium, source, key) for key in sources],
         dim=0,
     )
 
@@ -178,11 +201,11 @@ def test_solar_probability_mass_multiple_sources_preserves_source_order():
 
 def test_psolar_probabilities_are_normalized_and_match_mass_projection():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    weights = solar_probability_mass(oscillation, energy, profile, "8B")
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B")
+    weights = solar_probability_mass(oscillation, energy, medium, source, "8B")
+    probabilities = solar_probability_state(oscillation, energy, medium, source, "8B")
     pmns_projection = oscillation.pmns.pmns_matrix().abs() ** 2
     expected = torch.einsum("ei,ni->ne", pmns_projection, weights)
 
@@ -195,13 +218,13 @@ def test_psolar_probabilities_are_normalized_and_match_mass_projection():
 
 def test_psolar_multiple_sources_matches_single_source_stack():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([0.5, 5.0], device=DEVICE, dtype=DTYPE)
     sources = ("pp", "7Be", "8B")
 
-    multi = solar_probability_state(oscillation, energy, profile, sources)
+    multi = solar_probability_state(oscillation, energy, medium, source, sources)
     stacked = torch.stack(
-        [solar_probability_state(oscillation, energy, profile, source) for source in sources],
+        [solar_probability_state(oscillation, energy, medium, source, key) for key in sources],
         dim=0,
     )
 
@@ -211,10 +234,10 @@ def test_psolar_multiple_sources_matches_single_source_stack():
 
 def test_electron_survival_decreases_from_low_to_high_energy_for_8b():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([0.1, 10.0], device=DEVICE, dtype=DTYPE)
 
-    pee = solar_probability_state(oscillation, energy, profile, "8B")[:, 0]
+    pee = solar_probability_state(oscillation, energy, medium, source, "8B")[:, 0]
 
     assert pee[0] > pee[1]
     assert 0.45 < float(pee[0]) < 0.65
@@ -223,12 +246,11 @@ def test_electron_survival_decreases_from_low_to_high_energy_for_8b():
 
 def test_lz_enabled_standard_lma_matches_adiabatic_result_to_float_precision():
     oscillation = make_oscillation()
-    profile_ad = make_profile(use_lz=False)
-    profile_lz = make_profile(use_lz=True)
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_ad = solar_probability_state(oscillation, energy, profile_ad, "8B")
-    p_lz = solar_probability_state(oscillation, energy, profile_lz, "8B")
+    p_ad = solar_probability_state(oscillation, energy, medium, source, "8B", use_LZ=False)
+    p_lz = solar_probability_state(oscillation, energy, medium, source, "8B", use_LZ=True)
 
     torch.testing.assert_close(p_lz, p_ad, rtol=0.0, atol=0.0)
 
@@ -257,10 +279,10 @@ def test_solar_probability_state_sterile_does_not_crash_and_is_normalized():
     # and crash with a RuntimeError (3x3 @ 4x4 shape mismatch) for any
     # 4-flavour oscillation.pmns.
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_exact")
+    probabilities = solar_probability_state(oscillation, energy, medium, source, "8B", method="adiabatic_exact")
 
     assert probabilities.shape == (3, 4)
     assert torch.isfinite(probabilities).all()
@@ -281,11 +303,11 @@ def test_solar_probability_state_sterile_null_mixing_reduces_to_sm_active_sector
     context = make_context()
     oscillation_sm = make_oscillation(context=context)
     oscillation_st = make_sterile_oscillation("sterile_3p1_null_mixing", context=context)
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_sm = solar_probability_state(oscillation_sm, energy, profile, "8B")
-    p_st = solar_probability_state(oscillation_st, energy, profile, "8B", method="adiabatic_exact")
+    p_sm = solar_probability_state(oscillation_sm, energy, medium, source, "8B")
+    p_st = solar_probability_state(oscillation_st, energy, medium, source, "8B", method="adiabatic_exact")
 
     assert p_st.shape == (3, 4)
     torch.testing.assert_close(p_st[..., 3], torch.zeros(3, device=DEVICE, dtype=DTYPE), rtol=0.0, atol=1.0e-12)
@@ -325,11 +347,11 @@ def test_solar_probability_state_sterile_null_mixing_reduces_to_sm_active_sector
     oscillation_st = make_inverted_ordering(
         make_sterile_oscillation("sterile_3p1_null_mixing", context=context)
     )
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_sm = solar_probability_state(oscillation_sm, energy, profile, "8B")
-    p_st = solar_probability_state(oscillation_st, energy, profile, "8B", method="adiabatic_exact")
+    p_sm = solar_probability_state(oscillation_sm, energy, medium, source, "8B")
+    p_st = solar_probability_state(oscillation_st, energy, medium, source, "8B", method="adiabatic_exact")
 
     assert p_st.shape == (3, 4)
     torch.testing.assert_close(p_st[..., 3], torch.zeros(3, device=DEVICE, dtype=DTYPE), rtol=0.0, atol=1.0e-12)
@@ -348,29 +370,29 @@ def test_solar_probability_state_io_sterile_adiabatic_exact_matches_numerical_me
     oscillation = make_inverted_ordering(
         make_sterile_oscillation("sterile_3p1_null_mixing", context=context)
     )
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_adiabatic = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_exact")
-    p_numerical = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
+    p_adiabatic = solar_probability_state(oscillation, energy, medium, source, "8B", method="adiabatic_exact")
+    p_numerical = solar_probability_state(oscillation, energy, medium, source, "8B", method="numerical")
 
     torch.testing.assert_close(p_adiabatic, p_numerical, rtol=0.0, atol=5.0e-3)
 
 
 def test_solar_probability_mass_include_matter_nc_changes_result_for_sterile():
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     weights_cc_only = solar_probability_mass(
-        oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=False,
+        oscillation, energy, medium, source, "8B", method="adiabatic_exact", include_matter_nc=False,
     )
     weights_with_nc = solar_probability_mass(
-        oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=True,
+        oscillation, energy, medium, source, "8B", method="adiabatic_exact", include_matter_nc=True,
     )
     # include_matter_nc=None (the default) auto-resolves to True here since
-    # the profile carries neutron-density data and sterile is active.
-    weights_default = solar_probability_mass(oscillation, energy, profile, "8B", method="adiabatic_exact")
+    # the medium carries neutron-density data and sterile is active.
+    weights_default = solar_probability_mass(oscillation, energy, medium, source, "8B", method="adiabatic_exact")
 
     assert weights_cc_only.shape == weights_with_nc.shape == weights_default.shape == (3, 4)
     for weights in (weights_cc_only, weights_with_nc, weights_default):
@@ -387,12 +409,12 @@ def test_solar_probability_mass_include_matter_nc_ignored_for_three_flavour():
     # unobservable common phase in the plain 3-flavour case, so requesting
     # it there is mathematically inert, not an error.
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    weights_default = solar_probability_mass(oscillation, energy, profile, "8B")
+    weights_default = solar_probability_mass(oscillation, energy, medium, source, "8B")
     weights_with_nc = solar_probability_mass(
-        oscillation, energy, profile, "8B", include_matter_nc=True,
+        oscillation, energy, medium, source, "8B", include_matter_nc=True,
     )
 
     torch.testing.assert_close(weights_default, weights_with_nc, rtol=0.0, atol=0.0)
@@ -400,13 +422,13 @@ def test_solar_probability_mass_include_matter_nc_ignored_for_three_flavour():
 
 def test_solar_probability_mass_include_matter_nc_requires_density_n():
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
-    profile.density_n = None
+    medium, source = make_medium_source()
+    medium.density_n = None
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="density_n"):
         solar_probability_mass(
-            oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=True,
+            oscillation, energy, medium, source, "8B", method="adiabatic_exact", include_matter_nc=True,
         )
 
 
@@ -427,40 +449,40 @@ def test_adiabatic_exact_has_no_p_lz_parameter():
 def test_solar_probability_mass_rejects_sterile_with_adiabatic_approximated():
     # Default/explicit method="adiabatic_approximated" now rejects any BSM
     # extension outright (see solar_probability_mass), independent of
-    # profile.use_LZ.
+    # use_LZ.
     oscillation = make_sterile_oscillation()
-    profile = make_profile(use_lz=False)
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="only supports the plain 3-flavour Standard Model"):
-        solar_probability_mass(oscillation, energy, profile, "8B", method="adiabatic_approximated")
+        solar_probability_mass(oscillation, energy, medium, source, "8B", method="adiabatic_approximated")
 
 
 def test_solar_probability_mass_rejects_lz_with_adiabatic_exact():
     oscillation = make_sterile_oscillation()
-    profile_lz = make_profile(use_lz=True)
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="use_LZ=True is not supported"):
-        solar_probability_mass(oscillation, energy, profile_lz, "8B", method="adiabatic_exact")
+        solar_probability_mass(oscillation, energy, medium, source, "8B", method="adiabatic_exact", use_LZ=True)
 
 
 def test_solar_probability_mass_rejects_lz_with_numerical_method():
     oscillation = make_oscillation()
-    profile_lz = make_profile(use_lz=True)
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="use_LZ=True has no effect"):
-        solar_probability_mass(oscillation, energy, profile_lz, "8B", method="numerical")
+        solar_probability_mass(oscillation, energy, medium, source, "8B", method="numerical", use_LZ=True)
 
 
 def test_solar_probability_mass_rejects_lz_with_multidim_energy():
     oscillation = make_oscillation()
-    profile_lz = make_profile(use_lz=True)
+    medium, source = make_medium_source()
     energy = torch.tensor([[1.0, 5.0], [8.0, 10.0]], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="scalar or 1-D energy grid"):
-        solar_probability_mass(oscillation, energy, profile_lz, "8B")
+        solar_probability_mass(oscillation, energy, medium, source, "8B", use_LZ=True)
 
 
 # -----------------------------------------------------------------------
@@ -471,11 +493,11 @@ def test_solar_probability_state_nsi_alone_changes_result_and_stays_three_flavou
     context = make_context()
     oscillation_sm = make_oscillation(context=context)
     oscillation_nsi = make_nsi_oscillation(context=context)
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_sm = solar_probability_state(oscillation_sm, energy, profile, "8B")
-    p_nsi = solar_probability_state(oscillation_nsi, energy, profile, "8B", method="adiabatic_exact")
+    p_sm = solar_probability_state(oscillation_sm, energy, medium, source, "8B")
+    p_nsi = solar_probability_state(oscillation_nsi, energy, medium, source, "8B", method="adiabatic_exact")
 
     assert p_nsi.shape == (3, 3)
     assert torch.isfinite(p_nsi).all()
@@ -490,10 +512,10 @@ def test_solar_probability_state_nsi_and_sterile_combined_does_not_crash():
     # and the 3+1 sterile extension active simultaneously in the solar
     # pipeline.
     oscillation = make_nsi_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_exact")
+    probabilities = solar_probability_state(oscillation, energy, medium, source, "8B", method="adiabatic_exact")
 
     assert probabilities.shape == (3, 4)
     assert torch.isfinite(probabilities).all()
@@ -505,11 +527,11 @@ def test_solar_probability_state_nsi_and_sterile_combined_does_not_crash():
 
 def test_solar_probability_state_nsi_and_sterile_with_matter_nc_does_not_crash():
     oscillation = make_nsi_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     probabilities = solar_probability_state(
-        oscillation, energy, profile, "8B", method="adiabatic_exact", include_matter_nc=True,
+        oscillation, energy, medium, source, "8B", method="adiabatic_exact", include_matter_nc=True,
     )
 
     assert probabilities.shape == (3, 4)
@@ -525,11 +547,11 @@ def test_solar_probability_state_nsi_and_sterile_with_matter_nc_does_not_crash()
 
 def test_solar_probability_mass_rejects_unknown_method():
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     with pytest.raises(ValueError, match="method must be"):
-        solar_probability_mass(oscillation, energy, profile, "8B", method="bogus")
+        solar_probability_mass(oscillation, energy, medium, source, "8B", method="bogus")
 
 
 def test_solar_probability_state_numerical_matches_adiabatic_approximated_in_sm_limit():
@@ -539,11 +561,11 @@ def test_solar_probability_state_numerical_matches_adiabatic_approximated_in_sm_
     # approximation itself is good, which is excellent for standard LMA
     # parameters.
     oscillation = make_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    p_adiabatic = solar_probability_state(oscillation, energy, profile, "8B", method="adiabatic_approximated")
-    p_numerical = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
+    p_adiabatic = solar_probability_state(oscillation, energy, medium, source, "8B", method="adiabatic_approximated")
+    p_numerical = solar_probability_state(oscillation, energy, medium, source, "8B", method="numerical")
 
     assert p_numerical.shape == p_adiabatic.shape == (3, 3)
     assert torch.isfinite(p_numerical).all()
@@ -555,10 +577,10 @@ def test_solar_probability_state_numerical_matches_adiabatic_approximated_in_sm_
 
 def test_solar_probability_state_numerical_sterile_does_not_crash_and_is_normalized():
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
+    probabilities = solar_probability_state(oscillation, energy, medium, source, "8B", method="numerical")
 
     assert probabilities.shape == (3, 4)
     assert torch.isfinite(probabilities).all()
@@ -570,10 +592,10 @@ def test_solar_probability_state_numerical_sterile_does_not_crash_and_is_normali
 
 def test_solar_probability_state_numerical_nsi_and_sterile_combined_does_not_crash():
     oscillation = make_nsi_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
-    probabilities = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
+    probabilities = solar_probability_state(oscillation, energy, medium, source, "8B", method="numerical")
 
     assert probabilities.shape == (3, 4)
     assert torch.isfinite(probabilities).all()
@@ -584,22 +606,89 @@ def test_solar_probability_state_numerical_nsi_and_sterile_combined_does_not_cra
 
 def test_solar_probability_state_numerical_include_matter_nc_changes_result():
     oscillation = make_sterile_oscillation()
-    profile = make_profile()
+    medium, source = make_medium_source()
     energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
 
     p_cc_only = solar_probability_state(
-        oscillation, energy, profile, "8B", method="numerical", include_matter_nc=False,
+        oscillation, energy, medium, source, "8B", method="numerical", include_matter_nc=False,
     )
     p_with_nc = solar_probability_state(
-        oscillation, energy, profile, "8B", method="numerical", include_matter_nc=True,
+        oscillation, energy, medium, source, "8B", method="numerical", include_matter_nc=True,
     )
     # include_matter_nc=None (the default) auto-resolves to True here since
-    # the profile carries neutron-density data and sterile is active.
-    p_default = solar_probability_state(oscillation, energy, profile, "8B", method="numerical")
+    # the medium carries neutron-density data and sterile is active.
+    p_default = solar_probability_state(oscillation, energy, medium, source, "8B", method="numerical")
 
     assert not torch.allclose(p_cc_only, p_with_nc)
     torch.testing.assert_close(p_default, p_with_nc, rtol=1.0e-12, atol=1.0e-12)
     for p in (p_cc_only, p_with_nc, p_default):
         torch.testing.assert_close(
             p.sum(dim=-1), torch.ones(3, device=DEVICE, dtype=DTYPE), rtol=1.0e-6, atol=1.0e-6,
+        )
+
+
+# ---------------------------------------------------------------------------
+# NSI composition term (NSIConfig.eps_*_n) -- pipeline-level wiring
+# ---------------------------------------------------------------------------
+#
+# Unlike the sterile NC term above, this needs no include_matter_nc=True:
+# oscillation_needs_neutron_composition auto-detects it from oscillation.nsi
+# and neutron-density data is fetched independently of that flag (see
+# core.common.oscillation.oscillation_needs_neutron_composition and
+# medium.solar.probability/evolutor).
+
+def _make_eps_n_oscillation(ctx: RuntimeContext) -> OscillationParameters:
+    base = make_oscillation(context=ctx)
+    nsi = NSIConfig(eps_ee=0.05, eps_ee_n=0.30, device=ctx.device, real_dtype=ctx.dtype)
+    return dataclasses.replace(base, nsi=nsi)
+
+
+def test_solar_probability_mass_epsilon_n_changes_three_flavour_result_adiabatic_exact():
+    ctx = make_context()
+    oscillation_sm = make_oscillation(context=ctx)
+    oscillation_eps_n = _make_eps_n_oscillation(ctx)
+    medium, source = make_medium_source()
+    energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
+
+    weights_sm = solar_probability_mass(
+        oscillation_sm, energy, medium, source, "8B", method="adiabatic_exact",
+    )
+    weights_eps_n = solar_probability_mass(
+        oscillation_eps_n, energy, medium, source, "8B", method="adiabatic_exact",
+    )
+
+    assert weights_eps_n.shape == weights_sm.shape == (3, 3)
+    assert torch.isfinite(weights_eps_n).all()
+    torch.testing.assert_close(
+        weights_eps_n.sum(dim=-1), torch.ones(3, device=DEVICE, dtype=DTYPE), rtol=1.0e-12, atol=1.0e-12,
+    )
+    assert not torch.allclose(weights_sm, weights_eps_n)
+
+
+def test_solar_probability_state_numerical_epsilon_n_changes_three_flavour_result():
+    ctx = make_context()
+    oscillation_sm = make_oscillation(context=ctx)
+    oscillation_eps_n = _make_eps_n_oscillation(ctx)
+    medium, source = make_medium_source()
+    energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
+
+    p_sm = solar_probability_state(oscillation_sm, energy, medium, source, "8B", method="numerical")
+    p_eps_n = solar_probability_state(oscillation_eps_n, energy, medium, source, "8B", method="numerical")
+
+    assert not torch.allclose(p_sm, p_eps_n)
+    torch.testing.assert_close(
+        p_eps_n.sum(dim=-1), torch.ones(3, device=DEVICE, dtype=DTYPE), rtol=1.0e-6, atol=1.0e-6,
+    )
+
+
+def test_solar_probability_mass_epsilon_n_requires_density_n():
+    ctx = make_context()
+    oscillation_eps_n = _make_eps_n_oscillation(ctx)
+    medium, source = make_medium_source()
+    medium.density_n = None
+    energy = torch.tensor([1.0, 5.0, 10.0], device=DEVICE, dtype=DTYPE)
+
+    with pytest.raises(ValueError, match="eps_\\*_n"):
+        solar_probability_mass(
+            oscillation_eps_n, energy, medium, source, "8B", method="adiabatic_exact",
         )

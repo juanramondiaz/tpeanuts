@@ -67,9 +67,13 @@ import tpeanuts.config.default as default
 
 PearthMethod = Literal["analytical", "numerical"]
 
-from tpeanuts.medium.earth.evolutor import earth_evolutor
+from tpeanuts.medium.earth.evolutor import EarthPerturbativeDiagnostics, earth_evolutor
 
-from tpeanuts.core.common.oscillation import OscillationParameters, resolve_include_matter_nc
+from tpeanuts.core.common.oscillation import (
+    OscillationParameters,
+    oscillation_needs_neutron_composition,
+    resolve_include_matter_nc,
+)
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor, cdtype_from_real, state_tensor
 from tpeanuts.util.torch_util import broadcast_tensor
@@ -86,7 +90,6 @@ from tpeanuts.medium.earth.geometry import build_earth_trajectory, validate_eta_
 from tpeanuts.util.constant import R_E
 
 
-@torch.no_grad()
 def earth_probability_transition(
     profile_earth: object,
     oscillation: OscillationParameters,
@@ -147,7 +150,6 @@ def earth_probability_transition(
     return probability_transition(U_earth)
 
 
-@torch.no_grad()
 def earth_probability_state_analytical(
     nustate: Tensor,
     profile_earth: object,
@@ -161,7 +163,8 @@ def earth_probability_state_analytical(
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
     analytic_eigenvalues: bool = False,
-) -> Tensor:
+    return_diagnostics: bool = False,
+) -> Tensor | tuple[Tensor, EarthPerturbativeDiagnostics]:
     """Compute Earth probabilities with the analytical perturbative evolutor.
 
     Args:
@@ -191,7 +194,7 @@ def earth_probability_state_analytical(
     Returns:
         Final flavour probabilities with final dimension 3.
     """
-    U_earth = earth_evolutor(
+    evolutor_result = earth_evolutor(
         profile_earth=profile_earth,
         oscillation=oscillation,
         E=E_MeV,
@@ -201,7 +204,12 @@ def earth_probability_state_analytical(
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
         analytic_eigenvalues=analytic_eigenvalues,
+        return_diagnostics=return_diagnostics,
     )
+    if return_diagnostics:
+        U_earth, diagnostics = evolutor_result
+    else:
+        U_earth = evolutor_result
 
     state = state_tensor(
         nustate,
@@ -210,20 +218,23 @@ def earth_probability_state_analytical(
     )
 
     if massbasis:
-        return probability_incoherent(
+        probabilities = probability_incoherent(
             U_earth,
             state,
             pmns=oscillation.pmns,
             antinu=oscillation.antinu,
         ).real
+    else:
+        probabilities = probability_coherent(
+            U_earth,
+            state,
+        ).real
 
-    return probability_coherent(
-        U_earth,
-        state,
-    ).real
+    if return_diagnostics:
+        return probabilities, diagnostics
+    return probabilities
 
 
-@torch.no_grad()
 def earth_probability_state_numerical(
     nustate: Tensor,
     profile_earth: object,
@@ -287,16 +298,23 @@ def earth_probability_state_numerical(
             ``profile_earth.has_neutron_density`` is True, ``False``
             otherwise (with a ``RuntimeWarning`` if sterile was requested
             but the profile lacks neutron-density data). Always ``False``
-            for the plain 3-flavour case.
+            for the plain 3-flavour case. Independent of and orthogonal to
+            the NSI composition term: neutron density is sampled whenever
+            this resolves True *or* ``oscillation.nsi.has_neutron_coupling``
+            is True (auto-detected, no separate flag needed, any flavour
+            count -- see ``core.BSM.bsm_nsi``'s "Composition dependence"
+            section).
 
     Returns:
         Final flavour probabilities. If ``full_oscillation=True``, returns
         ``(probabilities_along_path, x_grid)``.
 
     Raises:
-        ValueError: If any broadcast ``eta`` value lies outside [0, pi], or
-            if a tensor ``oscillation.antinu`` is not broadcastable to the
-            (energy, eta) grid shape.
+        ValueError: If any broadcast ``eta`` value lies outside [0, pi], if
+            a tensor ``oscillation.antinu`` is not broadcastable to the
+            (energy, eta) grid shape, or if
+            ``oscillation.nsi.has_neutron_coupling`` is True and
+            ``profile_earth`` lacks neutron-density data.
     """
     dev, dtype = context.device, context.dtype
     E_b, eta_b = broadcast_tensor(
@@ -357,7 +375,22 @@ def earth_probability_state_numerical(
     n_e_constant = profile_earth.density_x_eta(r_mid, zero)
     n_e = torch.where(is_earth_crossing[..., None], n_e_crossing, n_e_constant)
 
-    if include_matter_nc:
+    # Sampling neutron density is needed for the sterile NC term
+    # (include_matter_nc) and/or the NSI composition term
+    # (oscillation.nsi.epsilon_n, any flavour count -- see
+    # core.BSM.bsm_nsi's "Composition dependence" section); the two are
+    # independent, so this ORs them rather than gating solely on the
+    # sterile-specific flag.
+    needs_eps_n = oscillation_needs_neutron_composition(oscillation)
+    if needs_eps_n and not getattr(profile_earth, "has_neutron_density", False):
+        raise ValueError(
+            "oscillation.nsi has non-zero eps_*_n (composition-dependent "
+            "NSI) but profile_earth was not built with neutron-density "
+            "coefficients (see EarthProfile.has_neutron_density, "
+            "EvenPowerProfileLayered/PremTabulatedProfile "
+            "include_neutron=True)."
+        )
+    if include_matter_nc or needs_eps_n:
         n_n_crossing = profile_earth.density_n_x_eta(trajectory.sample_x, eta_prime_seg)
         n_n_constant = profile_earth.density_n_x_eta(r_mid, zero)
         n_n = torch.where(is_earth_crossing[..., None], n_n_crossing, n_n_constant)
@@ -399,7 +432,6 @@ def earth_probability_state_numerical(
     return evolution
 
 
-@torch.no_grad()
 def earth_probability_state(
     nustate: Tensor,
     profile_earth: object,
@@ -418,7 +450,8 @@ def earth_probability_state(
     legacy_precision: bool = False,
     include_matter_nc: Optional[bool] = None,
     analytic_eigenvalues: bool = False,
-) -> Tensor | tuple[Tensor, Tensor]:
+    return_diagnostics: bool = False,
+) -> Tensor | tuple[Tensor, Tensor] | tuple[Tensor, EarthPerturbativeDiagnostics]:
     """Dispatch Earth matter-regeneration probabilities by method.
 
     This is the main public probability entry point for Earth propagation. It
@@ -459,9 +492,14 @@ def earth_probability_state(
             instead of ``torch.linalg.eigvalsh`` (see
             ``earth_probability_state_analytical``). Only meaningful with
             ``method="analytical"``.
+        return_diagnostics: Return analytical first-order validity
+            diagnostics together with the probabilities. Rejected for the
+            numerical method.
 
     Returns:
-        Probability tensor with final dimension 3. If method="numerical" and
+        Probability tensor with final dimension 3. With analytical
+        ``return_diagnostics=True``, returns ``(probabilities, diagnostics)``.
+        If method="numerical" and
         full_oscillation=True, returns (probabilities_along_path, x_grid).
 
     Raises:
@@ -502,6 +540,11 @@ def earth_probability_state(
             "analytic_eigenvalues=False (the default), or use "
             "method='analytical'."
         )
+    if method == "numerical" and return_diagnostics:
+        raise ValueError(
+            "return_diagnostics=True is only available for "
+            "method='analytical', which has an explicit first-order term."
+        )
 
     if method == "analytical":
         return earth_probability_state_analytical(
@@ -516,6 +559,7 @@ def earth_probability_state(
             legacy_precision=legacy_precision,
             include_matter_nc=include_matter_nc,
             analytic_eigenvalues=analytic_eigenvalues,
+            return_diagnostics=return_diagnostics,
         )
 
     return earth_probability_state_numerical(
@@ -535,7 +579,6 @@ def earth_probability_state(
     )
 
 
-@torch.no_grad()
 def earth_probability_integrated(
     nustate: Tensor,
     profile_earth: object,

@@ -38,7 +38,7 @@ Module contents:
         ``oscillation_parameters_from_preset`` is a static factory building
         the ``oscillation`` field (an ``OscillationParameters``) from a named
         preset; it is the composition layer allowed to depend on concrete
-        PMNS, sterile, NSI, and preset implementations, keeping
+        PMNS, sterile, NSI, Majorana, and preset implementations, keeping
         ``OscillationParameters`` itself a passive domain container.
 """
 
@@ -56,7 +56,7 @@ from tpeanuts.core.common.pmns import PMNSParams
 from tpeanuts.medium.atmosphere.profile import AtmosphereParameters
 from tpeanuts.medium.earth.exposure_table import ExposureParameters
 from tpeanuts.medium.earth.profile import EarthParameters
-from tpeanuts.medium.solar.profile import SolarParameters
+from tpeanuts.config.solar import SolarParameters
 from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor
 
@@ -160,6 +160,9 @@ class PropagationConfig:
         *,
         antinu: Union[bool, torch.Tensor] = False,
         NSI_extension: Optional[str] = None,
+        neutrino_nature: Literal["dirac", "majorana"] = "dirac",
+        alpha21_deg: float = 0.0,
+        alpha31_deg: float = 0.0,
         context: Optional[RuntimeContext] = None,
     ) -> OscillationParameters:
         """Build a concrete SM/BSM ``OscillationParameters`` from a named preset.
@@ -184,6 +187,25 @@ class PropagationConfig:
                 device/dtype (populating its ``epsilon`` tensor), and stores
                 it as ``oscillation.nsi``. None (default) means the plain
                 Standard Model matter potential.
+            neutrino_nature: ``"dirac"`` (default) or ``"majorana"``.
+                ``"dirac"`` builds a plain ``PMNS_SM`` object -- every
+                propagation result is exactly as before this argument
+                existed. ``"majorana"`` attaches a
+                ``tpeanuts.core.BSM.bsm_majorana.MajoranaPhases`` built from
+                ``alpha21_deg``/``alpha31_deg`` to a
+                ``tpeanuts.core.BSM.bsm_majorana.PMNS_Majorana`` object
+                (built in place of ``PMNS_SM``); this changes
+                ``oscillation.BSM_extension_majorana`` and the mixing
+                matrices themselves, but is provably inert for every
+                oscillation probability (see that module's docstring) -- it
+                only matters for observables that read the mixing matrix
+                directly, such as the effective Majorana mass
+                (``tpeanuts.core.BSM.bsm_majorana.effective_majorana_mass``).
+                Only supported for 3-flavour SM presets; combining it with a
+                3+1 sterile preset raises, since ``PMNS_sterile`` does not
+                apply the Majorana phase factor.
+            alpha21_deg, alpha31_deg: Majorana CP phases in degrees, used
+                only when ``neutrino_nature="majorana"``.
             context: Runtime context for stored tensors. If omitted, the
                 default device and ``torch.float64`` are used.
 
@@ -193,7 +215,9 @@ class PropagationConfig:
             set from the preset.
 
         Raises:
-            ValueError: If ``preset_name`` or ``NSI_extension`` is unknown.
+            ValueError: If ``preset_name`` or ``NSI_extension`` is unknown,
+                or if ``neutrino_nature="majorana"`` is combined with a 3+1
+                sterile preset.
         """
         if context is None:
             context = RuntimeContext.resolve(None, torch.float64)
@@ -207,6 +231,14 @@ class PropagationConfig:
             )
 
         preset = get_preset(OSCILLATION_PRESETS, preset_name, kind="oscillation preset")
+
+        if neutrino_nature == "majorana" and "theta14_deg" in preset:
+            raise ValueError(
+                'neutrino_nature="majorana" is not yet supported for the 3+1 '
+                f'sterile preset "{preset_name}": PMNS_sterile does not '
+                "apply the Majorana phase factor. Use a 3-flavour SM preset, "
+                'or neutrino_nature="dirac" (the default).'
+            )
 
         sm_params = PMNSParams(
             theta12=math.radians(float(preset["theta12_deg"])),
@@ -236,6 +268,17 @@ class PropagationConfig:
             pmns_obj = PMNS_sterile(sm_params, sterile_params)
             dm41 = as_tensor(float(preset["DeltamSq41"]), device=context.device, dtype=context.dtype)
             mass_spectrum = MassSpectrum_BSM(DeltamSq21=dm21, DeltamSq3l=dm3l, DeltamSq41=dm41)
+        elif neutrino_nature == "majorana":
+            from tpeanuts.core.BSM.bsm_majorana import MajoranaPhases, PMNS_Majorana
+            from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
+
+            majorana_params = MajoranaPhases(
+                alpha21=math.radians(float(alpha21_deg)),
+                alpha31=math.radians(float(alpha31_deg)),
+                context=context,
+            )
+            pmns_obj = PMNS_Majorana(sm_params, majorana_params)
+            mass_spectrum = MassSpectrum_SM(DeltamSq21=dm21, DeltamSq3l=dm3l)
         else:
             from tpeanuts.core.SM.sm_pmns import PMNS_SM
             from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM

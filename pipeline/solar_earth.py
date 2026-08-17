@@ -11,11 +11,14 @@ from tpeanuts.config.propagation import PropagationConfig
 from tpeanuts.core.common.flux import flux_integrated, flux_state
 from tpeanuts.core.common.probability import probability_integrated
 from tpeanuts.medium.earth.profile import EarthProfile
-from tpeanuts.medium.solar.geometry import (
+from tpeanuts.medium.earth.evolutor import EarthPerturbativeDiagnostics
+from tpeanuts.medium.vacuum.solar_geometry import (
     sun_earth_distance_factor,
     sun_earth_distance_factor_averaged,
 )
-from tpeanuts.medium.solar.profile import SolarProfile
+from tpeanuts.medium.solar.profile import SolarMediumProfile
+from tpeanuts.source.solar import SolarNeutrinoSource, build_solar_source
+from tpeanuts.source.solar import ContinuousSolarSpectrum, SolarLineSpectrum
 from tpeanuts.pipeline.earth import (
     EarthDetectorResult,
     propagate_earth_to_detector,
@@ -35,15 +38,17 @@ class SolarEarthDetectorResult:
     detector_probabilities: Optional[torch.Tensor] = None
     probabilities_energy_averaged: Optional[torch.Tensor] = None
     detector_flux_energy_integrated: Optional[torch.Tensor] = None
+    perturbative_diagnostics: Optional[EarthPerturbativeDiagnostics] = None
 
 
 @torch.no_grad()
 def propagate_solar_to_earth_detector(
     *,
-    E_MeV: TensorLike,
+    E_MeV: Optional[TensorLike] = None,
     config: PropagationConfig,
     source: str,
-    solar_profile: Optional[SolarProfile] = None,
+    solar_medium: Optional[SolarMediumProfile] = None,
+    solar_source: Optional[SolarNeutrinoSource] = None,
     earth_profile: Optional[EarthProfile] = None,
     eta: Optional[TensorLike] = None,
     source_spectrum: Optional[torch.Tensor] = None,
@@ -54,8 +59,13 @@ def propagate_solar_to_earth_detector(
     include_matter_nc: Optional[bool] = None,
     date: Optional[str] = None,
     average_sun_earth_distance: bool = False,
+    return_diagnostics: bool = False,
 ) -> SolarEarthDetectorResult:
     """Compose solar production and incoherent Earth regeneration.
+
+    ``return_diagnostics=True`` propagates the analytical Earth first-order
+    diagnostics into both ``earth_detector.perturbative_diagnostics`` and the
+    convenience field ``perturbative_diagnostics`` of this result.
 
     ``solar_method`` and ``include_matter_nc`` (both new) are forwarded to
     ``pipeline.solar.propagate_solar_to_surface`` for the solar leg only --
@@ -71,7 +81,7 @@ def propagate_solar_to_earth_detector(
 
     ``date``/``average_sun_earth_distance`` apply the Sun-Earth distance
     modulation ``(1 AU / R)^2`` to ``detector_flux``/
-    ``detector_flux_energy_integrated`` (see ``medium.solar.geometry``):
+    ``detector_flux_energy_integrated`` (see ``medium.vacuum.solar_geometry``):
     solar-model flux tables are normalized to 1 AU, but Earth's elliptical
     orbit makes the physically received flux vary by about +-3.4% over the
     year. Exactly one of the two is meaningful for a given call, matching
@@ -88,17 +98,30 @@ def propagate_solar_to_earth_detector(
             If True, averages the factor uniformly over the *same*
             day-of-year window already used for the nadir-angle exposure
             average, ``config.exposure.exposure_d1``/``exposure_d2`` (see
-            ``medium.solar.geometry.sun_earth_distance_factor_averaged``),
+            ``medium.vacuum.solar_geometry.sun_earth_distance_factor_averaged``),
             so a single exposure window consistently accounts for both the
             detector's day/night geometry and the Sun-Earth distance over
             the same period. Raises if ``integrate_exposure`` resolves to
             False (there is no day-of-year window to average over).
     """
+    solar_source = build_solar_source(
+        solar_source, params=config.solar.source, context=config.runtime,
+    )
+    if E_MeV is None:
+        spectrum = solar_source.spectrum_table(source)
+        if not isinstance(spectrum, SolarLineSpectrum):
+            raise ValueError(
+                "E_MeV may be omitted only for a discrete solar line source; "
+                f"{source!r} has a continuous spectrum."
+            )
+        E_MeV = spectrum.energy_MeV
+
     solar = propagate_solar_to_surface(
         E_MeV=E_MeV,
         config=config,
         source=source,
-        solar_profile=solar_profile,
+        solar_medium=solar_medium,
+        solar_source=solar_source,
         method=solar_method,
         legacy_precision=legacy_precision,
         include_matter_nc=include_matter_nc,
@@ -125,6 +148,7 @@ def propagate_solar_to_earth_detector(
             config=config,
             incident_basis="mass",
             earth_profile=earth_profile,
+            return_diagnostics=return_diagnostics,
         )
         probabilities = earth.probabilities_exposure
     else:
@@ -135,23 +159,43 @@ def propagate_solar_to_earth_detector(
             incident_basis="mass",
             earth_profile=earth_profile,
             eta=eta,
+            return_diagnostics=return_diagnostics,
         )
         probabilities = earth.probabilities_eta
-    resolved_spectrum = (
-        solar.profile.spectrum(source, solar.E_MeV)
-        if source_spectrum is None else source_spectrum
-    )
-    detector_flux = flux_state(
-        probabilities,
-        solar.profile.flux(source),
-        resolved_spectrum,
-    )
+    spectrum_model = solar.source.spectrum_table(source) if source_spectrum is None else None
+    if isinstance(spectrum_model, SolarLineSpectrum):
+        if solar.E_MeV.shape != spectrum_model.energy_MeV.shape or not torch.allclose(
+            solar.E_MeV, spectrum_model.energy_MeV,
+        ):
+            raise ValueError(
+                "A solar line source must be propagated at its exact line energies; "
+                "pass E_MeV=solar_source.spectrum_table(source).energy_MeV."
+            )
+        resolved_spectrum = spectrum_model.weights
+        # flux_state's internal broadcasting lifts resolved_spectrum (rank 1)
+        # against probabilities' actual rank (2 without an eta axis, 3 with
+        # one) by appending trailing singleton axes -- a plain
+        # resolved_spectrum[..., None] only appends one and silently
+        # misaligns the line-weight axis against the eta axis whenever
+        # probabilities is rank 3 (see propagate_earth_to_detector's
+        # multi-eta probabilities_eta).
+        weighted_probabilities = flux_state(probabilities, 1.0, resolved_spectrum)
+        detector_flux = weighted_probabilities * solar.source.total_flux(source)
+    else:
+        resolved_spectrum = (
+            spectrum_model.evaluate(solar.E_MeV)
+            if isinstance(spectrum_model, ContinuousSolarSpectrum)
+            else source_spectrum
+        )
+        detector_flux = flux_state(
+            probabilities, solar.source.total_flux(source), resolved_spectrum,
+        )
     if date is not None:
-        detector_flux = detector_flux * sun_earth_distance_factor(
+        detector_flux = detector_flux * solar.source.flux_reference_distance_au ** 2 * sun_earth_distance_factor(
             date, device=detector_flux.device, dtype=detector_flux.dtype,
         )
     elif average_sun_earth_distance:
-        detector_flux = detector_flux * sun_earth_distance_factor_averaged(
+        detector_flux = detector_flux * solar.source.flux_reference_distance_au ** 2 * sun_earth_distance_factor_averaged(
             config.exposure.exposure_d1,
             config.exposure.exposure_d2,
             device=detector_flux.device,
@@ -160,17 +204,14 @@ def propagate_solar_to_earth_detector(
     probability_energy = None
     detector_rate = None
     if integrate_energy:
-        probability_energy = probability_integrated(
-            probabilities,
-            solar.E_MeV,
-            resolved_spectrum,
-            energy_dim=0,
-        )
-        detector_rate = flux_integrated(
-            detector_flux,
-            solar.E_MeV,
-            energy_dim=0,
-        )
+        if isinstance(spectrum_model, SolarLineSpectrum):
+            probability_energy = weighted_probabilities.sum(dim=0)
+            detector_rate = detector_flux.sum(dim=0)
+        else:
+            probability_energy = probability_integrated(
+                probabilities, solar.E_MeV, resolved_spectrum, energy_dim=0,
+            )
+            detector_rate = flux_integrated(detector_flux, solar.E_MeV, energy_dim=0)
     return SolarEarthDetectorResult(
         solar_surface=solar,
         earth_detector=earth,
@@ -178,4 +219,5 @@ def propagate_solar_to_earth_detector(
         detector_probabilities=probabilities,
         probabilities_energy_averaged=probability_energy,
         detector_flux_energy_integrated=detector_rate,
+        perturbative_diagnostics=earth.perturbative_diagnostics,
     )

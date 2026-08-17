@@ -83,6 +83,7 @@ import tpeanuts.config.default as default
 from tpeanuts.core.common.oscillation import OscillationParameters
 from tpeanuts.core.numerical.geometry import OdeMethod
 from tpeanuts.medium.earth.probability import PearthMethod, earth_probability_state
+from tpeanuts.medium.earth.evolutor import EarthPerturbativeDiagnostics
 from tpeanuts.medium.earth.exposure_table import ExposureParameters, build_nadir_exposure
 from tpeanuts.util.context import RuntimeContext
 
@@ -139,7 +140,8 @@ def earth_probability_exposure(
     ode_method: OdeMethod | None = default.earth_numerical_method,
     include_matter_nc: Optional[bool] = None,
     analytic_eigenvalues: bool = False,
-) -> Tensor:
+    return_diagnostics: bool = False,
+) -> Tensor | tuple[Tensor, EarthPerturbativeDiagnostics]:
     """Compute Earth probabilities averaged over a nadir exposure table.
 
     The function builds or loads an exposure table ``W(eta)``, evaluates
@@ -186,6 +188,9 @@ def earth_probability_exposure(
             ``method="analytical"``; forwarded to every
             ``earth_probability_state`` call below, whose own validation
             raises if combined with ``method="numerical"``.
+        return_diagnostics: With analytical propagation, also return the
+            worst first-order validity diagnostics over the exposure angles
+            at each energy. Rejected for numerical propagation.
 
     Returns:
         Exposure-integrated final flavour probabilities with final dimension
@@ -200,6 +205,11 @@ def earth_probability_exposure(
 
     if method not in ("analytical", "numerical"):
         raise ValueError("method must be either 'analytical' or 'numerical'.")
+    if method == "numerical" and return_diagnostics:
+        raise ValueError(
+            "return_diagnostics=True is only available for "
+            "method='analytical'."
+        )
 
     source = exposure.exposure_source
     if source not in ("math", "cache", "csv", "legacy"):
@@ -243,6 +253,11 @@ def earth_probability_exposure(
         device=dev,
         dtype=dtype,
     )
+    diagnostic_maximum = torch.zeros(n_energy, device=dev, dtype=dtype)
+    diagnostic_accumulated = torch.zeros_like(diagnostic_maximum)
+    diagnostic_probability = torch.zeros_like(diagnostic_maximum)
+    diagnostic_unitarity = torch.zeros_like(diagnostic_maximum)
+    diagnostic_validity = torch.zeros(n_energy, device=dev, dtype=torch.int8)
 
     if chunk_eta is None or chunk_eta <= 0:
         chunk_eta = eta_grid.numel()
@@ -280,7 +295,7 @@ def earth_probability_exposure(
         # evolutor never re-unitarizes) so that reunitarize=True raises the
         # same "has no effect" ValueError here as it does for a direct
         # earth_probability_state call, instead of being silently dropped.
-        P_chunk = earth_probability_state(
+        probability_result = earth_probability_state(
             nustate=nustate,
             profile_earth=profile_earth,
             oscillation=dataclasses.replace(oscillation, antinu=antinu_chunk),
@@ -296,14 +311,56 @@ def earth_probability_exposure(
             reunitarize=reunitarize,
             include_matter_nc=include_matter_nc,
             analytic_eigenvalues=analytic_eigenvalues,
+            return_diagnostics=return_diagnostics,
         )
+        if return_diagnostics:
+            P_chunk, chunk_diagnostics = probability_result
+            diagnostic_maximum = torch.maximum(
+                diagnostic_maximum,
+                chunk_diagnostics.max_first_order_norm.amax(dim=1),
+            )
+            diagnostic_accumulated = torch.maximum(
+                diagnostic_accumulated,
+                chunk_diagnostics.accumulated_first_order_norm.amax(dim=1),
+            )
+            diagnostic_probability = torch.maximum(
+                diagnostic_probability,
+                chunk_diagnostics.max_probability_correction.amax(dim=1),
+            )
+            diagnostic_unitarity = torch.maximum(
+                diagnostic_unitarity,
+                chunk_diagnostics.unitarity_defect.amax(dim=1),
+            )
+            diagnostic_validity = torch.maximum(
+                diagnostic_validity,
+                chunk_diagnostics.validity_code.amax(dim=1),
+            )
+        else:
+            P_chunk = probability_result
 
         out = out + torch.sum(
             P_chunk * w_chunk[None, :, None],
             dim=1,
         ) * deta
 
+    if return_diagnostics:
+        diagnostics = EarthPerturbativeDiagnostics(
+            diagnostic_maximum,
+            diagnostic_accumulated,
+            diagnostic_probability,
+            diagnostic_unitarity,
+            diagnostic_validity,
+        )
+        if squeeze_E:
+            diagnostics = EarthPerturbativeDiagnostics(
+                diagnostics.max_first_order_norm[0],
+                diagnostics.accumulated_first_order_norm[0],
+                diagnostics.max_probability_correction[0],
+                diagnostics.unitarity_defect[0],
+                diagnostics.validity_code[0],
+            )
+            return out[0], diagnostics
+        return out, diagnostics
     if squeeze_E:
         return out[0]
-
     return out

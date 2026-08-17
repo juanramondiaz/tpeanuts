@@ -64,7 +64,6 @@ def _resolve_vacuum_context(
     )
 
 
-@torch.no_grad()
 def vacuum_evolutor(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -135,7 +134,6 @@ def vacuum_evolutor(
     return (U * phase[..., None, :]) @ Udag
 
 
-@torch.no_grad()
 def vacuum_evolved_state(
     nustate: TensorLike,
     oscillation: OscillationParameters,

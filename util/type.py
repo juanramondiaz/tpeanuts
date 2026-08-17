@@ -58,7 +58,7 @@ from typing import Any, Union
 
 # Type alias for values accepted as scalar-or-tensor inputs throughout
 # tpeanuts.
-TensorLike = Union[float, int, torch.Tensor]
+TensorLike = Union[float, int, torch.Tensor, np.ndarray]
 
 
 def cdtype_from_real(dtype: torch.dtype) -> torch.dtype:

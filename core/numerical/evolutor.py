@@ -50,7 +50,6 @@ from tpeanuts.util.context import RuntimeContext
 from tpeanuts.util.type import TensorLike, as_tensor
 
 
-@torch.no_grad()
 def evolutor_numerical_segment(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,
@@ -157,7 +156,6 @@ def evolutor_numerical_segment(
     return U_steps
 
 
-@torch.no_grad()
 def evolutor_numerical(
     oscillation: OscillationParameters,
     E_MeV: TensorLike,

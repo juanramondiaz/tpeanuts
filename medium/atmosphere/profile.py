@@ -99,7 +99,11 @@ class AtmosphereParameters:
         by ``atmosphere_evolutor_numerical``/``atmosphere_evolutor_analytical``
         via ``core.common.oscillation.resolve_include_matter_nc``: ``True``
         when ``oscillation.BSM_extension_sterile`` is set, ``False``
-        otherwise.
+        otherwise. That resolved value is then widened internally (on a
+        fresh ``dataclasses.replace``d copy, not this field's own contract)
+        whenever ``oscillation.nsi.has_neutron_coupling`` is also True, so
+        ``n_n_molcm3`` gets sampled for the NSI composition term too -- see
+        ``core.common.oscillation.oscillation_needs_neutron_composition``.
     """
 
     atmosphere_density_source: str = default.atmosphere_source_density

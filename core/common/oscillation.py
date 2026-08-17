@@ -110,13 +110,21 @@ class OscillationParameters:
         Read-only property (not a stored field): True iff ``nsi`` is not
         None. Auto-derived so it can never disagree with ``nsi``.
 
+    BSM_extension_majorana:
+        Read-only property (not a stored field): True iff ``pmns`` is a
+        ``tpeanuts.core.BSM.bsm_majorana.PMNS_Majorana`` object
+        (duck-typed via ``hasattr(pmns, "majorana_params")``). Unlike the
+        other two BSM extensions, this one is provably inert for every
+        oscillation probability computed in this project -- see that
+        module's docstring.
+
     BSM_extension:
-        Read-only property (not a stored field): True iff either
-        ``BSM_extension_NSI`` or ``BSM_extension_sterile`` is True, i.e. any
-        BSM extension is active. False means the plain Standard Model is
-        used. This is the flag ``core.BSM``/``core.numerical``/
-        ``core.perturbative`` check to route between the SM-only fast path
-        and the general BSM path.
+        Read-only property (not a stored field): True iff any of
+        ``BSM_extension_NSI``, ``BSM_extension_sterile``, or
+        ``BSM_extension_majorana`` is True, i.e. any BSM extension is
+        active. False means the plain Standard Model is used. This is the
+        flag ``core.BSM``/``core.numerical``/``core.perturbative`` check to
+        route between the SM-only fast path and the general BSM path.
 
     preset_name:
         Name of the named oscillation preset used to build this object via
@@ -162,9 +170,61 @@ class OscillationParameters:
         return self.nsi is not None
 
     @property
+    def BSM_extension_majorana(self) -> bool:
+        """True iff ``pmns`` is a Majorana-phase mixing object.
+
+        Duck-typed on ``hasattr(pmns, "majorana_params")`` -- true for
+        ``tpeanuts.core.BSM.bsm_majorana.PMNS_Majorana``, false for
+        ``PMNS_SM``/``PMNS_sterile`` -- exactly like ``BSM_extension_NSI``
+        is duck-typed on ``nsi``, and for the same reason: this module
+        never imports ``core.BSM`` (see the class docstring). ``False``
+        (the default, plain ``PMNS_SM``) reproduces every propagation
+        result exactly as it was before this extension existed -- Majorana
+        phases are provably inert for oscillation probabilities, see
+        ``tpeanuts.core.BSM.bsm_majorana``'s module docstring. This flag
+        matters only for observables that read the mixing matrix directly,
+        such as the effective Majorana mass
+        (``tpeanuts.core.BSM.bsm_majorana.effective_majorana_mass``).
+        """
+        return hasattr(self.pmns, "majorana_params")
+
+    @property
     def BSM_extension(self) -> bool:
-        """True iff any BSM extension (NSI and/or sterile) is active."""
-        return self.BSM_extension_NSI or self.BSM_extension_sterile
+        """True iff any BSM extension (NSI, sterile, and/or Majorana) is active."""
+        return (
+            self.BSM_extension_NSI
+            or self.BSM_extension_sterile
+            or self.BSM_extension_majorana
+        )
+
+
+def oscillation_needs_neutron_composition(oscillation: "OscillationParameters") -> bool:
+    """True iff ``oscillation.nsi`` has a non-zero neutron-normalized coupling.
+
+    Gates the NSI composition term ``V_CC(n_n) * epsilon_n`` (see
+    ``core.common.hamiltonian.hamiltonian_matter_reduced`` and
+    ``core.BSM.bsm_nsi``'s "Composition dependence" section), which needs
+    neutron-density data regardless of whether the 3+1 sterile extension or
+    its neutral-current term (``resolve_include_matter_nc`` below) is
+    active: unlike that term, the NSI composition term applies at any
+    ``oscillation.pmns.n_flavours`` and is *not* an optional refinement --
+    it is exactly as mandatory as ``oscillation.nsi.epsilon`` itself once
+    ``eps_*_n`` is non-zero, since there is no separate "enable NSI" flag
+    either. Medium-level pipelines (``medium.solar``/``medium.earth``/
+    ``medium.atmosphere``) that gate raw neutron-density sampling behind
+    ``include_matter_nc`` must OR this in as an independent condition so
+    that condition stays a pure sterile-NC-term policy (see
+    ``resolve_include_matter_nc``) while neutron data still gets fetched
+    whenever the NSI composition term needs it.
+
+    Args:
+        oscillation: Built ``OscillationParameters``; only ``nsi`` is read.
+
+    Returns:
+        True iff ``oscillation.nsi is not None`` and
+        ``oscillation.nsi.has_neutron_coupling`` is True.
+    """
+    return oscillation.BSM_extension_NSI and oscillation.nsi.has_neutron_coupling
 
 
 def resolve_include_matter_nc(

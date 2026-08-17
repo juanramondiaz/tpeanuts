@@ -97,6 +97,23 @@ def test_atmosphere_grid_pipeline_returns_full_transition_and_integrated_fluxes(
     assert result.detector_rate.shape == (3,)
 
 
+def test_atmosphere_earth_pipeline_returns_earth_perturbative_diagnostics():
+    productions = {
+        flavour: [_production(flavour, 140.0)]
+        for flavour in ("nue", "numu", "nutau")
+    }
+    result = propagate_atmosphere_grid_to_detector(
+        productions,
+        _config(),
+        return_diagnostics=True,
+    )
+
+    diagnostics = result.detector_results[0].perturbative_diagnostics
+    assert diagnostics is not None
+    assert diagnostics.max_first_order_norm.shape == torch.Size([2])
+    assert diagnostics.validity_code.dtype == torch.int8
+
+
 def test_atmosphere_grid_pipeline_propagates_analytic_eigenvalues_and_reunitarize_atmosphere():
     # config.analytic_eigenvalues flows into the Earth leg (pipeline/atmosphere_earth.py's
     # earth_evolutor_from_zenith call, always the perturbative/analytical path)
