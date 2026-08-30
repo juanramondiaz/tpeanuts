@@ -1,0 +1,190 @@
+\label{ch:introduction}
+
+\section{Purpose and how to read this document}
+
+This document is the second inference-side companion to the \emph{Theoretical
+Foundations of \texttt{tpeanuts}} document: where that document develops the
+generic neutrino-propagation physics implemented in \texttt{core/} and
+\texttt{medium/}, and \emph{Inference at Daya Bay} documents a reactor
+antineutrino application, this one documents a real solar-neutrino
+application built on a different statistical foundation than either --
+fitting the solar mixing angle $\theta_{12}$, the solar mass-squared
+splitting $\Delta m^2_{21}$, and the total active $^8$B solar-neutrino flux
+$\Phi_{8B}$ to the real public data of the Sudbury Neutrino Observatory's
+salt phase (Phase~II). Every number quoted here that is not explicitly
+attributed to a fitted \texttt{tpeanuts} result is a real, published,
+externally verifiable quantity, traceable through the References chapter.
+
+The five chapters are organised as follows: this chapter introduces the
+experiment itself -- the salt-phase detector modification, its three
+detection reactions, and the data-taking timeline -- with no reference yet to
+\texttt{tpeanuts}; \cref{ch:data-release} catalogues the real official
+published tables this document's data was transcribed from, table by table,
+including an honest account of which entries could and could not be read with
+full confidence; \cref{ch:detector-implementation} is the physics-and-mathematics
+core, developing the equivalent-flux forward model and the day/night Earth
+regeneration \texttt{tpeanuts.detector.sno\_ii} implements;
+\cref{ch:inference-process} documents the correlated-covariance statistical
+machinery -- including a genuine extension to this project's own shared
+inference code, built specifically to support this document -- and the
+fixed-slice/profiled likelihood-scan distinction; \cref{ch:results} presents,
+interprets, and summarises the numerical results obtained from
+\texttt{inference6\_sno\_ii.ipynb}, compared directly against SNO's own
+published best fit and likelihood contours.
+
+\section{Overview}
+
+The Sudbury Neutrino Observatory (SNO) is a heavy-water Cherenkov detector
+located 2039~m underground in the Creighton mine near Sudbury, Ontario,
+Canada, built to resolve the decades-old solar neutrino problem by measuring,
+independently and simultaneously, both the $\nu_e$-only flux and the
+total-active-flavour flux of $^8$B solar neutrinos. Its original (``Phase~I''
+or ``pure D$_2$O'') running period established, via a pure-D$_2$O
+neutral-current measurement, that solar $\nu_e$ genuinely change flavour en
+route from the Sun rather than simply disappearing
+\parencite{Ahmad2002NCDiscovery}. This document concerns SNO's second running
+phase, the \emph{salt phase} (Phase~II): between June 2001 and October 2003,
+approximately 2000~kg of NaCl were dissolved into SNO's $\sim$1000 tonnes of
+D$_2$O target, enhancing the detector's sensitivity to the neutral-current
+reaction specifically \parencite{Aharmim2005SaltPhase}. The data set this
+document's inference is built against is the full 391-live-day salt-phase
+sample, with its real published day/night electron-recoil spectrum and
+integrated fluxes \parencite{Aharmim2005SaltPhase}.
+
+\begin{notebox}
+\textbf{Scope of this document.} \texttt{tpeanuts} reproduces SNO's own real
+\emph{equivalent-flux} observable definitions (Eq.~A1 of the primary source),
+the real salt-phase energy-response parametrisation, real day/night
+Earth-matter regeneration, and a real correlated statistical+systematic
+covariance built from the collaboration's own published correlation and
+sensitivity tables. It does \emph{not} reproduce SNO's own underlying
+event-by-event maximum-likelihood signal extraction (the process that turned
+raw PMT hit patterns into the 38 published observables in the first place --
+see \cref{sec:salt-phase-principle}): that extraction is consumed as
+already-published, external input, the same ``use the officially extracted
+observable, not the raw data'' pattern this project already uses for
+Daya Bay's published IBD spectra and IceCube's published detector-systematics
+hypersurfaces. \Cref{ch:results} reports, honestly and without adjustment,
+where two specific systematic-table entries could not be transcribed with
+confidence from the published source and were conservatively set to zero
+rather than guessed.
+\end{notebox}
+
+\section{The salt-phase detector modification}
+\label{sec:salt-phase-detector}
+
+\begin{theorybox}
+SNO's heavy-water target is instrumented by $\sim$9500 photomultiplier tubes
+mounted on a geodesic support structure surrounding a transparent acrylic
+vessel, itself submerged in ordinary (light) water for shielding, following
+the same general Cherenkov-detector design principle used by Super-Kamiokande
+and (with GdLS instead of pure D$_2$O) Daya Bay. Dissolving NaCl into the
+D$_2$O target changed the physics of neutron detection specifically, since
+the dominant neutron-capture nucleus becomes $^{35}$Cl rather than deuterium
+itself:
+\begin{equation}
+  n + {}^{35}\mathrm{Cl} \rightarrow {}^{36}\mathrm{Cl} + \gamma\text{'s}
+  \quad(\text{total }\gamma\text{ energy}\approx 8.6~\mathrm{MeV}),
+\end{equation}
+compared to Phase~I's single $\approx6.25$~MeV $\gamma$ from
+$n+d\rightarrow t+\gamma$. Three real, direct consequences follow
+\parencite{Aharmim2005SaltPhase}: (i) the neutron-capture efficiency
+increases by roughly a factor of three; (ii) the higher-multiplicity,
+higher-energy $^{35}$Cl capture gamma cascade produces a measurably more
+\emph{isotropic} PMT hit pattern than a single-gamma CC or ES Cherenkov cone,
+providing a real, event-by-event discriminating observable
+(\cref{sec:salt-phase-principle}); (iii) the NC capture-gamma energy spectrum
+shifts to overlap the CC electron-recoil spectrum's own range more heavily
+than in Phase~I, reducing (not increasing) how much spectral shape alone can
+separate CC from NC -- the direct physical reason SNO's own salt-phase
+analysis relies on event isotropy for that separation rather than
+recoil-energy shape alone.
+\end{theorybox}
+
+\begin{notebox}
+The detector depth (2039~m) used throughout \texttt{tpeanuts.detector.sno\_ii}
+and \texttt{tpeanuts.detector.sno} alike is SNO's commonly quoted approximate
+value, not independently re-verified here against a primary SNO
+instrumentation paper -- its effect on Earth-crossing geometry is tiny
+relative to the Earth's $\sim$6371~km radius, the same reasoning already
+applied to Daya Bay's/Borexino's own approximate depths elsewhere in this
+project.
+\end{notebox}
+
+\section{Three simultaneous detection reactions}
+\label{sec:three-reactions}
+
+\begin{theorybox}
+SNO measures $^8$B solar neutrinos through three physically distinct
+reactions on the same D$_2$O(+NaCl) target, occurring simultaneously in the
+same data set:
+\begin{align}
+  \nu_e + d &\to p + p + e^- &&\text{(charged current, CC, } \nu_e\text{-only)}, \\
+  \nu_x + e^- &\to \nu_x + e^- &&\text{(elastic scattering, ES, all flavours)}, \\
+  \nu_x + d &\to p + n + \nu_x &&\text{(neutral current, NC, flavour-blind)}.
+\end{align}
+CC is sensitive only to the electron flavour, giving it a direct handle on
+the survival probability $P_{ee}$; ES is sensitive to every active flavour
+but with unequal couplings ($\sigma_e\approx6$--$7\times\sigma_{\mu,\tau}$ in
+this energy range, since $\nu_e$ scatters via both charged- and
+neutral-current diagrams while $\nu_\mu,\nu_\tau$ scatter via neutral current
+only); NC has an equal cross section for every active flavour, so in the
+Standard Model (three active flavours, unitary leptonic mixing) the NC rate
+is exactly the total active $^8$B flux, independent of the oscillation
+parameters -- SNO's own direct statement: ``the flux of all active neutrino
+types that would produce the same NC rate''
+\parencite{Aharmim2005SaltPhase}. This three-reaction combination is what let
+SNO measure $\Phi_{8B}$ (via NC) and $P_{ee}(E)$ (via CC/NC and ES)
+simultaneously, without relying on an external Standard Solar Model
+flux prediction the way a single-reaction (CC-only) experiment must.
+\end{theorybox}
+
+\section{Statistical separation via event isotropy}
+\label{sec:salt-phase-principle}
+
+\begin{theorybox}
+Unlike Phase~I -- where CC, ES, and NC contributions were separated primarily
+by the shape of the reconstructed electron-energy spectrum, since the NC
+capture-gamma peak sat at a distinctly lower energy than the bulk of the CC
+spectrum -- SNO's own salt-phase analysis performs an event-by-event
+statistical separation via an extended maximum-likelihood fit to four
+reconstructed quantities per event: kinetic energy $T_{\rm eff}$, volume-weighted
+radius $\rho$, an isotropy parameter $\beta_{14}$ (built from Legendre
+polynomials of the angles between pairs of PMT hits, small for a
+directional Cherenkov cone, larger for the more isotropic multi-gamma NC
+cascade), and the angle to the Sun $\cos\theta_\odot$ (peaked forward for CC
+and ES, flat for NC). This extraction -- performed entirely by the SNO
+collaboration on their own raw PMT data, never by \texttt{tpeanuts} -- is
+what produces the 38 published pseudo-observables this document's forward
+model predicts and fits against (\cref{sec:38-observables}).
+\end{theorybox}
+
+\begin{notebox}
+\texttt{tpeanuts} does not, and cannot, reconstruct this event-by-event
+statistical separation: the underlying multi-dimensional probability density
+functions ($P(T_{\rm eff},\beta_{14},\rho,\cos\theta_\odot)$ per reaction) were
+never published. \texttt{detector.sno\_ii} instead predicts the \emph{result}
+of that separation directly (\cref{ch:detector-implementation}), the same
+principled choice already made for Daya Bay's IBD spectra and IceCube's
+detector-systematics hypersurfaces elsewhere in this project.
+\end{notebox}
+
+\section{Data-taking period and physics goals}
+
+\begin{theorybox}
+The salt phase spans June 2001 to October 2003; this document's data set is
+SNO's own full 391-live-day sample from that period, split into 128.5 days
+of solar daytime and 262.9 days of solar nighttime livetime (their own
+zenith-livetime table, \cref{ch:data-release}). The salt phase's own
+headline results, quoted directly for later comparison
+(\cref{ch:results}): total active $^8$B flux
+$\Phi_{8B}=4.94^{+0.21}_{-0.21}({\rm stat})^{+0.38}_{-0.34}({\rm syst})\times10^6\,{\rm
+cm^{-2}s^{-1}}$ (from the NC channel alone, independent of any oscillation
+assumption); best-fit oscillation parameters, combined with the earlier pure
+D$_2$O phase and (separately) with KamLAND reactor data,
+$\Delta m^2=8.0^{+0.6}_{-0.4}\times10^{-5}\,{\rm eV}^2$,
+$\theta=33.9^{+2.4}_{-2.2}$~degrees \parencite{Aharmim2005SaltPhase}. This
+document's own fit (\cref{ch:results}) uses only the salt-phase data itself,
+with no KamLAND or Phase~I combination -- a deliberately narrower, real
+comparison baseline than SNO's own headline combined result.
+\end{theorybox}

@@ -1,0 +1,145 @@
+\label{ch:data-release}
+
+\section{Publications}
+
+\begin{refbox}
+\begin{itemize}
+  \item \textbf{Primary source.} B. Aharmim et al. (SNO Collaboration),
+    \emph{Electron Energy Spectra, Fluxes, and Day-Night Asymmetries of
+    $^8$B Solar Neutrinos from the 391-Day Salt Phase SNO Data Set}, Phys.
+    Rev. C \textbf{72}, 055502 (2005), arXiv:nucl-ex/0502021
+    \parencite{Aharmim2005SaltPhase}. Appendix A (its Tables XXX-XXXIV) is
+    the sole source of every real table this project's
+    \texttt{data/detector/sno\_ii/} tree consumes.
+  \item \textbf{Earlier flux-only salt-phase result.} S. N. Ahmed et al.
+    (SNO Collaboration), \emph{Measurement of the Total Active $^8$B Solar
+    Neutrino Flux at the Sudbury Neutrino Observatory with Enhanced Neutral
+    Current Sensitivity}, Phys. Rev. Lett. \textbf{92}, 181301 (2004)
+    \parencite{Ahmed2004SaltFlux}. Not this document's data source (a
+    different, earlier 254-day, flux-only extraction with no day/night
+    spectral information), but its own published methodology note is used
+    in \cref{sec:data-provenance} as an independent cross-check of this
+    document's correlated-covariance construction.
+  \item \textbf{Phase-I discovery paper.} Q. R. Ahmad et al. (SNO
+    Collaboration), \emph{Direct Evidence for Neutrino Flavor
+    Transformation from Neutral-Current Interactions in the Sudbury
+    Neutrino Observatory}, Phys. Rev. Lett. \textbf{89}, 011301 (2002)
+    \parencite{Ahmad2002NCDiscovery}. Source of the NC-measures-total-active-flux
+    principle used throughout \cref{ch:detector-implementation}.
+  \item \textbf{External comparison: NuFIT.} I. Esteban et al., \emph{The
+    fate of hints: updated global analysis of three-flavor neutrino
+    oscillations}, JHEP \textbf{12}, 216 (2024), arXiv:2410.05380
+    \parencite{EstebanNuFit2024} -- base analysis publication for NuFIT 6.1
+    (2025), \url{www.nu-fit.org}. Source of the starting $(\theta_{12},
+    \Delta m^2_{21},\theta_{13})$ values used throughout
+    \cref{ch:detector-implementation,ch:results}.
+\end{itemize}
+\end{refbox}
+
+\section{Data provenance and the transcription process}
+\label{sec:data-provenance}
+
+\begin{theorybox}
+Unlike Daya Bay's own machine-readable Zenodo/GitHub data release, no
+digitised data file exists for \cite{Aharmim2005SaltPhase}: the collaboration
+published a dedicated numerical-recipe note
+(\texttt{sno.phy.queensu.ca/sno/results\_09\_03/howto.pdf}) alongside their
+\emph{earlier}, flux-only salt result \parencite{Ahmed2004SaltFlux}, but no
+equivalent machine-readable release for this document's own 391-day
+spectral+day/night source. Every real number this document's inference
+uses -- the 17-bin CC spectrum, the integrated NC/ES fluxes, the two
+$19\times19$ statistical correlation matrices, the systematic percent
+sensitivities, and the zenith-livetime exposure -- was therefore transcribed
+by hand from the rendered PDF of \cite{Aharmim2005SaltPhase}'s own Appendix A
+into \texttt{data/detector/sno\_ii/}, with every transcription independently
+cross-checked wherever the paper's own internal redundancy allowed it.
+\end{theorybox}
+
+\begin{resultbox}
+Four independent cross-checks passed, all recorded in
+\texttt{data/detector/sno\_ii/metadata/source.json}:
+\begin{enumerate}
+  \item The 17 transcribed CC day bins sum to $1.7325\times10^6\,{\rm
+    cm^{-2}s^{-1}}$, matching the paper's own independently quoted day
+    integral flux, $1.73\times10^6\,{\rm cm^{-2}s^{-1}}$ (night: $1.6422$
+    vs.\ $1.64$).
+  \item Both $19\times19$ statistical correlation matrices have an exact
+    unit diagonal, are symmetric (after resolving one genuine
+    $10^{-4}$-level rounding inconsistency in the printed table itself,
+    verified against the rendered PDF twice), and are positive-semi-definite.
+  \item The 60-bin zenith-exposure table's bin edges match the paper's own
+    worked example (``the top bin has $\cos\theta_z=-0.5$ to $-0.4667$'')
+    exactly, and its total livetime sums to 391.43 days -- matching the
+    paper's own ``391-Day Salt Phase'' title/dataset name to within
+    rounding.
+  \item The salt-phase response-function coefficients quoted in this
+    project's own design notes were verified to match the primary source's
+    Eq.~A3 exactly, resolving an initial ambiguity with a different,
+    similarly-worded formula from the earlier flux-only paper's own
+    methodology note \parencite{Ahmed2004SaltFlux}.
+\end{enumerate}
+\end{resultbox}
+
+\begin{notebox}
+\textbf{Two entries could not be transcribed with confidence, and are
+disclosed rather than guessed.} Table XXXIV's \texttt{vertex\_resolution}
+and \texttt{angular\_resolution} rows are missing a value partway through
+their own CC$_9$-CC$_{17}$ block in the rendered source; two independent
+transcription attempts produced misaligned columns rather than a consistent
+reading. Both rows' CC$_9$-CC$_{17}$ entries are set to \texttt{0.0} (an
+explicit placeholder, not a measurement) in
+\texttt{cc\_spectral\_systematics.csv}, flagged in
+\texttt{metadata/source.json}, and excluded from this document's own
+systematic-covariance discussion of dominant contributions
+(\cref{ch:results}). Separately, Tables XIX/XX (NC's own two dedicated
+systematics: internal neutron background, neutron capture efficiency) were
+never transcribed at all -- the systematic covariance used throughout this
+document therefore understates NC's true systematic uncertainty specifically.
+\end{notebox}
+
+\section{Table catalogue}
+
+\Cref{tab:snoii-tables-observation,tab:snoii-tables-covariance} list every
+real table this project's \texttt{tpeanuts.detector.sno\_ii.io} module
+loads, and the physics each one encodes, developed in full in
+\cref{ch:detector-implementation}.
+
+\newcommand{\snoiicell}[1]{\parbox[t]{0.42\textwidth}{\raggedright #1}}
+
+\begin{table}[htb]
+\centering
+\caption{Real published observation tables (Tables XXX, XXIV of the primary source).}
+\label{tab:snoii-tables-observation}
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{Cached file} & \textbf{Real contents} & \textbf{Loader} \\
+\midrule
+\code{cc\_spectrum\_day\_night.csv} & \snoiicell{The 17-bin CC equivalent-flux spectrum (Table XXX), day and night, statistical uncertainty.} & \pyfunc{load\_cc\_spectrum\_day\_night} \\[4pt]
+\code{integrated\_fluxes\_day\_night.csv} & \snoiicell{Day/night NC and ES equivalent fluxes, stat+syst (Table XXIV); the CC integral is also carried, as a cross-check only.} & \pyfunc{load\_integrated\_fluxes\_day\_night} \\[4pt]
+\code{zenith\_livetime.csv} & \snoiicell{60-bin real $\cos(\text{zenith})$ livetime distribution, 391.43-day total (Table XXXI).} & \pyfunc{load\_zenith\_exposure} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htb]
+\centering
+\caption{Real published covariance and systematics tables (Tables XXXII-XXXIV).}
+\label{tab:snoii-tables-covariance}
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{Cached file} & \textbf{Real contents} & \textbf{Loader} \\
+\midrule
+\code{statistical\_correlation\_\{day,night\}.csv} & \snoiicell{The two real $19\times19$ statistical correlation matrices from SNO's own signal extraction.} & \pyfunc{load\_statistical\_correlation} \\[4pt]
+\code{cc\_spectral\_systematics.csv} & \snoiicell{16 detector systematics $\times$ 19 channels, signed percent sensitivity (Table XXXIV).} & \pyfunc{load\_cc\_spectral\_systematics} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{notebox}
+Not fetched/reproduced: Tables XIX/XX's NC-specific systematics (see above);
+Table XVII's fundamental constants and radiative-correction factors
+($\omega_{\rm CC}$, $\omega_{\rm NC}$, $\omega_{\rm ES}$); and the earlier
+Phase-I and 254-day flux-only salt datasets, which are already covered by
+this project's separate, sibling \texttt{detector.sno} package (Phase I) and
+are not combined with this document's own salt-phase-only fit.
+\end{notebox}

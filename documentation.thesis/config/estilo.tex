@@ -1,0 +1,57 @@
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+
+\onehalfspacing
+\setlength{\parindent}{1.25em}
+\setlength{\parskip}{0.15em}
+
+\pagestyle{scrheadings}
+\clearpairofpagestyles
+\ihead{\headmark}
+\ohead{\pagemark}
+\automark{section}
+
+% Modest, content-preserving space savings: slightly tighter lists,
+% float/caption, heading and display-equation spacing than the article/
+% enumitem/amsmath defaults, applied document-wide.
+\setlist{itemsep=0.15em, topsep=0.3em, parsep=0pt}
+\setlength{\intextsep}{0.6em}
+\setlength{\textfloatsep}{0.9em}
+\setlength{\floatsep}{0.6em}
+
+\titlespacing*{\subsection}{0pt}{1.0ex plus .2ex minus .1ex}{0.45ex plus .1ex}
+\titlespacing*{\subsubsection}{0pt}{0.8ex plus .2ex minus .1ex}{0.3ex plus .1ex}
+\titlespacing*{\paragraph}{0pt}{0.8ex plus .2ex minus .1ex}{0.5em}
+
+\AtBeginDocument{%
+  \setlength{\abovedisplayskip}{6pt plus 2pt minus 2pt}%
+  \setlength{\belowdisplayskip}{6pt plus 2pt minus 2pt}%
+  \setlength{\abovedisplayshortskip}{2pt plus 2pt}%
+  \setlength{\belowdisplayshortskip}{4pt plus 2pt}%
+}
+
+\definecolor{codebackground}{HTML}{F7F7F7}
+\definecolor{codecomment}{HTML}{4D7C0F}
+\definecolor{codekeyword}{HTML}{1D4ED8}
+\definecolor{codestring}{HTML}{B45309}
+
+\lstdefinestyle{tfmcode}{
+  backgroundcolor=\color{codebackground},
+  basicstyle=\ttfamily\small,
+  commentstyle=\color{codecomment},
+  keywordstyle=\color{codekeyword}\bfseries,
+  stringstyle=\color{codestring},
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\scriptsize,
+  tabsize=2
+}
+\lstset{style=tfmcode}
+
+\captionsetup{
+  font=small,
+  labelfont=bf,
+  skip=4pt
+}

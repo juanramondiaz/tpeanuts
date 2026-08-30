@@ -1,0 +1,162 @@
+\chapter{\texttt{core.SM} --- Standard Model specialisation (3 flavours)}
+\label{ch:core-sm}
+
+\section{\texttt{pmns.py} --- the Standard Model mixing matrix}
+
+\modulehead{core/SM/sm\_pmns.py}{\pyclass{PMNS\_SM}: the concrete 3-flavour
+implementation of the abstract class \pyclass{core.common.pmns.PMNS}.}
+
+\begin{theorybox}
+\subsection*{The Standard Model product structure}
+This is the only module that explicitly fixes a product structure for the
+generic factors defined in \cref{ch:core-common}. The full 3-flavour PMNS
+matrix is
+\begin{equation}
+  U = R_{23}(\theta_{23})\,\Delta(\delta)\,R_{13}(\theta_{13})\,\Delta(\delta)^\dagger\,R_{12}(\theta_{12}),
+  \qquad \Delta(\delta) = \diag(1,1,e^{i\delta}),
+\end{equation}
+built from the generators $R_{12}$, $R_{13}$, $R_{23}$, $\Delta$ defined in
+\cref{ch:core-common}. \pyfunc{PMNS\_SM.outer\_block} and
+\pyfunc{PMNS\_SM.reduced} identify
+\begin{equation}
+  O \equiv R_{23}(\theta_{23})\,\Delta(\delta),
+  \qquad
+  U_{\rm red} \equiv R_{13}(\theta_{13})\,\Delta(\delta)^\dagger\,R_{12}(\theta_{12}),
+  \qquad U = O\,U_{\rm red},
+\end{equation}
+so that this single factorisation is the concrete instance, for the SM,
+of the abstract $U=O\,U_{\rm red}$ contract from \cref{ch:core-common}.
+
+\subsection*{Why the outer block commutes with the matter Hamiltonian}
+$O$ does not mix the electron-flavour index: $R_{23}$ acts only on the
+$(\mu,\tau)$ block and $\Delta$ is diagonal, so $O$ has the block form
+$O = \begin{psmallmatrix}1 & 0\\ 0 & O_{2\times2}\end{psmallmatrix}$ in the
+flavour basis. Since the matter potential only has a non-zero $ee$ entry,
+$H_{\rm mat}=\diag(V,0,0)$, it follows that
+\begin{equation}
+  O\,H_{\rm mat}\,O^\dagger = H_{\rm mat} \qquad \text{(they commute exactly).}
+\end{equation}
+This is precisely the property \cref{ch:core-common} assumes, without
+proof, to derive the general factorisation \cref{eq:H-factorization}; here
+it is verified explicitly for the concrete SM $O$.
+
+\subsection*{Transforming the Hamiltonian to the reduced basis}
+Given the flavour-basis Hamiltonian
+$H_{\rm flavour}=H_{\rm kin}+H_{\rm mat}=U\diag(k_1,k_2,k_3)\,U^\dagger + H_{\rm mat}$
+(\texttt{hamiltonian.py} section, \cref{ch:core-common}), substituting
+$U=O\,U_{\rm red}$ and using $O\,H_{\rm mat}\,O^\dagger=H_{\rm mat}$ gives
+\begin{equation}
+  H_{\rm flavour} = O\underbrace{\Bigl[U_{\rm red}\diag(k)\,U_{\rm red}^\dagger + H_{\rm mat}\Bigr]}_{\displaystyle H_{\rm red}}O^\dagger = O\,H_{\rm red}\,O^\dagger,
+\end{equation}
+matching \cref{eq:H-factorization}: \pyfunc{PMNS\_SM.reduced\_basis}
+applied to $H_{\rm flavour}$ (inherited from \pyclass{PMNS}, computing
+$O^\dagger(\cdot)O$) yields exactly $H_{\rm red}$ above.
+
+\subsection*{The CP phase drops out of the reduced kinetic term}
+$R_{12}$ does not mix the $\tau$ index (third index) and $\Delta$ acts
+non-trivially only on that same index, so the product
+$R_{12}\diag(k)R_{12}^T$ has no non-zero entries connecting to index 3;
+conjugation by $\Delta$ therefore acts trivially on it:
+\begin{equation}
+  \Delta^\dagger\bigl(R_{12}\diag(k)R_{12}^T\bigr)\Delta = R_{12}\diag(k)R_{12}^T,
+\end{equation}
+so that \textbf{the CP phase $\delta$ drops out completely from the reduced
+kinetic term}, which reduces to the real matrix
+$U_{\rm red}^{(0)} \equiv R_{13}R_{12}$:
+\begin{equation}
+  \keyresult{U_{\rm red}\diag(k)\,U_{\rm red}^\dagger = \bigl(R_{13}R_{12}\bigr)\,\diag(k)\,\bigl(R_{13}R_{12}\bigr)^T.}
+\end{equation}
+This is why \pyfunc{PMNS\_SM.reduced} returns $R_{13}R_{12}$ rather than
+the formally-defined $R_{13}\Delta^\dagger R_{12}$: the two coincide once
+contracted with the (real, diagonal) kinetic term, but $R_{13}R_{12}$ is
+real, cheaper to evolve, and avoids carrying a phase that always cancels.
+
+\subsection*{Recovering the flavour basis}
+Once $H_{\rm red}$ (and its evolutor $S_{\rm red}$) has been obtained, the
+flavour-basis result is recovered by dressing once with $O$
+(\pyfunc{PMNS\_SM.flavour\_basis}, inherited from \pyclass{PMNS}, computing
+$O(\cdot)O^\dagger$):
+\begin{equation}
+  H_{\rm flavour} = O\,H_{\rm red}\,O^\dagger,
+  \qquad
+  S_{\rm flavour}(x) = O\,S_{\rm red}(x)\,O^\dagger.
+\end{equation}
+\end{theorybox}
+
+\begin{keyeqbox}
+\textbf{Coherent propagation scheme.} In vacuum ($H_{\rm mat}=0$), a
+coherent flavour state is most simply understood, and computed, entirely
+in the mass basis:
+\begin{enumerate}
+  \item \textbf{Flavour $\to$ mass}: project onto mass eigenstates,
+    $\psi_{\rm mass}(x_0) = U^\dagger\,\psi_{\rm flavour}(x_0)$;
+  \item \textbf{Coherent propagation}: each mass eigenstate accumulates its
+    own phase independently, since the mass basis diagonalises the kinetic
+    term by construction,
+    $\psi_{\rm mass}(x) = \diag\bigl(e^{-ik_1x},\dots,e^{-ik_3x}\bigr)\,\psi_{\rm mass}(x_0)$;
+  \item \textbf{Mass $\to$ flavour}: project back,
+    $\psi_{\rm flavour}(x) = U\,\psi_{\rm mass}(x)$.
+\end{enumerate}
+Composing the three steps gives the familiar vacuum evolutor
+$S_{\rm vacuum}(x)=U\diag\bigl(e^{-ik_ix}\bigr)U^\dagger$
+(\texttt{medium.vacuum.evolutor}). In matter, $H_{\rm mat}$ does not
+commute with the full $U$, so this three-step picture does not apply
+directly at the full-$U$ level; the reduction trick derived above is
+exactly what restores an analogous, computationally cheap three-step
+scheme -- flavour $\to$ reduced $\to$ propagate $\to$ flavour -- using $O$
+and $U_{\rm red}$ in place of $U$.
+\end{keyeqbox}
+
+\begin{implbox}
+\pyclass{PMNS\_SM(params: PMNSParams)} implements only the three abstract
+methods that depend on the product structure: \pyfunc{pmns\_matrix} (the
+full $3\times3$ $U$), \pyfunc{reduced} ($U_{\rm red}=R_{13}R_{12}$), and
+\pyfunc{outer\_block} ($O=R_{23}\Delta$). Everything else (rotation
+builders, \pyfunc{flavour\_basis}/\pyfunc{reduced\_basis}, antineutrino
+selection via \pyfunc{select\_antinu}) is inherited unchanged from the base
+class, without duplicating code. It is the default scenario for the whole
+project: any function in \texttt{medium.*} that receives a generic
+\pyclass{PMNS} object works unmodified with either \pyclass{PMNS\_SM} or
+\pyclass{PMNS\_sterile} (\cref{ch:core-bsm}), thanks to the inheritance
+design of \cref{ch:core-common}.
+\end{implbox}
+
+\begin{refbox}
+Standard PMNS parametrisation: \cite{ParticleDataGroup}. Reference numerical
+values (global best fits) used in the default presets:
+\cite{Esteban2020NuFit,NuFit52}.
+\end{refbox}
+
+\section{\texttt{mass\_spectrum.py} --- Standard Model mass spectrum}
+
+\modulehead{core/SM/sm\_mass\_spectrum.py}{\pyclass{MassSpectrum\_SM}, the
+concrete 3-flavour implementation of \pyclass{MassSpectrum}
+(\cref{ch:core-common}).}
+
+\begin{theorybox}
+The Standard Model scenario has no sterile state to accommodate, so
+\pyfunc{difference\_vector()} simply returns
+\pyfunc{difference\_vector\_base()} unchanged, sized to exactly 3
+components:
+\begin{equation}
+  \keyresult{\bigl(\Delta m^2_1,\ \Delta m^2_2,\ \Delta m^2_3\bigr)
+  =\begin{cases}
+      \bigl(0,\ \Delta m^2_{21},\ \Delta m^2_{3\ell}\bigr) & \Delta m^2_{3\ell} > 0\ \text{(NO)},\\[2pt]
+      \bigl(-\Delta m^2_{21},\ 0,\ \Delta m^2_{3\ell}\bigr) & \Delta m^2_{3\ell} < 0\ \text{(IO)}.
+    \end{cases}}
+\end{equation}
+The ordering-dependent construction itself -- selecting between the two
+branches above from the sign of $\Delta m^2_{3\ell}$ -- is entirely
+inherited from \pyclass{MassSpectrum} (\cref{ch:core-common},
+\texttt{mass\_spectrum.py} section): \pyclass{MassSpectrum\_SM} adds no
+logic of its own beyond fixing the output size to 3, in contrast with
+\pyclass{MassSpectrum\_BSM} (\cref{ch:core-bsm}), which appends a fourth,
+sterile entry $\Delta m^2_{41}$ to the same base vector.
+\end{theorybox}
+
+\begin{implbox}
+\pyclass{MassSpectrum\_SM(DeltamSq21, DeltamSq3l)}: adds no fields beyond
+the base \pyclass{MassSpectrum}; \pyfunc{difference\_vector()} is a
+single-line override, \code{return
+self.difference\_vector\_base(context=context)}.
+\end{implbox}

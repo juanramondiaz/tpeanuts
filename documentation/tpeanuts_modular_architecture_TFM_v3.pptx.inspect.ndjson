@@ -1,0 +1,62 @@
+{"kind":"deck","id":"pr/wyw1gy","name":"Deck"}
+{"kind":"layout","layoutId":"83a1d0b0-dfae-4dd0-bd50-41d8a68d8616","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"ec0a960a-c20a-41cd-9284-2527f86fa3a7","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/zs0k5v","slide":1,"title":"MASTER'S THESIS DEFENSE","textShapes":4}
+{"kind":"textbox","id":"sh/pg3ixozu","slide":1,"name":"cover-kicker","text":"MASTER'S THESIS DEFENSE","textPreview":"MASTER'S THESIS DEFENSE","textChars":23,"textLines":1,"bbox":[72,62,430,30]}
+{"kind":"textbox","id":"sh/2dcjmt03","slide":1,"name":"cover-title","text":"Tpeanuts modular architecture","textPreview":"Tpeanuts modular architecture","textChars":29,"textLines":1,"bbox":[72,185,830,150]}
+{"kind":"textbox","id":"sh/3el0veho","slide":1,"name":"cover-subtitle","text":"A layered, differentiable framework for neutrino oscillation and flux propagation","textPreview":"A layered, differentiable framework for neutrino oscillation and flux propagation","textChars":81,"textLines":1,"bbox":[72,365,720,92]}
+{"kind":"shape","id":"sh/gba1kjix","slide":1,"name":"cover-accent","bbox":[1000,0,280,720]}
+{"kind":"shape","id":"sh/hc3itozi","slide":1,"name":"cover-accent-strong","bbox":[1050,0,80,720]}
+{"kind":"textbox","id":"sh/upsji907","slide":1,"name":"cover-footer","text":"Torch-based scientific software · Python","textPreview":"Torch-based scientific software · Python","textChars":40,"textLines":1,"bbox":[72,625,600,34]}
+{"kind":"notes","id":"nt/zs0k5v","slide":1,"text":""}
+{"kind":"slide","id":"sl/yui4mh","slide":2,"title":"Tpeanuts keeps scientific concerns modular","textShapes":30}
+{"kind":"textbox","id":"sh/w7e58n2h","slide":2,"name":"architecture-title","text":"Tpeanuts keeps scientific concerns modular","textPreview":"Tpeanuts keeps scientific concerns modular","textChars":42,"textLines":1,"bbox":[56,34,1168,58]}
+{"kind":"textbox","id":"sh/b65ofilw","slide":2,"name":"architecture-subtitle","text":"A layered flow connects scientific domains to reusable physics and supporting tools.","textPreview":"A layered flow connects scientific domains to reusable physics and supporting tools.","textChars":84,"textLines":1,"bbox":[56,96,1050,30]}
+{"kind":"shape","id":"sh/a5cn6dkb","slide":2,"name":"pipelines-base","bbox":[250,145,350,80]}
+{"kind":"shape","id":"sh/9436d836","slide":2,"name":"inference-base","bbox":[680,145,350,80]}
+{"kind":"shape","id":"sh/oju5432l","slide":2,"name":"sources-base","bbox":[150,280,290,96]}
+{"kind":"shape","id":"sh/nil4byl0","slide":2,"name":"media-base","bbox":[495,280,290,96]}
+{"kind":"shape","id":"sh/mhcn2tkf","slide":2,"name":"detectors-base","bbox":[840,280,290,96]}
+{"kind":"shape","id":"sh/t076psja","slide":2,"name":"common-base","bbox":[150,430,290,96]}
+{"kind":"shape","id":"sh/sfy5g72p","slide":2,"name":"standard-model-base","bbox":[495,430,290,96]}
+{"kind":"shape","id":"sh/m98netwn","slide":2,"name":"bsm-base","bbox":[840,430,290,96]}
+{"kind":"shape","id":"sh/naho7yx8","slide":2,"name":"config-base","bbox":[70,590,250,72]}
+{"kind":"shape","id":"sh/8bq5g3et","slide":2,"name":"utilities-base","bbox":[365,590,250,72]}
+{"kind":"shape","id":"sh/9cz698fe","slide":2,"name":"external-base","bbox":[660,590,250,72]}
+{"kind":"shape","id":"sh/y5onatwr","slide":2,"name":"peanuts-base","bbox":[955,590,250,72]}
+{"kind":"shape","id":"sh/z6x43yxc","slide":2,"bbox":[295,225,130,55]}
+{"kind":"shape","id":"sh/0765cjeh","slide":2,"bbox":[855,225,130,55]}
+{"kind":"shape","id":"sh/l8zm5of2","slide":2,"bbox":[440,328,55,0]}
+{"kind":"shape","id":"sh/i1snmdwv","slide":2,"bbox":[785,328,55,0]}
+{"kind":"shape","id":"sh/j21ofixg","slide":2,"bbox":[295,376,0,54]}
+{"kind":"shape","id":"sh/fmtk7ads","slide":2,"bbox":[640,376,0,54]}
+{"kind":"shape","id":"sh/ulkje5c7","slide":2,"bbox":[985,376,0,54]}
+{"kind":"textbox","id":"sh/h8b29kvy","slide":2,"name":"application-layer","text":"APPLICATION LAYER","textPreview":"APPLICATION LAYER","textChars":17,"textLines":1,"bbox":[150,126,250,22]}
+{"kind":"textbox","id":"sh/g72lgfud","slide":2,"name":"domain-layer","text":"DOMAIN LAYER","textPreview":"DOMAIN LAYER","textChars":12,"textLines":1,"bbox":[150,258,250,22]}
+{"kind":"textbox","id":"sh/3adkbud4","slide":2,"name":"core-layer","text":"CORE","textPreview":"CORE","textChars":4,"textLines":1,"bbox":[150,408,250,22]}
+{"kind":"textbox","id":"sh/2943ipcj","slide":2,"name":"tools-layer","text":"TOOLS AND UTILITIES","textPreview":"TOOLS AND UTILITIES","textChars":19,"textLines":1,"bbox":[70,568,300,22]}
+{"kind":"textbox","id":"sh/pcv2dkvu","slide":2,"name":"pipelines-title","text":"Propagation pipelines","textPreview":"Propagation pipelines","textChars":21,"textLines":1,"bbox":[268,158,314,30]}
+{"kind":"textbox","id":"sh/4bmlkzu9","slide":2,"name":"pipelines-detail","text":"End-to-end solar and atmospheric workflows","textPreview":"End-to-end solar and atmospheric workflows","textChars":42,"textLines":1,"bbox":[268,193,314,22]}
+{"kind":"textbox","id":"sh/redkfud0","slide":2,"name":"inference-title","text":"Inference","textPreview":"Inference","textChars":9,"textLines":1,"bbox":[698,158,314,30]}
+{"kind":"textbox","id":"sh/qd43mpcf","slide":2,"name":"inference-detail","text":"Differentiable models · Likelihoods · Fits","textPreview":"Differentiable models · Likelihoods · Fits","textChars":42,"textLines":1,"bbox":[698,193,314,22]}
+{"kind":"textbox","id":"sh/8j61wzat","slide":2,"name":"sources-title","text":"Neutrino sources","textPreview":"Neutrino sources","textChars":16,"textLines":1,"bbox":[168,293,254,30]}
+{"kind":"textbox","id":"sh/94f254ry","slide":2,"name":"sources-detail","text":"Solar · Atmospheric · Reactor\nProduction spectra and fluxes","textPreview":"Solar · Atmospheric · Reactor | Production spectra and fluxes","textChars":59,"textLines":2,"bbox":[168,328,254,38]}
+{"kind":"textbox","id":"sh/mhojupsn","slide":2,"name":"media-title","text":"Propagation media","textPreview":"Propagation media","textChars":17,"textLines":1,"bbox":[513,293,254,30]}
+{"kind":"textbox","id":"sh/nixk3u98","slide":2,"name":"media-detail","text":"Vacuum · Solar · Earth · Atmosphere\nGeometry, density and evolution","textPreview":"Vacuum · Solar · Earth · Atmosphere | Geometry, density and evolution","textChars":67,"textLines":2,"bbox":[513,328,254,38]}
+{"kind":"textbox","id":"sh/0fm1szah","slide":2,"name":"detectors-title","text":"Detector models","textPreview":"Detector models","textChars":15,"textLines":1,"bbox":[858,293,254,30]}
+{"kind":"textbox","id":"sh/lgf214b2","slide":2,"name":"detectors-detail","text":"Responses · Observables\nSNO · Borexino · IceCube","textPreview":"Responses · Observables | SNO · Borexino · IceCube","textChars":48,"textLines":2,"bbox":[858,328,254,38]}
+{"kind":"textbox","id":"sh/ed4jqpsb","slide":2,"name":"common-title","text":"Common","textPreview":"Common","textChars":6,"textLines":1,"bbox":[168,443,254,30]}
+{"kind":"textbox","id":"sh/zed0zutw","slide":2,"name":"common-detail","text":"Hamiltonians · Potentials\nFluxes · Probabilities · PMNS","textPreview":"Hamiltonians · Potentials | Fluxes · Probabilities · PMNS","textChars":55,"textLines":2,"bbox":[168,478,254,38]}
+{"kind":"textbox","id":"sh/cbm1ofal","slide":2,"name":"standard-model-title","text":"Standard Model","textPreview":"Standard Model","textChars":14,"textLines":1,"bbox":[513,443,254,30]}
+{"kind":"textbox","id":"sh/dcvixkb6","slide":2,"name":"standard-model-detail","text":"Three-flavour mixing\nStandard mass spectrum","textPreview":"Three-flavour mixing | Standard mass spectrum","textChars":43,"textLines":2,"bbox":[513,478,254,38]}
+{"kind":"textbox","id":"sh/hgry5gry","slide":2,"name":"bsm-title","text":"Beyond Standard Model","textPreview":"Beyond Standard Model","textChars":21,"textLines":1,"bbox":[858,443,254,30]}
+{"kind":"textbox","id":"sh/gfihwbqd","slide":2,"name":"bsm-detail","text":"NSI · Sterile · Majorana\nExtended mass spectra","textPreview":"NSI · Sterile · Majorana | Extended mass spectra","textChars":46,"textLines":2,"bbox":[858,478,254,38]}
+{"kind":"textbox","id":"sh/fu9g369s","slide":2,"name":"config-title","text":"Config","textPreview":"Config","textChars":6,"textLines":1,"bbox":[84,598,222,24]}
+{"kind":"textbox","id":"sh/ut0zul87","slide":2,"name":"config-detail","text":"Defaults · Presets · Propagation","textPreview":"Defaults · Presets · Propagation","textChars":32,"textLines":1,"bbox":[84,624,222,27]}
+{"kind":"textbox","id":"sh/pkby907u","slide":2,"name":"utilities-title","text":"Utilities","textPreview":"Utilities","textChars":9,"textLines":1,"bbox":[379,598,222,24]}
+{"kind":"textbox","id":"sh/4j2h0vq9","slide":2,"name":"utilities-detail","text":"Tensor types · Context · Math · I/O","textPreview":"Tensor types · Context · Math · I/O","textChars":35,"textLines":1,"bbox":[379,624,222,27]}
+{"kind":"textbox","id":"sh/3itg7q9o","slide":2,"name":"external-title","text":"External data","textPreview":"External data","textChars":13,"textLines":1,"bbox":[674,598,222,24]}
+{"kind":"textbox","id":"sh/2hkzyl83","slide":2,"name":"external-detail","text":"nuSQuIDS · MCEq · Honda · PyMSIS","textPreview":"nuSQuIDS · MCEq · Honda · PyMSIS","textChars":32,"textLines":1,"bbox":[674,624,222,27]}
+{"kind":"textbox","id":"sh/5o7yxwrq","slide":2,"name":"peanuts-title","text":"Peanuts","textPreview":"Peanuts","textChars":7,"textLines":1,"bbox":[969,598,222,24]}
+{"kind":"textbox","id":"sh/knyxorq5","slide":2,"name":"peanuts-detail","text":"Legacy validation and compatibility","textPreview":"Legacy validation and compatibility","textChars":35,"textLines":1,"bbox":[969,624,222,27]}
+{"kind":"notes","id":"nt/yui4mh","slide":2,"text":""}

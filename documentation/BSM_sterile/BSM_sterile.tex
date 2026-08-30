@@ -1,0 +1,83 @@
+% =============================================================================
+%  BSM_sterile.tex
+%  The 3+1 sterile neutrino extension in tpeanuts: theory, implementation,
+%  presets/observables, and notebook results.
+%  Fast Simulation of Neutrino Oscillations in Matter (MSc Thesis)
+% =============================================================================
+\documentclass[11pt,a4paper,openany]{report}
+
+\usepackage[a4paper,margin=2.6cm,marginparwidth=2.1cm,marginparsep=4mm]{geometry}
+\usepackage{tpeanuts-inference}
+
+\addbibresource{references.bib}
+
+\title{\Huge The 3+1 Sterile Neutrino Extension in \texttt{tpeanuts}\\[4pt]
+  \Large Fast Simulation of Neutrino Oscillations in Matter}
+\author{Juan Ramon Diaz Santos}
+\date{August 2026 --- living document, generated from the source code}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.6cm}
+  {\Huge\bfseries\color{sterileColor} The 3+1 Sterile Neutrino\\[4pt] Extension in \texttt{tpeanuts}\par}
+  \vspace{0.8cm}
+  {\Large Fast Simulation of Neutrino Oscillations in Matter\par}
+  \vspace{1.5cm}
+  {\large MSc Thesis (Trabajo Fin de M\'aster) --- BSM Extension Companion Document\par}
+  \vspace{0.3cm}
+  {\large Juan Ramon Diaz Santos \\ \texttt{diazjuan@alumni.uv.es}\par}
+  \vspace{0.6cm}
+  {\normalsize Supervisors: Roberto Ruiz de Austri Bazan \quad\&\quad Michele Lucente\par}
+  \vfill
+  {\normalsize August 2026\par}
+  \vspace{0.5cm}
+  \begin{tcolorbox}[colback=sterileColor!5,colframe=sterileColor,width=0.85\textwidth,sharp corners=all,rounded corners=all,arc=1mm]
+    \small
+    This document is the companion reference for the \texttt{core.BSM.bsm\_sterile} and
+    \texttt{core.BSM.bsm\_mass\_spectrum} packages and every downstream consumer of a 4-flavour
+    \pyclass{OscillationParameters.pmns}: the exact-Hamiltonian builders in
+    \texttt{core.common.hamiltonian}, the closed-form Ferrari eigenvalue solver in
+    \texttt{core.perturbative.spectral}, the numerical and perturbative evolutors, and the
+    solar/Earth/atmosphere propagation pipelines. Chapter~1 covers the theoretical foundations of
+    the 3+1 scheme: the short-baseline anomalies motivating it, the $4\times4$ mixing
+    parametrisation, the sterile neutral-current term, and the exact SM-limit embedding.
+    Chapter~2 is an exhaustive account of the \texttt{tpeanuts} implementation, including the
+    closed-form quartic (Ferrari) eigenvalue solution specific to $N=4$. Chapter~3 documents the
+    named sterile presets and the observables/simulations that can be built with them. Chapter~4
+    walks through the validation notebooks that exercise the sterile extension and reports their
+    actual results. Blue boxes (\textbf{Theoretical Foundation}) contain the physics; green boxes
+    (\textbf{Implementation}) link that physics to actual \texttt{tpeanuts} code; orange boxes
+    collect approximations and limitations; indigo boxes (\textbf{Result}) report a concrete
+    numerical outcome of a notebook or of this project's own test suite. Text highlighted in
+    \keyresult{yellow} marks key results/equations.
+  \end{tcolorbox}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\listoftodos[Pending sections and notes]
+\clearpage
+\pagenumbering{arabic}
+
+% =============================================================================
+\chapter{Theoretical Foundations of the 3+1 Sterile Extension}
+\input{chapters/01_theory}
+
+% =============================================================================
+\chapter{Implementation in \texttt{tpeanuts}}
+\input{chapters/02_implementation}
+
+% =============================================================================
+\chapter{Presets, Observables, and Simulations}
+\input{chapters/03_presets_observables}
+
+% =============================================================================
+\chapter{Notebook Results}
+\input{chapters/04_notebook_results}
+
+\clearpage
+\printbibliography[title={References}]
+
+\end{document}

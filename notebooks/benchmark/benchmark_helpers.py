@@ -34,6 +34,7 @@ from tpeanuts.core.SM.sm_mass_spectrum import MassSpectrum_SM
 from tpeanuts.core.SM.sm_pmns import PMNS_SM
 from tpeanuts.medium.earth.profile import EarthParameters, EarthProfile
 from tpeanuts.medium.earth.probability import earth_probability_state
+from tpeanuts.medium.solar.adiabatic import mass_weights_adiabatic_approximated
 from tpeanuts.medium.solar.profile import SolarMediumParameters, SolarMediumProfile
 from tpeanuts.source.solar import SolarSourceParameters, SolarNeutrinoSource
 from tpeanuts.notebooks.notebooks_helper import FLAVOUR_NAMES, save_and_show, to_numpy
@@ -603,11 +604,40 @@ def _solar_source_for(device):
     return _SOLAR_SOURCE_CACHE[device]
 
 
+EARTH_ANALYTICAL_BATCH_LIMIT = 4096
+# torch.linalg.eigvalsh's batched CUDA path (cusolverDnXsyevBatched /
+# cusolverDnZheevjBatched, chosen internally depending on matrix size/dtype)
+# requests internal workspace that scales linearly at roughly 2.4 MB *per
+# tiny 3x3 (or 4x4 sterile) Hamiltonian in the batch* on this GPU/driver --
+# a known-pathological cuSOLVER batched-eigensolver workspace size for very
+# small matrices, confirmed by direct bisection (5000-element batch: OK;
+# 6000: CUDA OutOfMemoryError trying to allocate 14.6 GiB; 12000: 29.2 GiB).
+# This is a cuSOLVER/driver inefficiency, not a real data-size limit (the
+# actual tensors are a few KB). Grid sizes above ~70x70 in benchmark2/
+# benchmark3's Earth-dependent sections hit this, so the analytical Earth
+# evolutor is called in eta-axis chunks that stay comfortably under the
+# ~5000 failure onset and reassembled -- the same fix benchmark1 already
+# applies via its own iter_grid_chunks, just scoped to this one call site.
+
+
+def _earth_eta_chunk_bounds(n_eta, n_energy, limit=EARTH_ANALYTICAL_BATCH_LIMIT):
+    chunk = max(1, limit // max(n_energy, 1))
+    for start in range(0, n_eta, chunk):
+        yield start, min(start + chunk, n_eta)
+
+
 def torch_pearth_probability(state, E_MeV, eta, depth_m, *, massbasis=True, device=None):
     """tpeanuts Earth probability helper shared by benchmark notebooks."""
     dev = device if device is not None else DEVICE
     if BENCHMARK_BACKEND == "nusquids":
-        return earth_probability_state_analytical(state, earth_profile_t, oscillation, E_MeV, eta, depth_m, massbasis=massbasis)
+        eta_flat = torch.as_tensor(eta).reshape(-1)
+        n_energy = torch.as_tensor(E_MeV).reshape(-1).numel()
+        if n_energy * eta_flat.numel() <= EARTH_ANALYTICAL_BATCH_LIMIT:
+            return earth_probability_state_analytical(state, earth_profile_t, oscillation, E_MeV, eta, depth_m, massbasis=massbasis)
+        return torch.cat([
+            earth_probability_state_analytical(state, earth_profile_t, oscillation, E_MeV, eta_flat[s:e][None, :], depth_m, massbasis=massbasis)
+            for s, e in _earth_eta_chunk_bounds(eta_flat.numel(), n_energy)
+        ], dim=1)
 
     ctx = _context_for(dev)
     E_t = torch.as_tensor(E_MeV, device=dev, dtype=DTYPE)
@@ -616,7 +646,14 @@ def torch_pearth_probability(state, E_MeV, eta, depth_m, *, massbasis=True, devi
     osc_dev = _oscillation_for(dev)
     profile_dev = _earth_profile_for(dev)
     if EARTH_METHOD == "analytical":
-        return earth_probability_state(state_t, profile_dev, osc_dev, E_t, eta_t, depth_m, method="analytical", massbasis=massbasis, context=ctx)
+        eta_flat = eta_t.reshape(-1)
+        n_energy = E_t.reshape(-1).numel()
+        if n_energy * eta_flat.numel() <= EARTH_ANALYTICAL_BATCH_LIMIT:
+            return earth_probability_state(state_t, profile_dev, osc_dev, E_t, eta_t, depth_m, method="analytical", massbasis=massbasis, context=ctx)
+        return torch.cat([
+            earth_probability_state(state_t, profile_dev, osc_dev, E_t, eta_flat[s:e][None, :], depth_m, method="analytical", massbasis=massbasis, context=ctx)
+            for s, e in _earth_eta_chunk_bounds(eta_flat.numel(), n_energy)
+        ], dim=1)
     if EARTH_METHOD == "numerical":
         E_b, eta_b = torch.broadcast_tensors(E_t, eta_t)
         return torch.stack(
@@ -673,7 +710,7 @@ def nusquids_vacuum_matrix(E_MeV, L_km):
 
 def tpeanuts_solar_point(E_MeV):
     ne_r0 = solar_medium.electron_density(torch.tensor(SOLAR_R0, dtype=DTYPE, device=DEVICE))
-    return Tei(oscillation, E_MeV, ne_r0.unsqueeze(0).expand(E_MeV.numel()))
+    return mass_weights_adiabatic_approximated(oscillation, E_MeV, ne_r0.unsqueeze(0).expand(E_MeV.numel()))
 
 
 def nusquids_solar_point(E_MeV):
@@ -852,16 +889,31 @@ def _tpeanuts_earth_flux(E_1d, eta_1d, flux, *, device=None):
     E_t = torch.as_tensor(E_1d, device=dev, dtype=DTYPE)
     eta_t = torch.as_tensor(eta_1d, device=dev, dtype=DTYPE)
 
-    return earth_probability_state(
-        nustate=flux,
-        profile_earth=profile_dev,
-        oscillation=osc_dev,
-        E_MeV=E_t[:, None],
-        eta=eta_t[None, :],
-        depth_m=EARTH_DEPTH_M,
-        method="analytical",
-        massbasis=True,
-    )
+    n_energy = E_t.numel()
+    if n_energy * eta_t.numel() <= EARTH_ANALYTICAL_BATCH_LIMIT:
+        return earth_probability_state(
+            nustate=flux,
+            profile_earth=profile_dev,
+            oscillation=osc_dev,
+            E_MeV=E_t[:, None],
+            eta=eta_t[None, :],
+            depth_m=EARTH_DEPTH_M,
+            method="analytical",
+            massbasis=True,
+        )
+    return torch.cat([
+        earth_probability_state(
+            nustate=flux,
+            profile_earth=profile_dev,
+            oscillation=osc_dev,
+            E_MeV=E_t[:, None],
+            eta=eta_t[s:e][None, :],
+            depth_m=EARTH_DEPTH_M,
+            method="analytical",
+            massbasis=True,
+        )
+        for s, e in _earth_eta_chunk_bounds(eta_t.numel(), n_energy)
+    ], dim=1)
 
 
 def _legacy_earth_flux(E_np, eta_np, flux_np):
@@ -903,17 +955,33 @@ def _nusquids_earth_flux(E_1d, eta_1d, flux_np):
 
 
 def _tpeanuts_pearth_analytical(E_1d, eta_1d):
-    return earth_probability_state(
-        MASS_WEIGHTS,
-        earth_profile_t,
-        oscillation,
-        E_1d[:, None],
-        eta_1d[None, :],
-        EARTH_DEPTH_M,
-        method="analytical",
-        massbasis=True,
-        context=context,
-    )
+    n_energy = E_1d.numel()
+    if n_energy * eta_1d.numel() <= EARTH_ANALYTICAL_BATCH_LIMIT:
+        return earth_probability_state(
+            MASS_WEIGHTS,
+            earth_profile_t,
+            oscillation,
+            E_1d[:, None],
+            eta_1d[None, :],
+            EARTH_DEPTH_M,
+            method="analytical",
+            massbasis=True,
+            context=context,
+        )
+    return torch.cat([
+        earth_probability_state(
+            MASS_WEIGHTS,
+            earth_profile_t,
+            oscillation,
+            E_1d[:, None],
+            eta_1d[s:e][None, :],
+            EARTH_DEPTH_M,
+            method="analytical",
+            massbasis=True,
+            context=context,
+        )
+        for s, e in _earth_eta_chunk_bounds(eta_1d.numel(), n_energy)
+    ], dim=1)
 
 
 def _tpeanuts_pearth_numerical(E_1d, eta_1d):
@@ -1008,7 +1076,13 @@ def _tpeanuts_solar_detector_device(E_1d, eta_1d, device):
         context=dev_ctx,
     )
     mass = solar_probability_mass(osc_dev, E_1d, medium_dev, source_dev, SOLAR_SOURCE)
-    return earth_probability_state_analytical(mass, earth_dev, osc_dev, E_1d[:, None], eta_1d[None, :], SOLAR_DETECTOR_DEPTH_M, massbasis=True)
+    n_energy = E_1d.numel()
+    if n_energy * eta_1d.numel() <= EARTH_ANALYTICAL_BATCH_LIMIT:
+        return earth_probability_state_analytical(mass, earth_dev, osc_dev, E_1d[:, None], eta_1d[None, :], SOLAR_DETECTOR_DEPTH_M, massbasis=True)
+    return torch.cat([
+        earth_probability_state_analytical(mass, earth_dev, osc_dev, E_1d[:, None], eta_1d[s:e][None, :], SOLAR_DETECTOR_DEPTH_M, massbasis=True)
+        for s, e in _earth_eta_chunk_bounds(eta_1d.numel(), n_energy)
+    ], dim=1)
 
 
 def get_largest_timing_row(df: pd.DataFrame, largest_ne: int, largest_neta: int):

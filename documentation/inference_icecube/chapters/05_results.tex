@@ -1,0 +1,170 @@
+\label{ch:results}
+
+This chapter presents, interprets, and summarises the real numerical
+results of \texttt{inference5\_icecube.ipynb} (in
+\texttt{notebooks/inference/}), executed end to end against the real
+IceCube DeepCore 9-year golden-event data (\cref{ch:data-release}) using
+the physics of \cref{ch:detector-implementation} and the inference
+machinery of \cref{ch:inference-process}. Every number below is a real,
+reproducible output of that notebook or of this project's own test suite,
+not illustrative.
+
+\section{Detector-level closure check}
+
+\begin{resultbox}
+Before any fit, a single forward-model evaluation at NuFIT~6.1 defaults
+($\nu_{\rm norm}=\mu_{\rm norm}=1$) takes $2.7$~s and predicts a total of
+$513.2$ events, of which the muon background alone contributes $512.17$
+-- confirming the neutrino signal's own $\sim$0.2\% share at this
+unnatural normalization (\cref{sec:free-normalization-icecube}).
+Autograd gradients with respect to all four free parameters are finite:
+\begin{equation}
+  \frac{\partial(\text{total})}{\partial(\theta_{23},\Delta m^2_{3l},\nu_{\rm norm},\mu_{\rm norm})}
+  = (-0.083,\ -65.74,\ 1.049,\ 512.17),
+\end{equation}
+confirming gradient flow through the real Earth-matter transition
+probability, the real Honda-flux-weighted MC reweighting, and the
+differentiable per-bin histogram, before any fit is attempted.
+\end{resultbox}
+
+\section{Real fit}
+\label{sec:results-fit}
+
+\begin{resultbox}
+Starting from the calibrated point (\labelcref{eq:calibration}), the real
+4-parameter Poisson fit converges in 33 closure evaluations
+($131$~s wall time):
+\begin{equation}
+  \keyresult{\theta_{23} = 45.42^\circ \pm 1.85^\circ\ (\sin^2\theta_{23}=0.5074), \qquad
+    \Delta m^2_{3l} = (2.3947\pm0.0392)\times10^{-3}\,{\rm eV}^2,}
+\end{equation}
+\begin{equation}
+  \nu_{\rm norm} = 19{,}977.0\pm0.4, \qquad \mu_{\rm norm} = 1.617\pm0.216,
+\end{equation}
+with $-2\ln L$ improving from $353.71$ to $340.44$.
+\Cref{tab:icecube-comparison} compares the oscillation-parameter result
+directly against IceCube's own published best fit: the pull on
+$\sin^2\theta_{23}$ is $-0.05\sigma$ -- close agreement, not exact
+identity, exactly as expected given this document's own fixed-systematics
+scope decision (\cref{sec:flux-hypersurface}).
+\end{resultbox}
+
+\begin{table}[htb]
+\centering
+\caption{This document's own fit vs.\ IceCube's own published best fit (Table III/IV of \cite{Abbasi2023IceCube}).}
+\label{tab:icecube-comparison}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Parameter & \texttt{tpeanuts} (this document) & IceCube published \\
+\midrule
+$\sin^2\theta_{23}$ & $0.5074\pm0.033$ & $0.51$ \\
+$\Delta m^2_{32}$ [$10^{-3}$ eV$^2$] & $2.32\pm0.04$ & $2.41\pm0.07$ \\
+Atmospheric-muon norm.\ scale & $1.617\pm0.216$ & $1.39$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{notebox}
+Uncertainties on $\sin^2\theta_{23}$ and $\Delta m^2_{32}$ are propagated
+from $\theta_{23}$'s/$\Delta m^2_{3l}$'s own Laplace $\sigma$
+(\cref{sec:results-fit}) via $d(\sin^2\theta_{23})/d\theta_{23}$;
+$\Delta m^2_{32}=\Delta m^2_{3l}-\Delta m^2_{21}$, this project's own
+convention (\cref{ch:detector-implementation}).
+\end{notebox}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.75\textwidth]{fig1_fit_history}
+\caption{Poisson $-2\ln L$ at every LBFGS closure evaluation (including internal line-search evaluations).}
+\label{fig:fit-history}
+\end{figure}
+
+\section{2-D likelihood slice}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.62\textwidth]{fig2_2d_scan}
+\caption{$-2\ln L$ over $(\theta_{23},\Delta m^2_{3l})$, $\nu_{\rm norm}$/$\mu_{\rm norm}$ fixed at their own best-fit values ($625$ forward evaluations, $1028$~s).}
+\label{fig:2d-scan}
+\end{figure}
+
+\begin{notebox}
+\Cref{fig:2d-scan} is a \textbf{fixed-normalization slice}, not a fully
+profiled contour: $\nu_{\rm norm}$/$\mu_{\rm norm}$ are held at
+\cref{sec:results-fit}'s own best-fit values at every grid point, one
+forward pass each, rather than re-minimized (the \pyfunc{loglik\_grid}
+machinery documented in the SNO-II companion document's own Chapter~4
+supports \code{profile\_others=True} directly and could be applied here
+unchanged -- an explicitly deferred next step, not attempted in this
+notebook).
+\end{notebox}
+
+\section{Real data comparison}
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.85\textwidth]{fig3_real_comparison}
+\caption{Real IceCube 200-bin observed spectrum vs.\ two \texttt{tpeanuts} curves (NuFIT~6.1 simulation and the fitted result), collapsed onto reconstructed energy.}
+\label{fig:real-comparison}
+\end{figure}
+
+\section{The muon-background normalization audit}
+\label{sec:results-munorm}
+
+\begin{resultbox}
+\Cref{sec:munorm-audit}'s audit, carried out quantitatively:
+\begin{itemize}
+  \item \textbf{Earth-matter unitarity, ruled out.} At the published
+    best-fit point, forcing \code{reunitarize=True} changes the total
+    predicted rate from $21{,}913.81$ to $21{,}913.37$ (of a real observed
+    $21{,}914.0$) -- a $0.002\%$ shift, with a maximum per-bin relative
+    difference of only $0.06\%$. Three orders of magnitude too small to
+    account for $\mu_{\rm norm}$'s own $16\%$ gap above the published
+    $1.39$.
+  \item \textbf{Fixed detector systematics, identified and quantified.}
+    The real hypersurface correction's own mean value (best-fit vs.\
+    nominal systematics point) shifts by $+2.0\%$ (\code{nc}, identical to
+    \code{nue\_cc}), $+2.0\%$ (\code{numu\_cc}), and $+12.0\%$
+    (\code{nutau\_cc}) -- a real, non-negligible normalization effect that
+    this project's own reduced (4-parameter, no-prior) fit cannot
+    distinguish from a genuine muon-background rescaling, unlike
+    IceCube's own $\sim$40-parameter joint fit with Gaussian priors on
+    every nuisance.
+\end{itemize}
+\end{resultbox}
+
+\section{Summary and known limitations}
+
+This document fits IceCube's real public golden-event data using its own
+event-by-event weighted-Monte-Carlo reweighting technique
+(\cref{ch:detector-implementation}) and a real Poisson likelihood
+(\cref{ch:inference-process}), recovering $\theta_{23}$/$\Delta m^2_{3l}$
+close to the collaboration's own published best fit ($-0.05\sigma$ pull on
+$\sin^2\theta_{23}$). A dedicated test suite
+(\cref{sec:test-suite}), the first for this project's only weighted-MC
+detector, and a quantitative audit of the fitted muon-background
+normalization's $16\%$ discrepancy against IceCube's own published value
+(\cref{sec:munorm-audit}) -- ruling out an Earth-matter unitarity
+explanation and identifying fixed detector systematics as the more likely
+cause, with the size of the effect quantified directly -- are this
+document's own contributions beyond reproducing the existing notebook.
+
+\begin{notebox}
+\textbf{Known limitations, stated explicitly.} The 5 real
+detector-systematics parameters are fixed at their published best-fit
+point rather than re-fit as free nuisances -- the natural next step the
+muon-norm audit itself motivates, and the real hypersurface machinery
+(\cref{sec:flux-hypersurface}) already supports it without further code
+changes. The real MC is downsampled $10\times$ for computational
+tractability. Production is treated at the top of the atmosphere rather
+than through a full atmosphere-production-height treatment (a
+sub-percent-level simplification). \Cref{fig:2d-scan}'s likelihood
+picture is a fixed-normalization slice, not a fully profiled contour --
+the SNO-II companion document's own \code{profile\_others=True} machinery
+could be applied here directly. Next steps: free the 5 systematics as
+real Gaussian-prior nuisances and re-audit $\mu_{\rm norm}$; profile
+$\nu_{\rm norm}$/$\mu_{\rm norm}$ at every 2-D scan grid point; and
+combine this real atmospheric measurement with this project's other real
+detectors' oscillation-parameter constraints in a genuine joint
+likelihood.
+\end{notebox}

@@ -1,0 +1,294 @@
+% =============================================================================
+%  tpeanuts-inference.sty
+%  Visual style for the "BSM_sterile" document -- same template as
+%  documentation/inference_dayabay/tpeanuts-inference.sty,
+%  documentation/inference_sno_ii/tpeanuts-inference.sty,
+%  documentation/inference_icecube/tpeanuts-inference.sty,
+%  documentation/BSM_NSI/tpeanuts-inference.sty, and
+%  documentation/guide/tpeanuts-guide.sty, reused verbatim (only the
+%  resultColor accent changed, sterileColor instead of dayabayColor/snoiiColor/
+%  icecubeColor/nsiColor) for consistency across every tpeanuts documentation
+%  deliverable.
+% =============================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{tpeanuts-inference}[2026/08/09 v1.0 tpeanuts inference template]
+
+% -----------------------------------------------------------------------------
+% Fuentes y codificacion
+% -----------------------------------------------------------------------------
+\RequirePackage[T1]{fontenc}
+\RequirePackage{lmodern}
+\RequirePackage{microtype}
+\RequirePackage[english]{babel}
+\RequirePackage{csquotes}
+
+% -----------------------------------------------------------------------------
+% Matematicas
+% -----------------------------------------------------------------------------
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{mathtools}
+\RequirePackage{bm}
+\RequirePackage{physics}
+\DeclareMathOperator{\diag}{diag}
+
+% -----------------------------------------------------------------------------
+% Espaciado entre parrafos consecutivos (ligeramente mayor que el default)
+% -----------------------------------------------------------------------------
+\setlength{\parskip}{4pt plus 2pt minus 1pt}
+
+% -----------------------------------------------------------------------------
+% Colores: uno por capitulo/bloque tematico de este documento
+% -----------------------------------------------------------------------------
+\RequirePackage[table]{xcolor}
+
+\definecolor{coreColor}{RGB}{31,78,140}        % primary accent          azul
+\definecolor{mediumColor}{RGB}{0,121,107}      % oscillation/propagation verde
+\definecolor{detectorColor}{RGB}{183,28,28}    % detector response       rojo oscuro
+\definecolor{dayabayColor}{RGB}{140,45,20}     % Daya Bay experiment     terracota
+\definecolor{snoiiColor}{RGB}{0,105,130}       % SNO-II salt phase       teal oceanico
+\definecolor{icecubeColor}{RGB}{0,140,170}     % IceCube DeepCore        cian polar
+\definecolor{nsiColor}{RGB}{123,31,162}        % NSI extension           morado violeta
+\definecolor{sterileColor}{RGB}{63,81,181}     % 3+1 sterile extension   indigo
+\definecolor{reactorColor}{RGB}{198,93,24}     % reactor/flux            naranja tostado
+\definecolor{fitColor}{RGB}{69,39,120}         % inference/fit machinery morado
+\definecolor{externalColor}{RGB}{106,27,154}   % external links          morado
+
+\colorlet{filecolor}{black!65}
+\colorlet{theoryColor}{coreColor}
+\colorlet{implColor}{mediumColor}
+\colorlet{noteColor}{orange!85!black}
+\colorlet{refColor}{black!55}
+\colorlet{pendingColor}{red!60!black}
+\colorlet{exampleColor}{teal!70!black}
+\colorlet{resultColor}{sterileColor}
+
+% -----------------------------------------------------------------------------
+% Resaltado y marcado dentro del cuerpo de texto
+% -----------------------------------------------------------------------------
+\RequirePackage{soul}
+\setul{1.5pt}{1.5pt}
+\newcommand{\keyresult}[1]{%
+  \ifmmode
+    \colorbox{yellow!35}{$\displaystyle #1$}%
+  \else
+    \sethlcolor{yellow!40}\hl{#1}%
+  \fi
+}
+\newcommand{\important}[1]{\textbf{\color{coreColor}#1}}
+\newcommand{\approxterm}[1]{\sethlcolor{orange!25}\hl{#1}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\pkgpath}[1]{{\small\ttfamily\color{filecolor}#1}}
+\newcommand{\pyfunc}[1]{\texttt{\color{implColor!80!black}#1}}
+\newcommand{\pyclass}[1]{\texttt{\bfseries\color{implColor!80!black}#1}}
+
+\RequirePackage[colorinlistoftodos,textsize=scriptsize,disable=false]{todonotes}
+\newcommand{\pending}[1][]{%
+  \todo[color=pendingColor!20,bordercolor=pendingColor]{Pending: #1}%
+  {\color{pendingColor}\textbf{[Section pending full development.]}}%
+}
+\newcommand{\notemargin}[1]{\todo[color=noteColor!20,bordercolor=noteColor]{#1}}
+
+% -----------------------------------------------------------------------------
+% Cajas tematicas (tcolorbox)
+% -----------------------------------------------------------------------------
+\RequirePackage[most]{tcolorbox}
+\tcbuselibrary{skins,breakable,theorems}
+
+\newtcolorbox{theorybox}[1][]{
+  enhanced, breakable,
+  colback=theoryColor!4, colframe=theoryColor,
+  colbacktitle=theoryColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Theoretical Foundation},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=theoryColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{implbox}[1][]{
+  enhanced, breakable,
+  colback=implColor!4, colframe=implColor,
+  colbacktitle=implColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Implementation in \texttt{tpeanuts}},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=implColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{notebox}[1][]{
+  enhanced, breakable,
+  colback=noteColor!6, colframe=noteColor,
+  colbacktitle=noteColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Approximations and Limitations},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=noteColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm,
+  before upper={%
+    \setlength{\parskip}{8pt plus 2pt minus 2pt}%
+    \setlist[itemize]{itemsep=10pt plus 2pt, topsep=6pt}%
+    \setlist[enumerate]{itemsep=10pt plus 2pt, topsep=6pt}%
+  },
+  #1
+}
+
+\newtcolorbox{refbox}[1][]{
+  enhanced, breakable,
+  colback=refColor!5, colframe=refColor,
+  colbacktitle=refColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Key References},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=refColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{examplebox}[1][]{
+  enhanced, breakable,
+  colback=exampleColor!4, colframe=exampleColor,
+  colbacktitle=exampleColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Usage Example},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=exampleColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm,
+  before upper={%
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}%
+  },
+  #1
+}
+
+\newtcolorbox{resultbox}[1][]{
+  enhanced, breakable,
+  colback=resultColor!4, colframe=resultColor,
+  colbacktitle=resultColor, coltitle=white,
+  fonttitle=\bfseries,
+  title={Result},
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=resultColor, sharp corners},
+  sharp corners=downhill, rounded corners=all, arc=1.5mm,
+  top=4mm, #1
+}
+
+\newtcolorbox{keyeqbox}{
+  enhanced, breakable,
+  colback=yellow!8, colframe=black!70,
+  boxrule=0.4pt, sharp corners=all, rounded corners=all, arc=1mm,
+  left=3mm, right=3mm, top=1.5mm, bottom=1.5mm,
+}
+
+% Cabecera compacta de modulo: ruta de fichero + una linea de proposito
+\newcommand{\modulehead}[2]{%
+  \noindent\pkgpath{#1}\par
+  \noindent\textit{#2}\par\medskip
+}
+
+% -----------------------------------------------------------------------------
+% Titulos de parte / capitulo / seccion
+% -----------------------------------------------------------------------------
+\RequirePackage{titlesec}
+\RequirePackage{titletoc}
+
+\titleformat{\part}[display]
+  {\normalfont\Huge\bfseries\color{coreColor}}
+  {\filright\Large\MakeUppercase{\partname} \thepart}
+  {6pt}
+  {\titlerule[1pt]\vspace{8pt}\Huge}
+
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{coreColor}}
+  {\filleft\Large\chaptertitlename\ \thechapter}
+  {6pt}
+  {\titlerule[0.8pt]\vspace{6pt}\huge}
+\titlespacing*{\chapter}{0pt}{0pt}{20pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{implColor!70!coreColor}}
+  {\thesection}{0.6em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{coreColor}}
+  {\thesubsection}{0.6em}{}
+\titlespacing*{\subsection}{4pt}{12pt plus 4pt minus 2pt}{10pt plus 4pt minus 2pt}
+% -----------------------------------------------------------------------------
+% Cabeceras/pies de pagina
+% -----------------------------------------------------------------------------
+\RequirePackage{fancyhdr}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[RE]{\nouppercase{\leftmark}}
+\fancyhead[LO]{\nouppercase{\rightmark}}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[LE,RO]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% -----------------------------------------------------------------------------
+% Listas, tablas, codigo
+% -----------------------------------------------------------------------------
+\RequirePackage{enumitem}
+\setlist{itemsep=2pt, topsep=4pt}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+\RequirePackage{longtable}
+\RequirePackage{graphicx}
+\graphicspath{{figures/}}
+
+% Extra row height on every tabular/longtable in the document, so multi-line
+% cells (very common here, via \parbox) don't read as visually cramped.
+\renewcommand{\arraystretch}{1.3}
+
+\RequirePackage{listings}
+\definecolor{codebg}{RGB}{245,245,245}
+\lstdefinestyle{tpython}{
+  language=Python,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{coreColor}\bfseries,
+  commentstyle=\color{black!45}\itshape,
+  stringstyle=\color{reactorColor!80!black},
+  numbers=none,
+  breaklines=true,
+  showstringspaces=false,
+  frame=single,
+  rulecolor=\color{black!20},
+  xleftmargin=4pt, xrightmargin=4pt,
+  aboveskip=6pt, belowskip=6pt,
+}
+\lstset{style=tpython}
+
+% -----------------------------------------------------------------------------
+% Hipervinculos
+% -----------------------------------------------------------------------------
+\RequirePackage[
+  colorlinks=true,
+  linkcolor=coreColor,
+  citecolor=mediumColor,
+  urlcolor=externalColor,
+  bookmarksnumbered=true
+]{hyperref}
+\RequirePackage[capitalise,nameinlink]{cleveref}
+
+% -----------------------------------------------------------------------------
+% Bibliografia
+% -----------------------------------------------------------------------------
+\RequirePackage[
+  backend=biber,
+  style=numeric-comp,
+  sorting=nyt,
+  maxbibnames=6,
+  giveninits=true
+]{biblatex}
+
+% The `note` field on each references.bib entry is internal documentation
+% (data provenance, cross-references) for editors of this document; it is
+% not meant to appear in the printed References section.
+\AtEveryBibitem{\clearfield{note}}
+
+\endinput

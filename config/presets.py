@@ -346,7 +346,7 @@ register_preset(
 #        theta14=0 (R14 and R24 both act on the sterile index and do not
 #        commute in general, so a small residual survives in the nu_mu
 #        channel whenever theta14 and theta24 are simultaneously non-zero;
-#        see notebooks/validation/physics/BSM/sterile2_kinematics.ipynb,
+#        see notebooks/physics/experimental_results/BSM/sterile2_kinematics.ipynb,
 #        Section 3, for the quantified size of that residual).
 # theta14/theta24 are illustrative (not fit to data) - chosen larger than
 # current experimental bounds purely to make the exact-vs-naive-formula

@@ -1,0 +1,419 @@
+\label{ch:nsi-implementation}
+
+This chapter maps every equation of \cref{ch:nsi-theory} onto the concrete
+\texttt{tpeanuts} implementation, module by module. There is no separate
+\texttt{core.BSM} Hamiltonian-assembly module: \pyfunc{hamiltonian\_reduced}
+and \pyfunc{hamiltonian\_flavour} in \texttt{core.common.hamiltonian}
+already handle NSI, the 3+1 sterile extension, or both simultaneously,
+dispatching purely on which fields of \pyclass{OscillationParameters} are
+populated.
+
+\section{\texttt{NSIConfig}: the parameter container}
+\label{sec:impl-nsiconfig}
+
+\modulehead{core/BSM/bsm\_nsi.py}{frozen dataclass storing every NSI
+coupling and building the corresponding complex tensors.}
+
+\begin{implbox}
+\pyclass{NSIConfig} stores the electron/proton-normalized block $\epsilon$
+as nine real scalar fields (three real diagonal entries plus three complex
+off-diagonal entries decomposed into real/imaginary parts:
+\code{eps\_ee}, \code{eps\_mumu}, \code{eps\_tautau}, \code{eps\_emu\_re/\_im},
+\code{eps\_etau\_re/\_im}, \code{eps\_mutau\_re/\_im}), and the
+neutron-normalized block $\epsilon^n$ (\cref{eq:epsilon-composition}) as the
+mirrored nine fields \code{eps\_ee\_n}, \dots, \code{eps\_mutau\_n\_im}.
+Every field defaults to \code{0.0}, so $\epsilon^n=0$ (no composition
+dependence) reproduces every pre-existing single-matrix scenario exactly.
+
+\pyfunc{\_\_post\_init\_\_} recomputes \emph{both} derived complex $3\times3$
+tensors, \code{epsilon} and \code{epsilon\_n}, from their respective nine
+scalar fields on \emph{every} construction -- including every
+\pyfunc{dataclasses.replace(...)} call, since that re-invokes
+\pyfunc{\_\_init\_\_}/\pyfunc{\_\_post\_init\_\_}. This makes the eighteen
+scalar fields the single source of truth: tweaking one field via
+\pyfunc{replace} can never leave a stale \code{epsilon}/\code{epsilon\_n}
+behind.
+\end{implbox}
+
+\begin{implbox}[title={Differentiable tensor construction}]
+Both $3\times3$ Hermitian matrices are assembled by the shared helper
+\pyfunc{\_hermitian\_3x3}, built entirely from \code{torch} operations
+(\code{torch.complex}, \code{torch.stack}) rather than Python's
+\code{complex()} builtin or \code{torch.tensor(nested\_python\_list)}:
+\begin{lstlisting}[style=tpython]
+def _hermitian_3x3(ee, mumu, tautau, emu_re, emu_im,
+                    etau_re, etau_im, mutau_re, mutau_im,
+                    *, device, real_dtype):
+    def _rt(x):
+        return as_tensor(x, dtype=real_dtype, device=resolved_device)
+
+    zero = torch.zeros((), dtype=real_dtype, device=resolved_device)
+    ee_c, mumu_c, tautau_c = (torch.complex(_rt(v), zero)
+                               for v in (ee, mumu, tautau))
+    emu_c   = torch.complex(_rt(emu_re),   _rt(emu_im))
+    etau_c  = torch.complex(_rt(etau_re),  _rt(etau_im))
+    mutau_c = torch.complex(_rt(mutau_re), _rt(mutau_im))
+
+    row0 = torch.stack((ee_c, emu_c, etau_c))
+    row1 = torch.stack((emu_c.conj(), mumu_c, mutau_c))
+    row2 = torch.stack((etau_c.conj(), mutau_c.conj(), tautau_c))
+    return torch.stack((row0, row1, row2)).to(dtype=cdtype)
+\end{lstlisting}
+Every one of the eighteen scalar fields therefore accepts either a plain
+Python \code{float} (producing a non-grad-tracking leaf tensor, exactly as
+before) \emph{or} a differentiable \code{torch.Tensor} with
+\code{requires\_grad=True}, in which case the gradient reaches
+\code{epsilon}/\code{epsilon\_n} intact. \code{device=None} resolves to
+CPU and every field is moved (differentiably, via \code{.to()}) onto that
+single resolved device, so mixing a GPU-resident coupling with plain-float
+ones never produces a mixed-device tensor. This is what lets
+\pyclass{inference.solar\_model.SolarNSIOscillationModel}
+(\cref{sec:impl-autograd}) fit \code{eps\_ee} by gradient descent while
+building an ordinary \pyclass{NSIConfig}, with no separate raw-tensor
+escape hatch needed for that case.
+\end{implbox}
+
+\begin{notebox}
+\textbf{Identity-based equality.} \pyclass{NSIConfig} is declared with
+\code{@dataclass(frozen=True, eq=False)}: \code{\_\_eq\_\_}/\code{\_\_hash\_\_}
+are inherited from \code{object} (identity-based) rather than
+auto-generated from the fields. A field-tuple-based \code{\_\_eq\_\_} would
+be unsound here for two independent reasons: (i) comparing
+\code{torch.Tensor} fields with \code{==} does not reliably reduce to a
+plain boolean, and (ii) \pyfunc{NSIConfig.from\_raw\_epsilon}
+(below) leaves the eighteen scalar fields at their \code{0.0} defaults
+while setting \code{epsilon}/\code{epsilon\_n} directly, so a
+field-tuple-based comparison would make a config carrying a non-zero raw
+$\epsilon$ compare equal to the plain Standard-Model-limit
+\pyclass{NSIConfig()} -- a real defect discovered and fixed during
+external review of this extension. Use
+\code{torch.equal(a.epsilon, b.epsilon)} directly for value comparison.
+\end{notebox}
+
+\begin{implbox}[title={Preset construction and the raw-epsilon escape hatch}]
+\begin{itemize}
+  \item \pyfunc{NSIConfig.from\_preset(name)} builds a named configuration
+    from \code{tpeanuts.config.presets.NSI\_PRESETS} (\cref{ch:nsi-observables}).
+  \item \pyfunc{NSIConfig.from\_raw\_epsilon(epsilon, *, epsilon\_n=None)} is
+    the escape hatch for an $\epsilon$ (and, optionally, $\epsilon^n$) that
+    does not decompose into the eighteen-scalar parametrization -- e.g.\ a
+    precomputed matrix. It validates that each tensor supplied has at least
+    two dimensions, is square, is finite, and is Hermitian within a
+    dtype-scaled tolerance (raising \code{ValueError} otherwise), and, when
+    both are supplied, that $\epsilon$ and $\epsilon^n$ share the same
+    active-flavour block size. \textbf{A config built this way must not be
+    passed through \code{dataclasses.replace()}}: since its scalar fields
+    stay at their \code{0.0} defaults, \code{\_\_post\_init\_\_} would
+    silently recompute \code{epsilon}/\code{epsilon\_n} back to zero on the
+    next \code{replace()} call, discarding the raw tensor (and any
+    gradient connected to it) with no warning. Build a fresh config with
+    \code{from\_raw\_epsilon} again instead.
+\end{itemize}
+\end{implbox}
+
+\begin{implbox}[title={Convenience properties}]
+\begin{itemize}
+  \item \pyfunc{is\_sm\_limit}: \code{True} iff \emph{both} \code{epsilon}
+    and \code{epsilon\_n} are exactly the zero matrix.
+  \item \pyfunc{has\_cp\_violation}: \code{True} iff any off-diagonal entry
+    of \emph{either} matrix has a non-zero imaginary part.
+  \item \pyfunc{has\_neutron\_coupling}: \code{True} iff \code{epsilon\_n} is
+    not exactly zero. This is the single flag every downstream consumer in
+    this chapter uses to decide whether the composition term
+    (\cref{eq:epsilon-composition}) needs to be evaluated at all -- it costs
+    nothing extra when \code{False} (the default), so every pre-existing
+    scenario is bit-identical to before this extension existed.
+  \item \pyfunc{eps\_emu}/\pyfunc{eps\_etau}/\pyfunc{eps\_mutau} (and their
+    \code{\_n} counterparts) return the corresponding entry as a plain
+    Python \code{complex}, via a helper that detaches a tensor field first
+    -- these are non-differentiable display/convenience accessors, not part
+    of the gradient path.
+\end{itemize}
+\end{implbox}
+
+\section{Embedding $\epsilon$/$\epsilon^n$ for an arbitrary flavour count}
+
+\begin{implbox}
+\pyfunc{epsilon\_tensor(n\_flavours=...)} and its mirror
+\pyfunc{epsilon\_n\_tensor(n\_flavours=...)} embed the $3\times3$ active-flavour
+block in the top-left corner of an $n_{\rm flavours}\times n_{\rm flavours}$
+zero matrix when $n_{\rm flavours}>3$ (the 3+1 sterile case): the sterile row
+and column carry no NSI coupling of either kind, since the sterile state is
+an $\mathrm{SU}(2)_L\times\mathrm{U}(1)_Y$ singlet and NSI operators are
+built from Standard-Model-charged fermion currents. Both methods share a
+single embedding implementation (\code{\_embed\_active}), parametrised only
+by which of \code{self.epsilon}/\code{self.epsilon\_n} to embed, so the two
+code paths cannot silently diverge.
+\end{implbox}
+
+\section{Hamiltonian assembly: the three-piece decomposition}
+\label{sec:impl-hamiltonian}
+
+\modulehead{core/common/hamiltonian.py}{\pyfunc{hamiltonian\_matter\_reduced}
+-- the single function assembling the matter Hamiltonian for every scenario.}
+
+\begin{theorybox}
+\pyfunc{hamiltonian\_matter\_reduced} builds the flavour-basis matter term as
+up to \emph{three} independent, additive pieces, then rotates the whole sum
+into the reduced basis via $O^\dagger(\cdot)O$ (\S1.1, \S1.2):
+\begin{equation}
+  \keyresult{
+    H_{\rm mat}^{\rm flavour} =
+    \underbrace{V_{CC}(n_e)\bigl(\diag(1,0,\dots,0)+\epsilon\bigr)}_{\text{piece 1: NSI, }\epsilon}
+    \;+\;
+    \underbrace{V_{NC}(n_n)\,\diag(0,\dots,0,-1)}_{\text{piece 2: sterile NC}}
+    \;+\;
+    \underbrace{V_{CC}(n_n)\,\epsilon^n}_{\text{piece 3: NSI composition}}
+  },
+  \label{eq:three-piece}
+\end{equation}
+with $V_{CC}(n)\equiv\pm\sqrt2\,G_F\,n\,L_{\rm scale}$ the same charged-current
+potential function of \S1.1, evaluated once on the electron density and once
+(for pieces 2 and 3) on the neutron density, and $V_{NC}(n)$ the neutral-current
+potential of \S1.3. Piece 3 is exactly the composition term of
+\cref{eq:epsilon-composition},
+\begin{equation}
+  V_{CC}(n_n)\,\epsilon^n = L_{\rm scale}\sqrt2\,G_F\,n_n\,\epsilon^n
+  = \Bigl(L_{\rm scale}\sqrt2\,G_F\,n_e\Bigr)\frac{n_n}{n_e}\,\epsilon^n
+  = V_{CC}(n_e)\,\frac{n_n}{n_e}\,\epsilon^n,
+\end{equation}
+so re-evaluating the \emph{same} \pyfunc{matter\_potential\_cc} function on
+the neutron density instead of the electron density is algebraically
+identical to the ratio form of \cref{eq:epsilon-composition}, without ever
+dividing by $n_e$ -- avoiding a division that would be singular in vacuum
+($n_e=n_n=0$).
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \code{include\_nc = n\_n\_mol\_cm3 is not None and n\_flavours == 4}:
+    piece 2 is active only for the 3+1 sterile extension, and only when the
+    caller supplies a neutron density; omitting it recovers the CC-only
+    sterile Hamiltonian used throughout earlier phases of this project,
+    exactly as before this extension existed.
+  \item \code{needs\_eps\_n = oscillation.BSM\_extension\_NSI and
+    oscillation.nsi.has\_neutron\_coupling}: piece 3 is active for
+    \emph{any} flavour count, driven purely by whether $\epsilon^n\neq0$ --
+    not by whether the sterile extension is also active.
+  \item \textbf{Piece 3 is not optional once requested.} If
+    \code{needs\_eps\_n} is \code{True} but \code{n\_n\_mol\_cm3} was not
+    supplied, the function raises \code{ValueError} rather than silently
+    falling back to the $\epsilon$-only Hamiltonian. This is a deliberate
+    asymmetry with piece 2: omitting \code{n\_n\_mol\_cm3} for the sterile
+    NC term is itself a well-defined, physically exact choice (``CC-only
+    sterile propagation''), whereas a non-zero $\epsilon^n$ is an explicit
+    user request that the function must not silently downgrade.
+  \item The direction matrices $P_{cc}$, $P_{nc}$, $P_{\epsilon^n}$ (the
+    $O^\dagger(\cdot)O$-rotated, $V$-independent counterparts of the three
+    pieces above) are built once by the shared helper
+    \pyfunc{\_matter\_direction\_reduced}, reused identically by both the
+    exact Hamiltonian builder here and the perturbative segment evolutor
+    (\cref{sec:impl-perturbative}).
+\end{itemize}
+\end{implbox}
+
+\begin{notebox}
+Because \pyfunc{hamiltonian\_matter\_reduced} is the single function every
+other builder in this chapter delegates to, this \code{ValueError} is a
+defense-in-depth guarantee: any current or future caller anywhere in the
+pipeline that forgets to supply the neutron density for a non-zero
+$\epsilon^n$ configuration fails loudly at the point of Hamiltonian
+assembly, rather than silently returning a physically incomplete result.
+\end{notebox}
+
+\section{The perturbative segment evolutor}
+\label{sec:impl-perturbative}
+
+\modulehead{core/perturbative/evolutor.py}{\pyfunc{evolutor\_perturbative\_segment}
+-- first-order perturbative evolution for one piecewise-polynomial density
+segment (used by \texttt{medium.earth} and \texttt{medium.atmosphere}).}
+
+\begin{theorybox}
+For a segment over which the electron/neutron density varies, the
+zeroth-order evolutor $U_0$ uses the segment-\emph{average} potential;
+the first-order correction $U_1$ is built from the spectral projectors
+$M_a$ of the average Hamiltonian and the oscillatory integral of the
+\emph{residual} density (density minus its segment average) against the
+Hamiltonian eigenvalue differences,
+\begin{equation}
+  U_1 = -i\sum_{a,b} I_{ab}\,\bigl(M_a\,P\,M_b\bigr),
+  \qquad
+  I_{ab} = \int_{x_1}^{x_2}\delta n(x)\,e^{-i\lambda_a x+i\lambda_b x}\,dx,
+\end{equation}
+where $P$ is whichever position-independent direction matrix the term in
+question needs (\cref{eq:three-piece}).
+\end{theorybox}
+
+\begin{implbox}
+\pyfunc{evolutor\_first\_order} accepts three independent, optional direction
+matrices, mirroring \cref{eq:three-piece} exactly: \code{P} (piece 1),
+\code{P\_nc} (piece 2), and \code{P\_eps\_n} (piece 3). The key implementation
+observation is that pieces 2 and 3 need the \emph{same} underlying
+oscillatory integral -- both are built from the neutron-density residual,
+\code{profile\_model.residual\_integral\_neutron(la, lb)} -- and differ only
+in which potential-conversion function is applied to it afterwards
+(\pyfunc{matter\_potential\_nc} for piece 2, \pyfunc{matter\_potential\_cc}
+for piece 3, exactly matching \cref{eq:three-piece}'s $V_{NC}(n_n)$ versus
+$V_{CC}(n_n)$) and which direction matrix they sandwich. \code{P\_eps\_n}
+therefore required \emph{no new residual-integral machinery}: it reuses
+\code{residual\_integral\_neutron} exactly as \code{P\_nc} already did.
+\end{implbox}
+
+\begin{implbox}[title={Zeroth-order composition term and the neutron-coupling guard}]
+\pyfunc{evolutor\_perturbative\_segment} computes
+\code{include\_eps\_n = oscillation.BSM\_extension\_NSI and
+oscillation.nsi.has\_neutron\_coupling} and, when true, builds the
+zeroth-order piece-3 contribution from \code{profile\_model.average\_n}
+(the segment-average neutron density) via \pyfunc{matter\_potential\_cc} --
+\emph{not} from \code{profile\_model.potential\_n}, which is already
+converted with the \emph{neutral-current} prefactor for piece 2's own use
+and would apply the wrong prefactor if reused directly for piece 3. As in
+\cref{sec:impl-hamiltonian}, a non-zero $\epsilon^n$ with a
+\code{profile\_model} that was not built with neutron-density coefficients
+(\code{average\_n}/\code{potential\_n}/\code{residual\_integral\_neutron}
+unavailable) raises \code{ValueError} rather than silently ignoring the
+request -- mirroring, and reusing the same underlying neutron-density data
+as, the pre-existing \code{include\_matter\_nc} guard for piece 2.
+\end{implbox}
+
+\section{Pipeline wiring: fetching neutron density for the right reason}
+\label{sec:impl-pipeline}
+
+\begin{notebox}
+\textbf{The subtlety this section documents.} Piece 2 (sterile NC) and
+piece 3 (NSI composition) both need local neutron-density data, but they
+are triggered by \emph{independent} conditions: piece 2 by the
+sterile-specific, tri-state \code{include\_matter\_nc} policy
+(\pyfunc{core.common.oscillation.resolve\_include\_matter\_nc}, unchanged
+by this extension), piece 3 automatically by
+\code{oscillation.nsi.has\_neutron\_coupling}, with no separate flag --
+exactly like $\epsilon$ itself needs no ``enable NSI'' flag beyond
+\code{oscillation.nsi} being set. Every \texttt{medium.*} pipeline that
+decides \emph{whether to sample/fetch} raw neutron-density data at all
+(as opposed to whether to \emph{apply} the sterile NC term, which is
+already independently gated downstream) must therefore OR the two
+conditions together, via the shared helper
+\begin{lstlisting}[style=tpython]
+def oscillation_needs_neutron_composition(oscillation):
+    return oscillation.BSM_extension_NSI and oscillation.nsi.has_neutron_coupling
+\end{lstlisting}
+in \texttt{core.common.oscillation}.
+\end{notebox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \textbf{Earth.} \pyclass{EarthProfile} bakes its neutron-density
+    coefficients in at \emph{construction} time
+    (\code{profile\_perturbative\_kwargs={'include\_neutron': True}}),
+    independently of any per-call flag -- so the exact
+    (\pyfunc{evolutor\_numerical}-based) and perturbative
+    (\pyfunc{evolutor\_perturbative\_segment}-based) Earth paths both
+    automatically get composition-term support for free once the profile was
+    built with neutron data, requiring \emph{no} pipeline-level change. The
+    one exception is \pyfunc{earth\_probability\_state\_numerical}, which
+    (unlike the perturbative Earth path) samples \code{n\_n} itself from the
+    profile and previously did so only when \code{include\_matter\_nc} was
+    true; it now also samples it when
+    \pyfunc{oscillation\_needs\_neutron\_composition} is true, raising a
+    dedicated \code{ValueError} if the profile lacks neutron data.
+  \item \textbf{Atmosphere.} Both \pyfunc{atmosphere\_evolutor\_numerical}
+    and \pyfunc{atmosphere\_evolutor\_analytical} decide whether to
+    sample/fit neutron density \emph{per call} (unlike Earth); both now OR
+    in \pyfunc{oscillation\_needs\_neutron\_composition} alongside the
+    resolved \code{include\_matter\_nc}.
+  \item \textbf{Sun.} \pyfunc{solar\_evolutor\_numerical\_history} (feeding
+    \pyfunc{core.numerical.evolutor\_numerical}) and
+    \pyfunc{solar\_probability\_mass}'s \code{method="adiabatic\_exact"}
+    branch (feeding \pyfunc{mass\_weights\_adiabatic\_exact}, which itself
+    calls \pyfunc{hamiltonian\_flavour}) both apply the same OR condition
+    before sampling \code{medium.density\_n}. A related, more subtle fix was
+    needed inside \pyfunc{mass\_weights\_adiabatic\_exact} itself: its
+    fixed-permutation bookkeeping (relabelling \code{torch.linalg.eigh}'s
+    ascending-eigenvalue column order by physical vacuum mass index, needed
+    because that order disagrees with the physical one under inverted
+    ordering) diagonalises an auxiliary \emph{vacuum-limit} Hamiltonian at
+    $n_e=n_n=0$; that internal call used to pass \code{n\_n\_mol\_cm3=None}
+    (physically inert either way, since $V_{CC}(0)=0$), which now trips the
+    \S\ref{sec:impl-hamiltonian} guard whenever $\epsilon^n\neq0$. It now
+    passes an explicit zero tensor instead of \code{None} -- numerically
+    identical, but compatible with the new guard.
+\end{itemize}
+\end{implbox}
+
+\begin{notebox}
+\textbf{method="adiabatic\_approximated" remains Standard-Model only.} The
+closed-form two-level matter-mixing-angle formulas underlying that method
+have no NSI generalisation at all (not even for $\epsilon^n=0$); NSI of
+either kind is rejected there with \code{ValueError} regardless of
+composition, forcing \code{method="adiabatic\_exact"} or
+\code{method="numerical"} for any NSI scenario in the Sun.
+\end{notebox}
+
+\section{Not yet supported}
+
+\begin{notebox}
+The composition term (piece 3) has \emph{no} generalisation implemented for
+\pyfunc{medium.solar.adiabatic.mass\_weights\_adiabatic\_approximated} or
+its Landau-Zener correction, for the same structural reason $\epsilon$
+itself has none there (\S\ref{sec:impl-pipeline}). It is fully implemented
+for the exact evolutor path (any medium) and for the perturbative segment
+evolutor (Earth, atmosphere); the only propagation \emph{method} left
+without composition-term support is the closed-form adiabatic
+approximation, which was already NSI-incompatible before this extension.
+\end{notebox}
+
+\section{Autograd: fitting $\epsilon$ by gradient descent}
+\label{sec:impl-autograd}
+
+\modulehead{inference/solar\_model.py}{\pyclass{SolarNSIOscillationModel} --
+a differentiable solar $P_{ee}(E)$ model with a free diagonal NSI coupling.}
+
+\begin{implbox}
+\pyclass{SolarNSIOscillationModel.oscillation(theta)} builds a fresh
+\pyclass{NSIConfig} directly from the free-parameter tensor,
+\begin{lstlisting}[style=tpython]
+nsi = NSIConfig(
+    eps_ee=values["eps_ee"],          # a torch.Tensor, requires_grad=True
+    device=self.context.device,
+    real_dtype=self.context.dtype,
+)
+\end{lstlisting}
+relying on \cref{sec:impl-nsiconfig}'s differentiable
+\pyfunc{\_hermitian\_3x3} to keep \code{eps\_ee}'s gradient connected all the
+way through \code{epsilon}, \pyfunc{hamiltonian\_flavour}, and
+\pyfunc{mass\_weights\_adiabatic\_exact}'s
+\code{torch.linalg.eigh} diagonalisation, to the predicted $P_{ee}$. This
+constructor call is what \pyfunc{NSIConfig.from\_raw\_epsilon} (a one-hot
+$\times$ \code{eps\_ee} matrix multiplication, in an earlier version of this
+model) existed to work around before \cref{sec:impl-nsiconfig}'s rewrite --
+the differentiable scalar-field path removes the need for that workaround
+for any coupling that decomposes into the ordinary
+\code{eps\_*}/\code{eps\_*\_n} parametrization, which a single diagonal
+coupling like \code{eps\_ee} always does.
+\pyfunc{inference.fit.fit\_lbfgs} then differentiates through the whole
+chain with \code{torch.optim.LBFGS}, exactly as it already does for the
+purely-Standard-Model free parameters (\code{theta12}, \code{DeltamSq21},
+\dots); see \cref{sec:results-borexino-nsi} for the resulting fit.
+\end{implbox}
+
+\section{Summary: modules touched by this extension}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Module & Role \\
+\midrule
+\pkgpath{core/BSM/bsm\_nsi.py} & \pyclass{NSIConfig}: parameters, differentiable construction, embedding \\
+\pkgpath{core/common/hamiltonian.py} & \pyfunc{hamiltonian\_matter\_reduced}: the three-piece decomposition \\
+\pkgpath{core/common/oscillation.py} & \pyfunc{oscillation\_needs\_neutron\_composition} \\
+\pkgpath{core/numerical/evolutor.py} & Exact matrix-exponential evolution; consumes \code{n\_n\_mol\_cm3} generically \\
+\pkgpath{core/perturbative/evolutor.py} & \pyfunc{evolutor\_perturbative\_segment}: \code{P\_eps\_n} sandwich term \\
+\pkgpath{medium/earth/probability.py} & Neutron-density sampling for \pyfunc{earth\_probability\_state\_numerical} \\
+\pkgpath{medium/atmosphere/evolutor.py} & Neutron-density sampling for both atmosphere propagation methods \\
+\pkgpath{medium/solar/evolutor.py} & Neutron-density sampling for the numerical solar evolutor \\
+\pkgpath{medium/solar/probability.py} & Neutron-density sampling for \code{method="adiabatic\_exact"} \\
+\pkgpath{medium/solar/adiabatic.py} & Vacuum-limit permutation fix in \pyfunc{mass\_weights\_adiabatic\_exact} \\
+\pkgpath{inference/solar\_model.py} & Differentiable \code{eps\_ee} fit via \pyclass{SolarNSIOscillationModel} \\
+\bottomrule
+\end{tabular}
+\end{center}

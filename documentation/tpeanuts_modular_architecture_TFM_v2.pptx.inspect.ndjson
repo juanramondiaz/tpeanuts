@@ -1,0 +1,53 @@
+{"kind":"deck","id":"pr/zo1qyv","name":"Deck"}
+{"kind":"layout","layoutId":"f7fb8981-b4ad-4ab4-905c-8ab2633b8be4","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"157d2b68-a446-45df-b328-a16c95320ad4","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/yydpj3","slide":1,"title":"MASTER'S THESIS DEFENSE","textShapes":4}
+{"kind":"textbox","id":"sh/pof698fa","slide":1,"name":"cover-kicker","text":"MASTER'S THESIS DEFENSE","textPreview":"MASTER'S THESIS DEFENSE","textChars":23,"textLines":1,"bbox":[72,62,430,30]}
+{"kind":"textbox","id":"sh/214netgj","slide":1,"name":"cover-title","text":"Tpeanuts modular architecture","textPreview":"Tpeanuts modular architecture","textChars":29,"textLines":1,"bbox":[72,185,830,150]}
+{"kind":"textbox","id":"sh/3mdo7yx4","slide":1,"name":"cover-subtitle","text":"A layered, differentiable framework for neutrino oscillation and flux propagation","textPreview":"A layered, differentiable framework for neutrino oscillation and flux propagation","textChars":81,"textLines":1,"bbox":[72,365,720,92]}
+{"kind":"shape","id":"sh/gzm5cjyt","slide":1,"name":"cover-accent","bbox":[1000,0,280,720]}
+{"kind":"shape","id":"sh/10v65ofy","slide":1,"name":"cover-accent-strong","bbox":[1050,0,80,720]}
+{"kind":"textbox","id":"sh/ex4natgn","slide":1,"name":"cover-footer","text":"Torch-based scientific software · Python","textPreview":"Torch-based scientific software · Python","textChars":40,"textLines":1,"bbox":[72,625,600,34]}
+{"kind":"notes","id":"nt/yydpj3","slide":1,"text":""}
+{"kind":"slide","id":"sl/ukyys7","slide":2,"title":"Tpeanuts keeps scientific concerns modular","textShapes":23}
+{"kind":"textbox","id":"sh/6poj2dgb","slide":2,"name":"architecture-title","text":"Tpeanuts keeps scientific concerns modular","textPreview":"Tpeanuts keeps scientific concerns modular","textChars":42,"textLines":1,"bbox":[56,34,1168,58]}
+{"kind":"textbox","id":"sh/tcfidsf2","slide":2,"name":"architecture-subtitle","text":"High-level workflows compose independent source, medium and physics components.","textPreview":"High-level workflows compose independent source, medium and physics components.","textChars":79,"textLines":1,"bbox":[56,96,1050,30]}
+{"kind":"shape","id":"sh/sr614nyh","slide":2,"name":"pipelines-base","bbox":[185,158,270,112]}
+{"kind":"shape","id":"sh/jmd07ix0","slide":2,"name":"inference-base","bbox":[505,158,270,112]}
+{"kind":"shape","id":"sh/il4jydgf","slide":2,"name":"detectors-base","bbox":[825,158,270,112]}
+{"kind":"shape","id":"sh/5ovi98fq","slide":2,"name":"sources-base","bbox":[185,337,270,112]}
+{"kind":"shape","id":"sh/4nm103yl","slide":2,"name":"media-base","bbox":[505,337,270,112]}
+{"kind":"shape","id":"sh/vid03yho","slide":2,"name":"physics-core-base","bbox":[825,337,270,112]}
+{"kind":"shape","id":"sh/uh4zutg3","slide":2,"name":"foundations-base","bbox":[32,205,120,292]}
+{"kind":"shape","id":"sh/g3y5w3q9","slide":2,"name":"integration-base","bbox":[1128,205,120,292]}
+{"kind":"shape","id":"sh/h47m5ore","slide":2,"name":"legacy-base","bbox":[185,540,910,82]}
+{"kind":"shape","id":"sh/uhwnut83","slide":2,"bbox":[320,270,0,67]}
+{"kind":"shape","id":"sh/v2p43y9o","slide":2,"bbox":[640,270,0,67]}
+{"kind":"shape","id":"sh/8fe5sjqx","slide":2,"bbox":[960,270,0,67]}
+{"kind":"shape","id":"sh/tgnm1ori","slide":2,"bbox":[455,393,50,0]}
+{"kind":"shape","id":"sh/6dwnq98r","slide":2,"bbox":[775,393,50,0]}
+{"kind":"shape","id":"sh/7e54ze9c","slide":2,"bbox":[152,351,353,42]}
+{"kind":"shape","id":"sh/cbi54nq1","slide":2,"bbox":[1095,351,33,42]}
+{"kind":"shape","id":"sh/dcr6d8rm","slide":2,"bbox":[640,449,0,91]}
+{"kind":"textbox","id":"sh/1g3e1ofu","slide":2,"name":"application-layer","text":"APPLICATION LAYER","textPreview":"APPLICATION LAYER","textChars":17,"textLines":1,"bbox":[185,132,250,22]}
+{"kind":"textbox","id":"sh/0fud8je9","slide":2,"name":"domain-layer","text":"DOMAIN & COMPUTATION LAYER","textPreview":"DOMAIN & COMPUTATION LAYER","textChars":26,"textLines":1,"bbox":[185,311,350,22]}
+{"kind":"textbox","id":"sh/zelwzexo","slide":2,"name":"pipelines-title","text":"Propagation pipelines","textPreview":"Propagation pipelines","textChars":21,"textLines":1,"bbox":[203,171,234,30]}
+{"kind":"textbox","id":"sh/edcv69w3","slide":2,"name":"pipelines-detail","text":"Solar · Earth · Atmosphere\nCombined end-to-end workflows","textPreview":"Solar · Earth · Atmosphere | Combined end-to-end workflows","textChars":56,"textLines":2,"bbox":[203,206,234,54]}
+{"kind":"textbox","id":"sh/dc3ex4fi","slide":2,"name":"inference-title","text":"Inference","textPreview":"Inference","textChars":9,"textLines":1,"bbox":[523,171,234,30]}
+{"kind":"textbox","id":"sh/sbud4zex","slide":2,"name":"inference-detail","text":"Differentiable models\nLikelihoods · Fits · Scans","textPreview":"Differentiable models | Likelihoods · Fits · Scans","textChars":48,"textLines":2,"bbox":[523,206,234,54]}
+{"kind":"textbox","id":"sh/rq1wvuxc","slide":2,"name":"detectors-title","text":"Detector models","textPreview":"Detector models","textChars":15,"textLines":1,"bbox":[843,171,234,30]}
+{"kind":"textbox","id":"sh/qpsv29w7","slide":2,"name":"detectors-detail","text":"Responses · Observables\nSNO · Borexino · IceCube","textPreview":"Responses · Observables | SNO · Borexino · IceCube","textChars":48,"textLines":2,"bbox":[843,206,234,54]}
+{"kind":"textbox","id":"sh/5ojut4fm","slide":2,"name":"sources-title","text":"Neutrino sources","textPreview":"Neutrino sources","textChars":16,"textLines":1,"bbox":[203,350,234,30]}
+{"kind":"textbox","id":"sh/4nad0ze1","slide":2,"name":"sources-detail","text":"Solar · Atmospheric · Reactor\nProduction spectra and fluxes","textPreview":"Solar · Atmospheric · Reactor | Production spectra and fluxes","textChars":59,"textLines":2,"bbox":[203,385,234,54]}
+{"kind":"textbox","id":"sh/ut8ba5cz","slide":2,"name":"media-title","text":"Propagation media","textPreview":"Propagation media","textChars":17,"textLines":1,"bbox":[523,350,234,30]}
+{"kind":"textbox","id":"sh/vuhs3ad4","slide":2,"name":"media-detail","text":"Vacuum · Solar · Earth · Atmosphere\nGeometry, density and evolution","textPreview":"Vacuum · Solar · Earth · Atmosphere | Geometry, density and evolution","textChars":67,"textLines":2,"bbox":[523,385,234,54]}
+{"kind":"textbox","id":"sh/gvqtcvup","slide":2,"name":"core-title","text":"Physics core","textPreview":"Physics core","textChars":12,"textLines":1,"bbox":[843,350,234,30]}
+{"kind":"textbox","id":"sh/hwza50va","slide":2,"name":"core-detail","text":"Hamiltonians · PMNS · Potentials\nSM/BSM models · Numerical solvers","textPreview":"Hamiltonians · PMNS · Potentials | SM/BSM models · Numerical solvers","textChars":66,"textLines":2,"bbox":[843,385,234,54]}
+{"kind":"textbox","id":"sh/6pob6lcn","slide":2,"name":"foundations-title","text":"CONFIG &\nUTILITIES","textPreview":"CONFIG & | UTILITIES","textChars":18,"textLines":2,"bbox":[42,220,100,50]}
+{"kind":"textbox","id":"sh/7qxszqd8","slide":2,"name":"foundations-detail","text":"Configuration\n\nTensor types\n\nRuntime context\n\nMath & I/O","textPreview":"Configuration |  | Tensor types |  | Runtime context |  | Math & I/O","textChars":56,"textLines":7,"bbox":[42,282,100,190]}
+{"kind":"textbox","id":"sh/8r6t8vut","slide":2,"name":"integration-title","text":"EXTERNAL &\nDATA","textPreview":"EXTERNAL & | DATA","textChars":15,"textLines":2,"bbox":[1138,220,100,50]}
+{"kind":"textbox","id":"sh/tsza10ve","slide":2,"name":"integration-detail","text":"Reference data\n\nnuSQuIDS\n\nMCEq · Honda\n\nPyMSIS","textPreview":"Reference data |  | nuSQuIDS |  | MCEq · Honda |  | PyMSIS","textChars":46,"textLines":7,"bbox":[1138,282,100,190]}
+{"kind":"textbox","id":"sh/ylor2lcr","slide":2,"name":"legacy-title","text":"Legacy compatibility and validation","textPreview":"Legacy compatibility and validation","textChars":35,"textLines":1,"bbox":[205,551,310,28]}
+{"kind":"textbox","id":"sh/jmxsvqdc","slide":2,"name":"legacy-detail","text":"The NumPy/Numba peanuts package provides regression checks and backward compatibility.","textPreview":"The NumPy/Numba peanuts package provides regression checks and backward compatibility.","textChars":86,"textLines":1,"bbox":[515,551,555,50]}
+{"kind":"textbox","id":"sh/beho7mhs","slide":2,"name":"flow-label","text":"composition → propagation → prediction","textPreview":"composition → propagation → prediction","textChars":38,"textLines":1,"bbox":[430,652,420,26]}
+{"kind":"notes","id":"nt/ukyys7","slide":2,"text":""}

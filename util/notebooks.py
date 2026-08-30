@@ -62,7 +62,7 @@ def find_repo_root(start: Path | str | None = None, folder: str = "tests") -> Pa
         start: Directory or file path used as the starting point. None uses the
             current working directory.
         folder: Notebook subfolder that must exist below notebooks, such as
-            "tests", "runs", "analysis", or "benchmark".
+            "tests", "runs", "physics", or "benchmark".
 
     Returns:
         Repository root path containing pyproject.toml and notebooks/folder.

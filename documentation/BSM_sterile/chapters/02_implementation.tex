@@ -1,0 +1,319 @@
+\label{ch:sterile-implementation}
+
+This chapter maps every equation of \cref{ch:sterile-theory} onto the
+concrete \texttt{tpeanuts} implementation, module by module. As with NSI
+(see the companion \texttt{BSM\_NSI} document), there is no separate
+$N=4$-specific Hamiltonian-assembly module: \pyfunc{hamiltonian\_reduced}
+and \pyfunc{hamiltonian\_flavour} in \texttt{core.common.hamiltonian}
+handle the 3+1 extension by reading the flavour count directly off
+\pyclass{OscillationParameters.pmns}, with no explicit branch on ``is this
+sterile.''
+
+\section{\texttt{PMNSSterileParams} and \texttt{PMNS\_sterile}}
+
+\modulehead{core/BSM/bsm\_sterile.py}{\pyclass{PMNS\_sterile}: the
+$4\times4$ mixing matrix for one additional light sterile neutrino.}
+
+\begin{implbox}
+\pyclass{PMNSSterileParams} is an immutable dataclass holding \emph{only}
+the sterile-sector extension: $\theta_{14},\theta_{24},\theta_{34}$ and
+their CP phases $\delta_{14},\delta_{24},\delta_{34}$ (the last always
+$0$, \cref{ch:sterile-theory}). The Standard Model sector
+($\theta_{12},\theta_{13},\theta_{23},\delta_{13}$) lives in a separate,
+already-existing \pyclass{PMNSParams} object, passed alongside it to the
+\pyclass{PMNS\_sterile} constructor -- mirroring exactly how
+\pyclass{NSIConfig} is an optional, orthogonal attribute of
+\pyclass{OscillationParameters} rather than baked into the mixing object.
+$\Delta m^2_{41}$ is deliberately \emph{not} stored on
+\pyclass{PMNSSterileParams}: like $\Delta m^2_{21}$/$\Delta m^2_{3\ell}$,
+it never enters a mixing-matrix rotation, so it lives on
+\pyclass{OscillationParameters} (via \pyclass{MassSpectrum\_BSM}, below)
+instead.
+
+\pyclass{PMNS\_sterile} is a direct subclass of the abstract
+\pyclass{core.common.pmns.PMNS} with the class attribute
+\code{n\_flavours=4}: every method that is generic in flavour count
+(\pyfunc{R12}, \pyfunc{R13}, \pyfunc{R23}, \pyfunc{Delta},
+\pyfunc{flavour\_basis}, \pyfunc{select\_antinu}, \dots) is inherited
+\emph{unchanged}, automatically sized to $4\times4$; only the genuinely
+$3{+}1$-specific pieces are defined here.
+\end{implbox}
+
+\begin{theorybox}
+The three new rotation builders each act on a single active--sterile
+2-plane, mirroring \pyfunc{R12}/\pyfunc{R13}/\pyfunc{R23}'s construction
+exactly (via the shared \pyfunc{PMNS.\_rot} generator):
+\begin{align*}
+  \pyfunc{R14()} &= \text{rotation in the }(e,s)=(0,3)\text{ plane, carrying }\delta_{14}, \\
+  \pyfunc{R24()} &= \text{rotation in the }(\mu,s)=(1,3)\text{ plane, carrying }\delta_{24}, \\
+  \pyfunc{R34()} &= \text{rotation in the }(\tau,s)=(2,3)\text{ plane, real (}\delta_{34}=0\text{)}.
+\end{align*}
+\pyfunc{outer\_block} and \pyfunc{reduced} are overridden with the $3{+}1$
+product structure of \cref{eq:u4}, identifying $O_4\equiv R_{23}\Delta_4R_{24}R_{34}$
+(\pyfunc{PMNS\_sterile.outer\_block}) so that a formal reduced factor
+$U_{\rm red,4}\equiv R_{13}\Delta_4^\dagger R_{12}R_{14}$ satisfies
+$U_4=O_4\,U_{\rm red,4}$ exactly, mirroring the 3-flavour Standard Model
+factorisation. Exactly as for $\Delta$ in the 3-flavour case, $\Delta_4$
+cancels from the reduced \emph{kinetic term} specifically,
+\begin{equation}
+  \keyresult{
+    \Delta_4^\dagger\bigl(R_{12}R_{14}\diag(k)R_{14}^\dagger R_{12}^\dagger\bigr)\Delta_4
+    = R_{12}R_{14}\diag(k)R_{14}^\dagger R_{12}^\dagger
+  },
+\end{equation}
+valid because neither $R_{12}$ (the $e$--$\mu$ plane) nor $R_{14}$ (the
+$e$--$s$ plane) mixes with the $\tau$ index, the only non-trivial index of
+$\Delta_4$. This is why \pyfunc{PMNS\_sterile.reduced} returns the
+simplified, $\Delta_4$-free
+\begin{equation}
+  U_{\rm red,4}^{\rm code}=R_{13}R_{12}R_{14}
+\end{equation}
+rather than the formal $U_{\rm red,4}$: the two agree once contracted with
+the diagonal kinetic term, but $U_{\rm red,4}^{\rm code}$ is cheaper to
+build and use.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{$U=O\,U_{\rm red}$ holds exactly only for the formal
+$U_{\rm red}$, not for \pyfunc{reduced}.} Consequently,
+\pyfunc{outer\_block}$(\,)\cdot$\pyfunc{reduced}$(\,)$ is \emph{not}
+bit-for-bit equal to \pyfunc{pmns\_matrix}$(\,)$: the two agree up to a
+diagonal phase ($\Delta_4$) that leaves the kinetic term invariant but is
+otherwise dropped. This is harmless for every use of \pyfunc{reduced} in
+this project (always as the sandwiching matrix of a kinetic term), and
+mirrors the identical, already-documented situation for the plain
+3-flavour \pyclass{PMNS\_SM}.
+\end{notebox}
+
+\section{\texttt{MassSpectrum\_BSM}: the sterile mass splitting}
+
+\modulehead{core/BSM/bsm\_mass\_spectrum.py}{Extends the active-sector
+mass-squared-difference vector with $\Delta m^2_{41}$.}
+
+\begin{implbox}
+\pyclass{MassSpectrum\_BSM} is a frozen dataclass carrying one extra field,
+\code{DeltamSq41}, on top of the inherited \code{DeltamSq21}/\code{DeltamSq3l}.
+Its \pyfunc{difference\_vector()} override appends \code{DeltamSq41} to the
+base 3-vector, returning a $(\dots,4)$-shaped tensor consumed by
+\pyfunc{kinetic\_eigenvalue\_vector} (\cref{sec:impl-kinetic}) to build the
+four dimensionless kinetic eigenvalues $k_1,\dots,k_4$. \code{DeltamSq41=None}
+is accepted at construction time (so an incomplete configuration can still
+be built and inspected) but raises \code{ValueError} the moment
+\pyfunc{difference\_vector} is actually evaluated, since a 3+1 Hamiltonian
+genuinely cannot be assembled without it.
+\end{implbox}
+
+\section{Hamiltonian assembly for $N=4$}
+\label{sec:impl-kinetic}
+
+\modulehead{core/common/hamiltonian.py}{\pyfunc{hamiltonian\_kinetic\_reduced}/
+\pyfunc{hamiltonian\_matter\_reduced}: the same two functions used for the
+3-flavour and NSI cases, generalised to any flavour count.}
+
+\begin{theorybox}
+The reduced-basis kinetic term uses $U_{\rm red,4}^{\rm code}=R_{13}R_{12}R_{14}$
+together with its \emph{Hermitian conjugate} (never the plain transpose):
+\begin{equation}
+  \keyresult{H_{\rm kin,4}^{\rm red} = U_{\rm red,4}^{\rm code}\,\diag(k_1,k_2,k_3,k_4)\,\bigl(U_{\rm red,4}^{\rm code}\bigr)^\dagger}.
+\end{equation}
+Unlike the 3-flavour $R_{13}R_{12}$, $U_{\rm red,4}^{\rm code}$ is
+genuinely complex whenever the active--sterile CP phase $\delta_{14}\neq0$
+(it carries $R_{14}$, built with a non-trivial phase, unlike
+$R_{12}$/$R_{13}$): the Hermitian-conjugate convention is therefore not a
+merely-safe default here but the only correct choice for
+$U_4=O_4\,U_{\rm red,4}$ to be respected by the flavour-basis dressing.
+\end{theorybox}
+
+\begin{theorybox}
+The matter term takes one of three forms, matching
+\cref{sec:sterile-matter}'s three cases exactly:
+\begin{enumerate}
+  \item \textbf{No NSI, no neutral-current term (the default).} Since
+    $R_{23},\Delta_4,R_{24},R_{34}$ (i.e.\ every generator of $O_4$) leave
+    the electron index fixed, $O_4\,\diag(V_{CC},0,0,0)\,O_4^\dagger=\diag(V_{CC},0,0,0)$
+    exactly, so no rotation is needed at all:
+    $H_{\rm mat,4}^{\rm red}=H_{\rm mat,4}^{\rm flavour}=\diag(V_{CC},0,0,0)$.
+    This introduces no approximation beyond the 3-flavour case, for any
+    $\theta_{14},\theta_{24},\theta_{34}$.
+  \item \textbf{With the neutral-current term, no NSI.} Supplying a
+    neutron density activates $H_{\rm mat,4}^{\rm flavour}=\diag(V_{CC},0,0,-V_{NC})$
+    (\cref{eq:sterile-nc}) instead. Because $O_4$ genuinely mixes the
+    $\{\mu,\tau,s\}$ block, it no longer leaves this term invariant, so
+    \pyfunc{hamiltonian\_matter\_reduced} takes the general rotated path,
+    \begin{equation}
+      \keyresult{H_{\rm mat,4}^{\rm red}=O_4^\dagger\,H_{\rm mat,4}^{\rm flavour}\,O_4},
+    \end{equation}
+    even though NSI is off -- the reduction-trick shortcut of case~1 is
+    specific to the charged-current-only term.
+  \item \textbf{With NSI (and, optionally, the neutral-current term).}
+    Fully supported by the same code path documented in the companion
+    \texttt{BSM\_NSI} document: \pyfunc{NSIConfig.epsilon\_tensor(n\_flavours=4)}
+    (and \pyfunc{epsilon\_n\_tensor}) embed the $3\times3$ active-flavour
+    block in the top-left corner of a $4\times4$ zero matrix, since $\nu_s$
+    is a gauge singlet and carries no NSI coupling of either kind; the
+    resulting flavour-basis matter term is rotated into the reduced basis
+    with the same $O_4^\dagger(\cdot)O_4$ transformation as case~2.
+\end{enumerate}
+Nothing in \pyfunc{hamiltonian\_reduced}/\pyfunc{hamiltonian\_flavour}
+branches explicitly on ``sterile or NSI or both'': the flavour count
+$n\in\{3,4\}$ and the presence of \code{oscillation.nsi} are read directly
+off \pyclass{OscillationParameters}, so all combinations are handled by the
+exact same two functions used throughout this project.
+\end{theorybox}
+
+\section{The closed-form quartic (Ferrari) eigenvalue solver}
+\label{sec:impl-ferrari}
+
+\modulehead{core/perturbative/spectral.py}{\pyfunc{hamiltonian\_traceless\_eigenvalues(\dots,
+analytic=True)}: closed-form eigenvalues for a traceless Hermitian
+Hamiltonian, Cardano for $N=3$, Ferrari for $N=4$.}
+
+\begin{theorybox}
+The perturbative evolutor (\cref{sec:impl-perturbative-sterile}) needs the
+Hamiltonian's spectral decomposition $H=\sum_a\lambda_a M_a$. By default
+$\lambda_a$ is obtained numerically via \pyfunc{torch.linalg.eigvalsh}; an
+explicit closed-form alternative is also available specifically for
+$N\in\{3,4\}$, since a traceless Hermitian matrix's characteristic
+polynomial is guaranteed real-rooted and has no sub-leading term. For
+$N=4$ specifically -- the case this document is about -- the characteristic
+polynomial of the traceless part $T=H-\Tr(H)I_4/4$ is the depressed
+quartic $\lambda^4+p\lambda^2+q\lambda+r=0$ with $p=c_1=-\tfrac12\Tr(T^2)$,
+$q=-e_3=-\tfrac13\Tr(T^3)$, $r=e_4=\det(T)$. Ferrari's method solves it by
+first finding a real root $m$ of the \emph{resolvent cubic}
+\begin{equation}
+  m^3+p\,m^2+\Bigl(\tfrac{p^2}4-r\Bigr)m-\tfrac{q^2}8=0,
+\end{equation}
+itself solved with the same trigonometric (Cardano) formula used for the
+$N=3$ case: since $T$ is Hermitian, the quartic is guaranteed real-rooted,
+and the resolvent cubic's three roots are exactly the real pairwise sums
+$m_{ij|kl}=-\tfrac12(\lambda_i+\lambda_j)(\lambda_k+\lambda_l)$ over the
+three ways of splitting the four roots into two pairs, so it is real-rooted
+too and the closed form applies unconditionally. Taking the \emph{largest}
+resolvent root $m$ (the conditioning-optimal choice) factors the quartic
+into two real quadratics,
+\begin{equation}
+  \keyresult{
+    s=\sqrt{2m},\qquad
+    \lambda\in\Bigl\{\tfrac{s\pm\sqrt{\Delta_1}}2,\ \tfrac{-s\pm\sqrt{\Delta_2}}2\Bigr\},
+    \qquad
+    \Delta_1=-2\Bigl(m+p+\tfrac qs\Bigr),\ \ \Delta_2=-2\Bigl(m+p-\tfrac qs\Bigr).
+  }
+\end{equation}
+\end{theorybox}
+
+\begin{notebox}
+\textbf{Conditioning is not unconditional for $N=4$, unlike $N=3$.} The
+chosen pairing's $m$ can itself be close to singular (only possible, for a
+traceless Hermitian $T$, near $T\approx0$), or the resolvent cubic's own
+three roots can nearly coincide even when the \emph{chosen} $m$ is
+well-separated from zero (e.g.\ $\lambda=(a,a,-a,-a)$ has a
+well-conditioned pairing $m=2a^2$ whose resolvent cubic nonetheless has a
+repeated root elsewhere). Batch entries flagged by either check fall back
+directly to \pyfunc{torch.linalg.eigvalsh} for the \emph{eigenvalues}
+themselves (unlike the projector-only degeneracy fallback described next),
+since this closed form can lose the eigenvalues, not merely lose precision
+in a downstream ratio.
+
+\textbf{Spectral projectors and the degeneracy fallback.} The corresponding
+$N=4$ projector formula,
+\begin{equation}
+  M_a = \frac{T^3+\lambda_aT^2+(c_1+\lambda_a^2)T+(\lambda_a^3+c_1\lambda_a-e_3)I_4}{4\lambda_a^3+2c_1\lambda_a-e_3},
+\end{equation}
+has a denominator equal to $p'(\lambda_a)$, the characteristic polynomial's
+derivative at that root, which vanishes exactly at a repeated eigenvalue.
+Near a (near-)degenerate spectrum, \pyfunc{\_spectral\_degeneracy\_mask}
+flags the affected batch entries (by relative eigenvalue-gap size) and
+replaces \emph{only their projectors} wholesale with
+$M_a=v_av_a^\dagger$ from a direct \pyfunc{torch.linalg.eigh(T)} call --
+exact and stable by construction, computed only when at least one batch
+entry actually needs it.
+\end{notebox}
+
+\begin{implbox}
+\pyfunc{hamiltonian\_traceless\_eigenvalues(T, *, analytic=False, c1=None,
+c0=None, e3=None, e4=None)} dispatches on \code{T.shape[-1]}: Cardano for
+$3$, Ferrari for $4$, and unconditional fallback to
+\pyfunc{torch.linalg.eigvalsh} for any other size (no closed form is
+defined there). \pyfunc{evolutor\_perturbative\_segment} and
+\pyfunc{earth\_evolutor}/\pyfunc{atmosphere\_evolutor} expose this as the
+public \code{analytic\_eigenvalues=True} flag; passing it together with a
+matrix-exponential (\code{method="numerical"}) propagation path raises,
+since that path never diagonalises the Hamiltonian at all.
+\end{implbox}
+
+\section{The perturbative segment evolutor}
+\label{sec:impl-perturbative-sterile}
+
+\modulehead{core/perturbative/evolutor.py}{\pyfunc{evolutor\_perturbative\_segment}:
+generalised, without modification, to $N=4$.}
+
+\begin{implbox}
+\pyfunc{evolutor\_perturbative\_segment} never branches explicitly on
+``sterile'': it reads \code{n\_flavours = int(pmns.n\_flavours)} off
+whatever \pyclass{PMNS} object \pyclass{OscillationParameters} carries and
+sizes every subsequent tensor accordingly. The one behaviour that
+\emph{is} sterile-specific is \code{include\_matter\_nc}: when True (and
+\code{n\_flavours==4}), the sterile neutral-current direction matrix
+\code{P\_nc} (\cref{eq:sterile-nc}, rotated by $O_4^\dagger(\cdot)O_4$
+exactly as in \cref{sec:impl-kinetic}'s case~2) is built by
+\pyfunc{\_matter\_direction\_reduced} and sandwiched into the first-order
+correction alongside the CC direction \code{P}, using the profile's
+\code{residual\_integral\_neutron(la, lb)} and
+\pyfunc{matter\_potential\_nc}. Requesting it without a profile built with
+neutron-density coefficients (\code{potential\_n}/\code{average\_n}/
+\code{residual\_integral\_neutron} unavailable) raises \code{ValueError}
+rather than silently omitting the term.
+\end{implbox}
+
+\section{Pipeline wiring: the neutral-current policy}
+
+\begin{notebox}
+\textbf{\code{resolve\_include\_matter\_nc}: the shared tri-state policy.}
+Because omitting the sterile NC term is a genuine physical incompleteness
+once $\theta_{24}$ or $\theta_{34}$ are non-zero (\cref{sec:sterile-matter}),
+\texttt{medium.solar}, \texttt{medium.earth}, and \texttt{medium.atmosphere}
+all resolve \code{include\_matter\_nc} through one shared function in
+\texttt{core.common.oscillation}:
+\begin{itemize}
+  \item \code{include\_matter\_nc} given explicitly (\code{True}/\code{False}):
+    always honoured as-is.
+  \item \code{include\_matter\_nc=None} (unspecified): resolves to
+    \code{True} when \code{oscillation.BSM\_extension\_sterile} is set
+    \emph{and} the profile/medium in hand can actually supply a neutron
+    density; \code{False} for the plain 3-flavour case regardless (there
+    $V_{NC}$ truly is an unobservable common phase, so omitting it is
+    exact, not approximate). When sterile is active but no neutron-density
+    data is available, this still resolves to \code{False} (the CC-only
+    fallback), but emits an explicit \code{RuntimeWarning} rather than
+    resolving silently -- exactly the warning quoted in
+    \cref{sec:results-intrinsic3}, triggered because the
+    \texttt{even\_power} Earth profile used by that notebook's Section~5
+    was not built with \code{include\_neutron=True}.
+\end{itemize}
+Each medium then supplies the raw density itself: \pyclass{EarthProfile}
+via \code{profile\_perturbative\_kwargs={'include\_neutron': True}} at
+construction time (PREM- or even-power-tabulated), \pyclass{AtmosphereParameters}
+via its own \code{include\_matter\_nc} field feeding
+\pyfunc{atmosphere\_density(\dots, density\_type="neutron\_density")}, and
+\pyclass{SolarMediumProfile} via its \code{density\_n} table (derived from
+the standard solar model composition).
+\end{notebox}
+
+\section{Summary: modules touched by the sterile extension}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Module & Role \\
+\midrule
+\pkgpath{core/BSM/bsm\_sterile.py} & \pyclass{PMNS\_sterile}: $4\times4$ mixing matrix, $R_{14}/R_{24}/R_{34}$ \\
+\pkgpath{core/BSM/bsm\_mass\_spectrum.py} & \pyclass{MassSpectrum\_BSM}: appends $\Delta m^2_{41}$ \\
+\pkgpath{core/common/hamiltonian.py} & \pyfunc{hamiltonian\_reduced}/\code{\_flavour}, generic in flavour count \\
+\pkgpath{core/perturbative/spectral.py} & Ferrari closed-form quartic eigenvalues, $N=4$ \\
+\pkgpath{core/perturbative/evolutor.py} & \code{P\_nc} sandwich term, \code{analytic\_eigenvalues} \\
+\pkgpath{core/numerical/evolutor.py} & Exact matrix-exponential evolution, generic in flavour count \\
+\pkgpath{core/common/oscillation.py} & \pyfunc{resolve\_include\_matter\_nc}: shared tri-state policy \\
+\pkgpath{medium/earth}, \pkgpath{medium/atmosphere}, \pkgpath{medium/solar} & Neutron-density profile construction/sampling \\
+\bottomrule
+\end{tabular}
+\end{center}

@@ -1,0 +1,80 @@
+% =============================================================================
+% references.bib
+% Bibliography for the "inference_sno_ii" document.
+%
+% Every entry has been cross-checked against the original source (arXiv id,
+% volume, DOI) prior to submission of the document.
+% =============================================================================
+
+@article{Aharmim2005SaltPhase,
+  author  = {Aharmim, B. and others},
+  title   = {Electron Energy Spectra, Fluxes, and Day-Night Asymmetries of $^8$B Solar Neutrinos from the 391-Day Salt Phase SNO Data Set},
+  journal = {Phys. Rev. C},
+  volume  = {72},
+  pages   = {055502},
+  year    = {2005},
+  eprint  = {nucl-ex/0502021},
+  note    = {SNO Collaboration. The primary source for this entire document: Appendix A (Tables XXX-XXXIV) is transcribed directly into data/detector/sno\_ii/ and consumed by tpeanuts.detector.sno\_ii throughout. Eq.~A1-A3 (equivalent-flux definition and response function), Eq.~19-21 (correlated chi-square), and Table XXVIII (best-fit oscillation parameters) are the specific results this document's own inference is compared against in Chapter 5.}
+}
+
+@article{Ahmed2004SaltFlux,
+  author  = {Ahmed, S. N. and others},
+  title   = {Measurement of the Total Active $^8$B Solar Neutrino Flux at the Sudbury Neutrino Observatory with Enhanced Neutral Current Sensitivity},
+  journal = {Phys. Rev. Lett.},
+  volume  = {92},
+  pages   = {181301},
+  year    = {2004},
+  eprint  = {nucl-ex/0309004},
+  note    = {SNO Collaboration. The earlier, flux-only (254-day, no spectral/day-night information) salt-phase result; its own methodology note (sno.phy.queensu.ca/sno/results\_09\_03/howto.pdf) independently confirms this document's V\_total=V\_stat+V\_syst construction and free-f\_B convention, cross-checked directly against the primary source \cite{Aharmim2005SaltPhase} during this document's own data-provenance audit (Chapter 2).}
+}
+
+@article{Ahmad2002NCDiscovery,
+  author  = {Ahmad, Q. R. and others},
+  title   = {Direct Evidence for Neutrino Flavor Transformation from Neutral-Current Interactions in the Sudbury Neutrino Observatory},
+  journal = {Phys. Rev. Lett.},
+  volume  = {89},
+  pages   = {011301},
+  year    = {2002},
+  note    = {SNO Collaboration. Original pure-D$_2$O (Phase I) NC discovery, establishing the NC-measures-total-active-flux principle (Eq.~10 of \cite{Aharmim2005SaltPhase}) that Chapter 3's NC equivalent-flux observable relies on.}
+}
+
+@article{EstebanNuFit2024,
+  author  = {Esteban, I. and Gonzalez-Garcia, M. C. and Maltoni, M. and Schwetz, T. and Zhou, A.},
+  title   = {The fate of hints: updated global analysis of three-flavor neutrino oscillations},
+  journal = {JHEP},
+  volume  = {12},
+  pages   = {216},
+  year    = {2024},
+  eprint  = {2410.05380},
+  note    = {Base analysis publication for the NuFIT 6.1 (2025) global fit, \url{www.nu-fit.org}; source of the starting/default $\theta_{12}$, $\Delta m^2_{21}$, $\theta_{13}$ values used throughout this document's fits (Chapter 4-5).}
+}
+
+@article{Wolfenstein1978,
+  author  = {Wolfenstein, L.},
+  title   = {Neutrino oscillations in matter},
+  journal = {Phys. Rev. D},
+  volume  = {17},
+  pages   = {2369--2374},
+  year    = {1978},
+  note    = {Charged-current matter potential underlying the day/night Earth-matter regeneration (\texttt{tpeanuts.medium.earth}) this document's model composes with solar production mixing (Chapter 3).}
+}
+
+@article{MikheyevSmirnov1985,
+  author  = {Mikheyev, S. P. and Smirnov, A. Yu.},
+  title   = {Resonance enhancement of oscillations in matter and solar neutrino spectroscopy},
+  journal = {Sov. J. Nucl. Phys.},
+  volume  = {42},
+  pages   = {913--917},
+  year    = {1985},
+  note    = {MSW resonant solar-neutrino conversion, underlying \texttt{tpeanuts.medium.solar.probability.solar\_probability\_mass}'s production-region mixing (Chapter 3).}
+}
+
+@article{BakerCousins1984,
+  author  = {Baker, S. and Cousins, R. D.},
+  title   = {Clarification of the use of chi-square and likelihood functions in fits to histograms},
+  journal = {Nucl. Instrum. Meth.},
+  volume  = {221},
+  pages   = {437},
+  year    = {1984},
+  note    = {The likelihood-ratio construction whose correlated-Gaussian analogue (Eq.~19-21 of \cite{Aharmim2005SaltPhase}) this document's own \texttt{correlated\_gaussian\_nll} implements (Chapter 4); cited here for the shared asymptotic (Wilks' theorem) reasoning behind both statistics.}
+}

@@ -1,0 +1,165 @@
+% =============================================================================
+% references.bib
+% Bibliography for the "Inference_DayaBay" document.
+%
+% Every entry has been cross-checked against the original source (arXiv id,
+% volume, DOI) prior to submission of the document.
+% =============================================================================
+
+@misc{DayaBayZenodo2025,
+  author       = {{Daya Bay Collaboration}},
+  title        = {{Full Data Release of the Daya Bay Reactor Neutrino Experiment}},
+  version      = {v1.0.0},
+  year         = {2025},
+  howpublished = {\url{https://doi.org/10.5281/zenodo.17587229}},
+  doi          = {10.5281/zenodo.17587229},
+  note         = {Official analysis-dataset (TSV) tier, mirrored on GitHub at github.com/dayabay-experiment/dayabay-data-official and fetched by notebooks/external/reactor/dayabay/DayaBay1\_generator.ipynb into data/detector/dayabay/. Source of every real table consumed by tpeanuts.detector.dayabay: baselines, Huber-Mueller spectra, fission fractions, IBD spectra/backgrounds, IAV matrix, LSNL curves, non-equilibrium/SNF corrections, weekly reactor rate, IBD constants, and the published best-fit parameters.}
+}
+
+@article{An2023DayaBayPrecision,
+  author  = {An, F. P. and others},
+  title   = {Precision Measurement of Reactor Antineutrino Oscillation at Kilometer-Scale Baselines by Daya Bay},
+  journal = {Phys. Rev. Lett.},
+  volume  = {130},
+  pages   = {161802},
+  year    = {2023},
+  doi     = {10.1103/PhysRevLett.130.161802},
+  note    = {Daya Bay Collaboration. Main precision-measurement publication accompanying \cite{DayaBayZenodo2025}; source of the published $\sin^2 2\theta_{13}$/$\Delta m^2_{32}$ best fit used throughout this document as the external comparison truth.}
+}
+
+@article{An2012DayaBayDiscovery,
+  author  = {An, F. P. and others},
+  title   = {Observation of Electron-Antineutrino Disappearance at Daya Bay},
+  journal = {Phys. Rev. Lett.},
+  volume  = {108},
+  pages   = {171803},
+  year    = {2012},
+  doi     = {10.1103/PhysRevLett.108.171803},
+  note    = {Daya Bay Collaboration. Original 2012 discovery of $\theta_{13}>0$, a near/far rate comparison -- the real methodology tpeanuts.detector.dayabay.inference\_model.NearFarRatioDayaBayModel reproduces (Chapter 4).}
+}
+
+@article{An2017DayaBayFluxSpectrum,
+  author  = {An, F. P. and others},
+  title   = {Improved measurement of the reactor antineutrino flux and spectrum at Daya Bay},
+  journal = {Chin. Phys. C},
+  volume  = {41},
+  pages   = {013002},
+  year    = {2017},
+  doi     = {10.1088/1674-1137/41/1/013002},
+  note    = {Daya Bay Collaboration. Independently published per-detector IBD rate table (Table 5) used in Chapter 5 as an external cross-check of the absolute-normalization audit; also the original publication of the Reactor Antineutrino Anomaly measurement (Huber-Mueller/observed flux ratio $0.946\pm0.020$) discussed in Chapter 3.}
+}
+
+@article{VogelBeacom1999,
+  author  = {Vogel, P. and Beacom, J. F.},
+  title   = {Angular distribution of neutron inverse beta decay},
+  journal = {Phys. Rev. D},
+  volume  = {60},
+  pages   = {053003},
+  year    = {1999},
+  eprint  = {hep-ph/9903554},
+  note    = {Source of the order-1/M inverse-beta-decay differential cross section (their Eq.~13-15) implemented in tpeanuts.detector.interaction.inverse\_beta\_decay.sigma\_ibd\_diff\_cos\_precise (Chapter 3), including the threshold-respecting kinematics their own Eq.~18-19 "high-energy limit" formula explicitly does not capture.}
+}
+
+@article{Huber2011,
+  author  = {Huber, P.},
+  title   = {Determination of antineutrino spectra from nuclear reactors},
+  journal = {Phys. Rev. C},
+  volume  = {84},
+  pages   = {024617},
+  year    = {2011},
+  eprint  = {1106.0687},
+  note    = {Real predicted $^{235}$U/$^{239}$Pu/$^{241}$Pu antineutrino spectra, tabulated in the Daya Bay data release and consumed by tpeanuts.detector.dayabay.flux; erratum \cite{Huber2012Erratum}.}
+}
+
+@article{Huber2012Erratum,
+  author  = {Huber, P.},
+  title   = {Determination of antineutrino spectra from nuclear reactors [erratum]},
+  journal = {Phys. Rev. C},
+  volume  = {85},
+  pages   = {029901},
+  year    = {2012},
+  doi     = {10.1103/PhysRevC.85.029901}
+}
+
+@article{Mueller2011,
+  author  = {Mueller, Th. A. and others},
+  title   = {Improved Predictions of Reactor Antineutrino Spectra},
+  journal = {Phys. Rev. C},
+  volume  = {83},
+  pages   = {054615},
+  year    = {2011},
+  eprint  = {1101.2663},
+  note    = {Real predicted $^{238}$U antineutrino spectrum, tabulated in the Daya Bay data release and consumed by tpeanuts.detector.dayabay.flux.}
+}
+
+@article{Wolfenstein1978,
+  author  = {Wolfenstein, L.},
+  title   = {Neutrino oscillations in matter},
+  journal = {Phys. Rev. D},
+  volume  = {17},
+  pages   = {2369--2374},
+  year    = {1978},
+  note    = {Charged-current matter potential; the vacuum limit used by tpeanuts.medium.vacuum for the Daya Bay 3-flavour survival probability (Chapter 3) reduces to the standard PMNS vacuum-oscillation formula, unaffected by this potential since reactor antineutrinos are not modelled as matter-crossing in this project.}
+}
+
+@article{EstebanNuFit2024,
+  author  = {Esteban, I. and Gonzalez-Garcia, M. C. and Maltoni, M. and Schwetz, T. and Zhou, A.},
+  title   = {The fate of hints: updated global analysis of three-flavor neutrino oscillations},
+  journal = {JHEP},
+  volume  = {12},
+  pages   = {216},
+  year    = {2024},
+  eprint  = {2410.05380},
+  note    = {Base analysis publication for the NuFIT 6.1 (2025) global fit, \url{www.nu-fit.org}; source of the fixed solar parameters ($\theta_{12}$, $\Delta m^2_{21}$) and $\theta_{23}$/$\delta_{CP}$ preset values used throughout Chapters 3-5, and of the independent NuFIT comparison in Chapter 5's results table.}
+}
+
+@article{BakerCousins1984,
+  author  = {Baker, S. and Cousins, R. D.},
+  title   = {Clarification of the use of chi-square and likelihood functions in fits to histograms},
+  journal = {Nucl. Instrum. Meth.},
+  volume  = {221},
+  pages   = {437},
+  year    = {1984},
+  note    = {Source of the Poisson likelihood-ratio statistic (tpeanuts.inference.likelihood.poisson\_nll) minimized throughout Chapter 4.}
+}
+
+@article{NunokawaParkeZukanovich2005,
+  author  = {Nunokawa, H. and Parke, S. and Zukanovich Funchal, R.},
+  title   = {Another possible way to determine the neutrino mass hierarchy},
+  journal = {Phys. Rev. D},
+  volume  = {72},
+  pages   = {013009},
+  year    = {2005},
+  eprint  = {hep-ph/0503283},
+  note    = {Source of the effective mass-squared splitting $\Delta m^2_{ee}$ construction, exposed by tpeanuts.detector.dayabay.inference\_model.DayaBayExperimentalModel (Chapter 4) to match Daya Bay's own reported observable \cite{An2023DayaBayPrecision}.}
+}
+
+@article{ParticleDataGroup2024,
+  author  = {{Particle Data Group} and Navas, S. and others},
+  title   = {Review of Particle Physics},
+  journal = {Phys. Rev. D},
+  volume  = {110},
+  pages   = {030001},
+  year    = {2024},
+  note    = {PDG2024 neutron lifetime, neutron/proton/electron masses -- tabulated in the Daya Bay data release's own parameters/pdg2024.yaml and used by tpeanuts.util.constant for the order-1/M IBD cross section (Chapter 3).}
+}
+
+@article{Pontecorvo1957,
+  author  = {Pontecorvo, B.},
+  title   = {Mesonium and antimesonium},
+  journal = {Sov. Phys. JETP},
+  volume  = {6},
+  pages   = {429},
+  year    = {1958},
+  note    = {English translation of Zh. Eksp. Teor. Fiz. 33, 549 (1957); year given here is the Sov. Phys. JETP translation's own publication year, matching the journal/volume/page cited, not the original Russian publication.}
+}
+
+@article{MakiNakagawaSakata1962,
+  author  = {Maki, Z. and Nakagawa, M. and Sakata, S.},
+  title   = {Remarks on the unified model of elementary particles},
+  journal = {Prog. Theor. Phys.},
+  volume  = {28},
+  pages   = {870--880},
+  year    = {1962},
+  note    = {Original PMNS mixing-matrix references, underlying the 3-flavour vacuum survival probability tpeanuts.medium.vacuum implements and this document's Daya Bay inference uses throughout (Chapter 3).}
+}

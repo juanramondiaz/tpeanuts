@@ -131,6 +131,13 @@ def as_tensor(
         if device is not None:
             t = t.to(device=device)
     else:
+        if isinstance(x, np.ndarray) and not x.flags.writeable:
+            # torch.as_tensor shares memory with writable NumPy arrays for
+            # free; a non-writable array (e.g. a read-only view or a memory-
+            # mapped/pandas-derived buffer) can't be shared that way without
+            # torch warning that in-place writes would be undefined
+            # behaviour, so copy defensively only in that case.
+            x = x.copy()
         t = torch.as_tensor(x, dtype=dtype, device=device)
 
     if requires_grad is not None:

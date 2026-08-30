@@ -1,0 +1,306 @@
+\label{ch:sterile-results}
+
+This chapter reports the actual results produced by the four notebooks
+that exercise the 3+1 sterile extension: three physics-validation notebooks
+(\texttt{notebooks/physics/experimental\_results/BSM/sterile1\_test.ipynb},
+\texttt{sterile2\_kinematics.ipynb}, \texttt{sterile3\_analysis.ipynb}) and
+one cross-method intrinsic-validation notebook
+(\texttt{notebooks/validation/intrinsic/intrinsic3\_BSM\_extension\_sterile.ipynb}).
+Unlike the companion \texttt{BSM\_NSI} document, no inference notebook in
+this repository currently fits real data with the sterile extension.
+
+\begin{notebox}
+\textbf{On the completeness of the reported numbers.} As with the
+companion \texttt{BSM\_NSI} document's Chapter~4, several of these
+notebooks' saved \code{.ipynb} files have code cells with
+\code{execution\_count: null} and an empty output list even though later
+cells or markdown narrative reference a result. This chapter states
+explicitly, for every quoted number, whether it is a value directly
+recorded in the notebook's saved output (\textbf{confirmed}) or not. This
+is a bookkeeping limitation of the notebook files as currently saved, not a
+defect in the underlying \texttt{tpeanuts} computation itself, which
+\cref{ch:sterile-implementation} documents and this project's automated
+test suite (\pkgpath{core/BSM/test/test3\_bsm\_sterile.py} and related)
+independently exercises on every change.
+\end{notebox}
+
+\section{\texttt{sterile1\_test.ipynb}: framework verification}
+\label{sec:results-sterile1}
+
+\begin{implbox}
+This notebook validates the 3+1 implementation against analytic
+expectations: the Standard-Model limit, unitarity, the matter-Hamiltonian
+structure, and CP-phase dependence, for three presets
+(\code{sterile\_3p1\_null\_mixing}, \code{sterile\_3p1\_bestfit\_giunti2017},
+\code{sterile\_3p1\_benchmark\_icecube}) plus the plain 3-flavour
+\code{"\_SM\_NUFIT52\_NO"} reference, all propagated in vacuum via a local
+helper built from \pyfunc{hamiltonian\_reduced}-style construction and
+\pyfunc{kinetic\_potential} rather than through the Earth/atmosphere/solar
+pipelines.
+\end{implbox}
+
+\begin{resultbox}
+\textbf{Confirmed, directly printed output.}
+
+\emph{SM-limit recovery} (\cref{sec:sterile-presets-table}'s
+\code{sterile\_3p1\_null\_mixing} vs.\ the plain 3-flavour SM): the
+active-sector column $|U_{\alpha4}|^2$ for the null-mixing preset is
+exactly $[0,0,0,1]$ (the sterile state fully decoupled); the PMNS
+submatrix agreement is $\|U_{\rm sterile}[:3,:3]-U_{\rm SM}\|_F=\|\cdot\|_\infty=0.00\times10^{0}$
+(exact to the printed precision); the Hamiltonian agreement
+$\|H_4[:3,:3]-H_{\rm SM}\|_F$ is exactly $0$ at all four tested $(E,n_e)$
+points (5~MeV/0.01, 10~MeV/0.1, 100~MeV/0.5, 1000~MeV/0.2~mol/cm$^3$); the
+vacuum-probability agreement $\|P_4[:3,:3]-P_3\|_\infty$ at $E=10$~MeV is
+$2.22\times10^{-16}$ (1~km), $3.47\times10^{-18}$ (10~km),
+$2.00\times10^{-15}$ (100~km), $0.00$ (1000~km), $4.17\times10^{-13}$
+(10\,000~km) -- all consistent with floating-point round-off, not a
+physical discrepancy. The notebook's own printed conclusion: "All diffs
+$\leq10^{-6}$ $\Rightarrow$ SM limit is correctly recovered."
+
+\emph{Unitarity and probability conservation}: $\|U_4U_4^\dagger-I_4\|_F=1.47\times10^{-16}$
+(null mixing), $2.35\times10^{-16}$ (Giunti 2017), $3.01\times10^{-16}$
+(IceCube 2020). Total vacuum probability at $E=10$~MeV, $L=100$~km:
+$\sum_\beta P_\beta=1.00000000$ for all three presets, with maximum
+deviation $3.33\times10^{-16}$/$2.22\times10^{-16}$/$2.22\times10^{-16}$
+respectively.
+
+\emph{Sterile state receives no matter potential}: for the Giunti-2017
+preset at $E=10$~MeV, $n_e=0.1$~mol/cm$^3$, both the sterile row and column
+of the matter Hamiltonian are exactly $[0{+}0i,0{+}0i,0{+}0i,0{+}0i]$.
+
+\emph{CP-phase scan} ($\delta_{14}\in[0,2\pi]$, custom
+\pyclass{PMNSSterileParams} at LSND kinematics, $E=10$~MeV,
+$L=30$~m): "Max $|A_{CP}|=0.001\%$ at $\delta_{14}=108.9^\circ$," and
+disappearance CP-symmetry ($|P_{\mu\mu}(\nu)-P_{\mu\mu}(\bar\nu)|\approx0$)
+verified, consistent with the standard result that CP violation appears
+only in appearance channels.
+\end{resultbox}
+
+\begin{notebox}
+The appearance CP asymmetry found here, $\lesssim0.01\%$ at LSND
+kinematics, is tiny not because the framework lacks CP violation but
+because a short single baseline like LSND's cannot resolve two independent
+mass-squared splittings simultaneously -- genuine 3+1 CP violation requires
+sensitivity to the interference between the standard and sterile
+oscillation frequencies, which needs either a longer baseline or an energy
+range spanning both scales. This is a property of the physics being probed,
+not a limitation of the numerical framework, and is exactly the kind of
+statement the notebook's own printed unitarity/SM-limit checks (both at
+floating-point precision) are designed to isolate from.
+\end{notebox}
+
+The notebook produces three figures: Fig~3, a three-panel heatmap of
+$|U_{\alpha i}|^2$ (flavour rows $e,\mu,\tau,s$ against mass columns
+$1$--$4$, annotated with numeric values) for the three presets; Fig~6, a
+three-panel heatmap of the reduced kinetic, matter, and total Hamiltonian
+for the Giunti-2017 preset; and Fig~9, $P(\nu_\mu\to\nu_e)$/$P(\bar\nu_\mu\to\bar\nu_e)$/$P(\nu_\mu\to\nu_\mu)$/$P(\nu_e\to\nu_e)$
+and the CP asymmetry $A_{CP}(\%)$ against $\delta_{14}\in[0^\circ,360^\circ]$.
+
+\section{\texttt{sterile2\_kinematics.ipynb}: the two-flavour approximation}
+\label{sec:results-kinematics}
+
+\begin{implbox}
+This notebook quantifies exactly the effect anticipated in
+\cref{ch:sterile-theory}'s closing section: how well the textbook
+2-flavour disappearance formula approximates the full 4-flavour vacuum
+evolution, separating the residual into (i) a pure mass-hierarchy
+("one-mass-scale-dominance") piece and (ii) an active-sector mixing piece
+from $R_{14}$/$R_{24}$ non-commutation, and mapping representative
+experiments onto the $(L,E)$ plane.
+\end{implbox}
+
+\begin{resultbox}
+\textbf{Confirmed, directly printed output} -- idealised limit
+(\code{sterile\_3p1\_two\_flavour\_limit}, $\theta_{12}=\theta_{13}=\theta_{23}=0$,
+$\theta_{14}=15^\circ$, $\theta_{24}=12^\circ$, $\Delta m^2_{41}=1.0$~eV$^2$,
+compared against the exact-phase-constant 2-flavour formula):
+\begin{center}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Channel & max.\ $|P_{\rm numerical}-P_{\rm 2\text{-}flavour}|$ \\
+\midrule
+$\nu_e$ (both $\theta_{14},\theta_{24}$ active) & $1.03\times10^{-14}$ \\
+$\nu_\mu$ ($\theta_{14}$ forced to $0$, isolated) & $1.41\times10^{-3}$ \\
+$\nu_\mu$ (both $\theta_{14},\theta_{24}$ active) & $1.07\times10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Confirmed, directly printed output} -- realistic mixing (literature
+$1.267$ phase constant):
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Channel (preset) & $|U_{\alpha4}|^2_{\rm naive}$ & $|U_{\alpha4}|^2_{\rm exact}$ & predicted max.\ dev. & observed max.\ dev. \\
+\midrule
+$\nu_e$ (Giunti 2017) & $0.0218$ & $0.0149$ & $0.0268$ & $0.0268$ \\
+$\nu_\mu$ (IceCube 2020) & $0.0257$ & $0.0110$ & $0.0563$ & $0.0821$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Confirmed, directly printed output} -- oscillation-maximum
+kinematics: $\Delta m^2_{41}=0.3$~eV$^2\Rightarrow(L/E)_{\max}=4.13$~m/MeV;
+$1.7$~eV$^2\Rightarrow0.73$~m/MeV; $7.0$~eV$^2\Rightarrow0.18$~m/MeV.
+\end{resultbox}
+
+\begin{notebox}
+\textbf{Reading the two confirmed tables together.} The $\nu_e$ channel is
+exact to $10^{-14}$ (floating-point) in the idealised limit and its
+realistic-mixing deviation ($0.0268$) is \emph{fully} explained by the
+naive-versus-exact $|U_{e4}|^2$ convention alone (predicted equals
+observed to the printed precision) -- i.e.\ for $\nu_e$, using
+$|U_{e4}|^2=\cos^2\theta_{12}\cos^2\theta_{13}\sin^2\theta_{14}$ (the code's
+actual rotation ordering) instead of the naive $\sin^2\theta_{14}$ already
+captures essentially all of the departure from the 2-flavour formula. The
+$\nu_\mu$ channel is qualitatively different: even in the idealised limit,
+forcing $\theta_{14}=0$ leaves a residual of $1.4\times10^{-3}$ (a pure
+mass-hierarchy effect, not related to $R_{14}$/$R_{24}$ non-commutation),
+which grows to $1.07\times10^{-2}$ once both angles are simultaneously
+active; at realistic mixing the observed deviation ($0.0821$) is
+\emph{larger} than what the naive-versus-exact $|U_{\mu4}|^2$ convention
+alone predicts ($0.0563$), confirming
+\cref{ch:sterile-theory}'s statement that $|U_{\mu4}|^2=\sin^2\theta_{24}$
+is never exact once $\theta_{14}\neq0$ -- there is a genuine residual
+active-sector structure in the $\nu_\mu$ channel that the 2-state reduction
+does not capture, beyond the diagonal mixing-fraction correction alone.
+\end{notebox}
+
+The notebook produces three figures: Fig~3, $\nu_e$/$\nu_\mu$ survival vs.\
+$L$ (log scale) for the idealised limit, numerical vs.\ 2-flavour formula;
+Fig~4, the same comparison at realistic mixing (Giunti-2017 for $\nu_e$,
+IceCube for $\nu_\mu$); and Fig~5, three $(E,L)$ heatmaps of
+$P(\nu_e\to\nu_e)$ for $\Delta m^2_{41}=0.3,1.7,7.0$~eV$^2$ with markers
+for the Reactor, Gallium (BEST), LSND, MiniBooNE, and IceCube experimental
+$(E,L)$ points.
+
+\section{\texttt{sterile3\_analysis.ipynb}: experimental anomalies and the global tension}
+
+\begin{implbox}
+This notebook connects the three realistic presets to the actual
+experimental data motivating them (\cref{ch:sterile-theory}): reactor and
+Gallium ($\nu_e$ disappearance), LSND/MiniBooNE ($\nu_\mu\to\nu_e$
+appearance), and IceCube ($\nu_\mu$ disappearance), all evaluated with the
+same vacuum-propagation helper as the previous two notebooks (no Earth
+matter effects), and quantifies the tension between the appearance and
+disappearance data sets within the minimal 3+1 model.
+\end{implbox}
+
+\begin{resultbox}
+\textbf{Confirmed, directly printed output} -- configuration cell, the
+effective $e$--$\mu$ appearance amplitude $\sin^2(2\theta_{e\mu})_{\rm eff}\equiv4|U_{e4}|^2|U_{\mu4}|^2$
+for each preset:
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Preset & $\theta_{14}$ & $\theta_{24}$ & $\Delta m^2_{41}$ & $\sin^2(2\theta_{e\mu})_{\rm eff}$ \\
+\midrule
+\code{sterile\_3p1\_null\_mixing} & $0.00^\circ$ & $0.00^\circ$ & $1.00$~eV$^2$ & $0.00000$ \\
+\code{sterile\_3p1\_bestfit\_giunti2017} & $8.50^\circ$ & $7.50^\circ$ & $1.70$~eV$^2$ & $0.00146$ \\
+\code{sterile\_3p1\_benchmark\_icecube} & $0.00^\circ$ & $9.22^\circ$ & $0.30$~eV$^2$ & $0.00000$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Confirmed, directly printed output} -- final summary cell, the
+notebook's global-tension argument:
+\begin{quote}
+\itshape
+Reactor: $\sin^2(2\theta_{14})<0.10 \Rightarrow \theta_{14}<9.2^\circ$ \\
+IceCube: $\sin^2(2\theta_{24})<0.10 \Rightarrow \theta_{24}<9.2^\circ$ \\
+Combined: $A_{e\mu}^{\rm eff}<0.10\times\sin^2(9.2^\circ)\sim0.10\times0.026\sim0.003$ \\
+LSND requires $A_{e\mu}^{\rm eff}\sim0.003$--$0.030 \Rightarrow$ global 3+1 tension $>3\sigma$
+\end{quote}
+\end{resultbox}
+
+\begin{notebox}
+\textbf{Partially unconfirmed numbers.} The notebook's Section~8 markdown
+summary table additionally quotes: reactor $\langle P\rangle$ at $L=15$~m
+(SM $1.00$, Giunti-2017 $\approx0.97$, measured $\approx0.94$); BEST Inner
+survival at $L=0.6$~m (SM $1.00$, Giunti-2017 $\approx0.94$, measured
+$0.79\pm0.05$); LSND peak appearance probability over $E=20$--$52$~MeV (SM
+$0$, Giunti-2017 $\approx1.2\times10^{-4}$, measured $\sim0.003$); IceCube
+survival at $1$~TeV (SM $\approx1.00$, Giunti-2017 $\approx0.993$, a
+$0.7\%$ deficit, measured deficit $<10\%$). These numbers appear in a
+markdown cell that itself summarises earlier plotting cells
+(\code{st2-reactor}, \code{st2-gallium}, \code{st2-lsnd-miniboone},
+\code{st2-icecube}); those individual cells were confirmed to have
+\emph{some} recorded output but their exact raw printed text was not
+independently re-extracted for this document. They are reported here as
+notebook-stated, not as independently re-verified raw cell-output text.
+\end{notebox}
+
+The notebook produces five figures: Fig~3, reactor $\bar\nu_e$ survival
+vs.\ $E$ at ILL/Bugey-3 baselines plus average rate deficit vs.\ $L$ with
+the measured deficit band; Fig~4, $\nu_e$ survival vs.\ $L$ at the $^{51}$Cr
+source energy with BEST Inner/Outer data points and an illustrative
+$\theta_{14}=20^\circ$ curve; Fig~5, $P(\bar\nu_\mu\to\bar\nu_e)$ (LSND) and
+$P(\nu_\mu\to\nu_e)$ (MiniBooNE) vs.\ $E$ with required-signal reference
+lines; Fig~6, $P(\nu_\mu\to\nu_\mu)$ vs.\ $E$ at Earth-diameter baseline
+with a $\theta_{24}$-scan panel; and Fig~7, three $(\theta_{14},\theta_{24})$
+contour maps (appearance amplitude, reactor rate ratio, IceCube rate) with
+the Giunti-2017 and IceCube benchmark points marked. The notebook's own
+stated conclusion: the minimal 3+1 model cannot simultaneously fit
+appearance (LSND/MiniBooNE) and disappearance (reactor+IceCube) data --
+"incompatible with a combined LSND + MiniBooNE interpretation at
+$>3\sigma$" -- motivating "either more complex BSM models or systematic
+re-examination of the anomalies," a standard conclusion in the sterile
+neutrino literature (see \cref{ch:sterile-theory}'s discussion of the
+appearance/disappearance tension).
+
+\section{\texttt{intrinsic3\_BSM\_extension\_sterile.ipynb}: cross-method validation}
+\label{sec:results-intrinsic3}
+
+\begin{notebox}
+\textbf{This notebook's saved file contains essentially no recorded
+numeric results.} Unlike every other notebook in this chapter, a
+cell-by-cell inspection of \code{execution\_count} and \code{outputs}
+shows that every substantive comparison cell -- the Section~3 SM-limit
+study, Section~4 solar-surface comparison, Section~5 pure-flavour Earth
+comparison's numeric metrics, Section~6 solar-to-detector, Section~7.1/7.2
+atmosphere comparisons, and the Section~8 final summary (which contains
+\code{assert np.isfinite(\ldots)} and a
+"All four physical comparisons completed successfully." print) -- has
+\textbf{no recorded output} in the file as saved. The only two pieces of
+genuinely recorded evidence are a device/path configuration print
+(confirming the notebook was run on \code{cuda:0}, \code{torch.float64})
+and a single \code{RuntimeWarning} raised during the Section~5 Earth
+comparison:
+\begin{quote}
+\ttfamily\small
+earth\_probability\_state\_numerical: the 3+1 sterile extension is active
+but no neutron-density data is available for this profile/model, so the
+neutral-current matter term cannot be included. Falling back to the
+CC-only sterile Hamiltonian (include\_matter\_nc=False).
+\end{quote}
+This confirms two things directly, and nothing else: (i) the notebook does
+reach the Earth-comparison cell and does exercise
+\pyfunc{earth\_probability\_state\_numerical} with a sterile preset
+(\code{sterile\_3p1\_bestfit\_giunti2017}) on a profile that was
+\emph{not} built with neutron-density coefficients, so
+\pyfunc{resolve\_include\_matter\_nc} (\cref{ch:sterile-implementation})
+correctly falls back to the CC-only sterile Hamiltonian with an explicit
+warning rather than silently doing so; and (ii) no comparison metric,
+error value, or pass/fail outcome for any of this notebook's five
+end-to-end scenarios (SM limit, solar surface, Earth, solar-to-detector,
+atmosphere) is recoverable from the saved file. The markdown "Expected
+results" text throughout the notebook (e.g.\ "active probabilities should
+agree to floating-point precision," "every metric must be finite") is
+aspirational prose, not a corroborated result, in this copy of the file.
+\end{notebox}
+
+\begin{implbox}
+The notebook's stated design (from its markdown, not from any recorded
+output) is a numerical-vs-perturbative cross-check with
+\code{ABSOLUTE\_THRESHOLD = 1e-3} and a $|P_{\rm reference}|\geq10^{-5}$
+floor for relative-error comparisons -- structurally identical to the
+companion \texttt{BSM\_NSI} document's \texttt{intrinsic2\_BSM\_extension\_NSI.ipynb},
+which \emph{did} have two of its five comparisons' output recorded (see
+that document's Chapter~4). Re-running this notebook end to end, with a
+neutron-density-enabled Earth profile so that the sterile neutral-current
+term is actually exercised rather than silently skipped, would be a
+natural, low-effort follow-up to this document.
+\end{implbox}

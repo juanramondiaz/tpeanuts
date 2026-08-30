@@ -153,7 +153,7 @@ class NotebookConfig:
     """
 
     package_dir: Path = field(
-        default_factory=lambda: find_repo_root(Path.cwd(), folder="analysis")
+        default_factory=lambda: find_repo_root(Path.cwd(), folder="physics")
     )
     output_root: Path = field(
         default_factory=lambda: Path(
@@ -214,7 +214,7 @@ class NotebookConfig:
 
     @property
     def output_analysis_root(self) -> Path:
-        """``output_root/analysis``: outputs of the ``notebooks/analysis`` notebooks."""
+        """``output_root/analysis``: outputs of the ``notebooks/physics/simulation`` notebooks."""
         return self.output_root / "analysis"
 
     @property

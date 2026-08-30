@@ -28,7 +28,7 @@ Generic Hamiltonian-builder machinery is covered in
 The vacuum-probability SM-limit test below
 (``test_vacuum_probability_sm_limit_exact_at_zero_sterile_angles``) is a
 regression guard for a discrepancy observed in the exploratory notebook
-``notebooks/validation/physics/BSM/sterile1_test.ipynb``: PMNS- and
+``notebooks/physics/experimental_results/BSM/sterile1_test.ipynb``: PMNS- and
 Hamiltonian-level SM-limit checks there are exact (0.00e+00), but the
 notebook's own probability-level SM-limit check printed large residuals
 (0.07-0.98) while its concluding text claimed they were <=1e-6. This test

@@ -1,0 +1,230 @@
+\chapter{\texttt{detector.borexino} --- the Borexino liquid-scintillator detector}
+\label{ch:detector-borexino}
+
+Borexino is the first concrete detector implemented on top of
+\texttt{detector.common} (\cref{ch:detector-common}) and
+\texttt{detector.interaction} (\cref{ch:detector-interaction}): a
+liquid-scintillator detector that measures solar-neutrino-induced electron
+recoils via the elastic scattering channel of \cref{ch:detector-interaction}.
+This chapter documents everything specific to it -- target composition,
+energy resolution, backgrounds, and the composed event-rate function -- with
+no attempt to also cover any other detector; further detectors will get
+their own, separate chapters when added.
+
+\section{\texttt{parameters.py} --- scintillator composition and reference grids}
+
+\modulehead{detector/borexino/parameters.py}{target stoichiometry, a
+published-table-matching reference normalization, and the default
+integration grids.}
+
+\begin{theorybox}
+Borexino's scintillator solvent is pseudocumene (1,2,4-trimethylbenzene,
+C$_9$H$_{12}$); feeding its textbook composition and molar mass into
+\texttt{detector.common.target.n\_electrons} (\cref{ch:detector-common})
+gives the target electron count at a chosen reference mass,
+\begin{equation}
+  N_e^{\rm ref} = n_{\rm electrons}\bigl(\{\text{C}{:}9,\,\text{H}{:}12\},\;
+    M=120.19\ \mathrm{g/mol},\; m={\rm REFERENCE\_TARGET\_MASS\_TON}\bigr).
+\end{equation}
+The PPO fluor ($\sim1.5$--$2.0\ \mathrm{g/L}$) and quenchers dissolved in the
+scintillator are neglected: their electron contribution is a small
+correction relative to the solvent's own mass fraction, and including them
+would require a fluor concentration value not otherwise needed anywhere
+else in this project.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{PSEUDOCUMENE\_COMPOSITION} = \code{\{"C": 9, "H": 12\}},
+    \pyfunc{PSEUDOCUMENE\_MOLAR\_MASS\_G\_MOL} = 120.19.
+  \item \pyfunc{REFERENCE\_TARGET\_MASS\_TON} = 100, \pyfunc{REFERENCE\_EXPOSURE\_DAYS} = 1:
+    chosen to match the units of the real published spectrum this package is
+    validated against,
+    \code{data/detector/borexino/observation/nature2018\_low\_energy\_spectrum.csv}
+    (``Events/[day $\times$ 100\,t $\times N_h$]'', see \texttt{io.py} below
+    for the $N_h$ caveat) -- \emph{not} Borexino's true absolute fiducial
+    mass or total live time, which are not needed at this normalisation and
+    are not quoted here.
+  \item \pyfunc{N\_TARGET\_ELECTRONS}: $N_e^{\rm ref}$ above, computed once
+    at import time.
+  \item \pyfunc{ENERGY\_RESOLUTION\_A} = 0.05: the resolution-curve
+    normalisation consumed by \texttt{response.py} below (value and caveat
+    discussed there).
+  \item \pyfunc{E\_NU\_GRID\_MEV} = \code{linspace(0.15, 16.0, 400)},
+    \pyfunc{T\_GRID\_MEV} = \code{linspace(0.05, 14.0, 400)},
+    \pyfunc{TPRIME\_GRID\_MEV} = \pyfunc{T\_GRID\_MEV}: default integration
+    grids spanning the pp-chain neutrino energy range, matching
+    \texttt{notebooks/inference/inference2\_Borexino.ipynb}'s 0.15--16~MeV
+    convention, and the corresponding electron-recoil range; equal true/
+    reconstructed grids satisfy \pyfunc{predicted\_counts}'s current
+    equal-grid requirement (\cref{ch:detector-common}).
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{response.py} --- Borexino's energy resolution}
+
+\modulehead{detector/borexino/response.py}{$\sigma(T)=a\sqrt{T}$, the
+photostatistics-limited resolution of a photoelectron-counting liquid
+scintillator, wired into
+\texttt{detector.common.response.gaussian\_response\_matrix}.}
+
+\begin{theorybox}
+A liquid-scintillator detector reconstructs deposited energy from a counted
+number of photoelectrons $N_{\rm pe}$, roughly proportional to the true
+deposit, $N_{\rm pe}\propto T$. Photon (and photoelectron) counting is a
+Poisson process, so the \emph{relative} statistical spread scales as
+$1/\sqrt{N_{\rm pe}}$, giving an absolute resolution that scales as
+$\sqrt{T}$ rather than linearly with $T$:
+\begin{equation}
+  \keyresult{\sigma(T) = a\,\sqrt{T},}
+  \label{eq:borexino-sigma}
+\end{equation}
+the standard functional form for this detector class, with $a$ an
+empirical normalisation absorbing the scintillator's light yield, photon
+collection efficiency, and photodetector quantum efficiency.
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{sigma\_MeV(T\_grid\_MeV, resolution\_a=ENERGY\_RESOLUTION\_A)}
+    implements \labelcref{eq:borexino-sigma} directly.
+  \item \pyfunc{response\_matrix(T\_grid\_MeV, Tprime\_grid\_MeV,
+    resolution\_a)} feeds \labelcref{eq:borexino-sigma} into
+    \pyfunc{detector.common.response.gaussian\_response\_matrix}
+    (\cref{sec:detector-response}), i.e.\ Borexino's response is modelled as
+    Gaussian with the energy-dependent width above -- no separate
+    Borexino-specific convolution code exists beyond supplying this
+    $\sigma(T)$.
+\end{itemize}
+\end{implbox}
+
+\begin{notebox}
+$a={\rm ENERGY\_RESOLUTION\_A}=0.05$ (i.e.\ $5\%/\sqrt{\mathrm{MeV}}$) is a
+representative order-of-magnitude figure for this detector class, \textbf{not}
+a number read off the Nature 2018 paper \parencite{Agostini2018Borexino}.
+Treat any fit whose result is sensitive to its exact value as illustrative
+until it is replaced with the paper's own quoted resolution.
+\end{notebox}
+
+\section{\texttt{backgrounds.py} --- background placeholder}
+
+\modulehead{detector/borexino/backgrounds.py}{currently always zero; see
+\texttt{detector.common.background} (\cref{ch:detector-common}) for why this
+is explicit rather than silently omitted.}
+
+\begin{implbox}
+\pyfunc{backgrounds\_MeV(n\_bins, device=None, dtype=torch.float64)} calls
+\pyfunc{detector.common.background.zero\_background} directly. No real
+background model is implemented: Borexino's actual low-energy background
+budget -- $^{14}$C beta decay (endpoint $\approx156\ \mathrm{keV}$, which
+sets the detector's practical low-energy analysis threshold), $^{210}$Po
+alpha decay ($\approx5.3\ \mathrm{MeV}$ visible energy, separated from
+beta/gamma events by pulse-shape discrimination), $^{85}$Kr, $^{210}$Bi,
+cosmogenic isotopes, and external gammas from detector materials and rock --
+is each its own dedicated analysis in the Borexino collaboration's papers,
+not something to approximate here without a citable model.
+\end{implbox}
+
+\section{\texttt{event\_rate.py} --- the composed Borexino event rate}
+
+\modulehead{detector/borexino/event\_rate.py}{wires
+\texttt{detector.common.event\_rate.predicted\_counts} with Borexino's own
+target, response, and background; deliberately does not know about
+oscillation or the Sun.}
+
+\begin{theorybox}
+\subsection*{Two-flavour split from the survival probability}
+\pyfunc{event\_rate} takes the $\nu_e$ survival probability $P_{ee}(E_\nu)$
+and the total (flavour-summed) incident flux $\Phi_{\rm tot}(E_\nu)$ as its
+only oscillation-dependent inputs, splitting them into the two effective
+channels \texttt{detector.interaction} needs
+(\cref{ch:detector-interaction}):
+\begin{equation}
+  \keyresult{\Phi_e(E_\nu) = P_{ee}(E_\nu)\,\Phi_{\rm tot}(E_\nu),
+    \qquad
+    \Phi_x(E_\nu) = \bigl(1-P_{ee}(E_\nu)\bigr)\,\Phi_{\rm tot}(E_\nu).}
+\end{equation}
+This is exact for a two-flavour-equivalent treatment of solar propagation
+(the surviving flux is $\nu_e$ with probability $P_{ee}$, and
+``everything else'' -- $\nu_\mu$ or $\nu_\tau$ with equal cross section,
+\cref{ch:detector-interaction} -- with probability $1-P_{ee}$), and requires
+no assumption on how $P_{ee}$ itself was computed: \texttt{event\_rate}
+never imports \texttt{medium.solar} or any propagation code, taking
+$P_{ee}$/$\Phi_{\rm tot}$ as plain, already-computed tensors (see the module
+docstring for how a caller assembles them from
+\pyclass{SolarProfile.flux}/\pyclass{SolarProfile.spectrum} and an
+oscillation model's own prediction).
+
+\subsection*{Exposure unit conversion}
+The incident flux is expressed in physical units
+$\mathrm{cm^{-2}\,s^{-1}\,MeV^{-1}}$ (a rate per second), while the public
+\code{exposure\_days} argument is naturally quoted in days; the two are
+reconciled by converting days to seconds before multiplying into
+\labelcref{eq:detector-bin-counts} (\cref{ch:detector-common}),
+\begin{equation}
+  {\rm exposure} = {\rm exposure\_days}\times86{,}400\ \mathrm{s/day}.
+\end{equation}
+\end{theorybox}
+
+\begin{implbox}
+\begin{itemize}
+  \item \pyfunc{event\_rate(p\_ee, flux\_tot\_MeV, bin\_edges\_MeV, *,
+    E\_nu\_grid\_MeV=..., T\_grid\_MeV=..., n\_target=N\_TARGET\_ELECTRONS,
+    exposure\_days=REFERENCE\_EXPOSURE\_DAYS, resolution\_a=ENERGY\_RESOLUTION\_A,
+    threshold\_MeV=None, background\_counts=None)}: builds
+    \code{cross\_section\_e}/\code{cross\_section\_x} via
+    \texttt{detector.interaction.neutrino\_electron}'s
+    \pyfunc{nue\_cross\_section\_grid}/\pyfunc{numutau\_cross\_section\_grid}
+    (\cref{ch:detector-interaction}), the response matrix via
+    \pyfunc{detector.borexino.response.response\_matrix}, the efficiency via
+    \pyfunc{detector.common.efficiency.step\_efficiency} if
+    \code{threshold\_MeV} is given (else uniformly 1), and the background
+    via \pyfunc{detector.borexino.backgrounds.backgrounds\_MeV} if
+    \code{background\_counts} is not supplied -- then calls
+    \pyfunc{detector.common.event\_rate.predicted\_counts}
+    (\cref{ch:detector-common}) with all of them plugged in, and
+    \code{exposure\_days} $\times$ 86\,400 as the exposure.
+  \item Returns predicted counts per bin, shape \code{(..., n\_bins)}, in
+    events per \code{exposure\_days} days -- at the default
+    \code{exposure\_days=1}, directly a rate (events/day), matching
+    \pyfunc{parameters.REFERENCE\_EXPOSURE\_DAYS}'s normalisation.
+  \item Fully differentiable with respect to \code{p\_ee} (and hence, through
+    it, w.r.t.\ whatever upstream oscillation parameters produced it): every
+    other input (grids, cross sections, response, efficiency, target,
+    background) is treated as a constant, per
+    \texttt{detector.common.event\_rate}'s autograd convention
+    (\cref{ch:detector-common}).
+\end{itemize}
+\end{implbox}
+
+\section{\texttt{io.py} --- loading the real Nature 2018 spectrum}
+
+\modulehead{detector/borexino/io.py}{\pyfunc{load\_low\_energy\_spectrum}:
+loads the real Borexino low-energy rate spectrum
+\parencite{Agostini2018Borexino} into an \pyclass{Observation}
+(\cref{ch:detector-common}).}
+
+\begin{implbox}
+\pyfunc{load\_low\_energy\_spectrum(path=None, device=None, dtype=torch.float64)}
+reads \code{data/detector/borexino/observation/nature2018\_low\_energy\_spectrum.csv}
+(or an explicit override \code{path}) via \code{pandas.read\_csv}, converting
+the table's \code{energy\_keV}/\code{width\_keV} columns to MeV and its
+\code{rate}/\code{rate\_error} columns into a symmetric
+\pyclass{Observation} (\pyfunc{Observation.from\_symmetric}, with
+\code{bin\_width\_MeV} set -- a genuinely binned spectrum, unlike the
+pointwise Borexino $P_{ee}(E)$ observation used elsewhere in this project).
+\end{implbox}
+
+\begin{notebox}
+\textbf{Read before comparing against \pyfunc{event\_rate.event\_rate}'s
+predicted counts.} The source table's own header states its units as
+``Events/[day $\times$ 100\,t $\times N_h$]''. $N_h$ is a
+Borexino-internal reconstructed-energy-estimator scale factor (present as
+its own column in the table, distinct from \code{energy\_keV}) that this
+package does not model -- \texttt{detector.borexino.event\_rate} predicts
+events/day/100\,t, \emph{not} divided by $N_h$. Treat any comparison between
+the loaded \pyclass{Observation} and \pyfunc{event\_rate}'s output as a
+qualitative shape check, not a bin-for-bin fit, until $N_h$ is understood and
+folded in -- or restrict the comparison to a normalisation-free quantity
+(the spectral shape alone).
+\end{notebox}

@@ -467,7 +467,7 @@ def validation_comparison_grid(
     for ax in axes[0]:
         ax.set_ylabel("Probability"); ax.set_ylim(-0.02, 1.02); ax.legend(fontsize=7, ncol=2)
     for ax in axes[1]: ax.set_ylabel("Absolute error"); ax.set_yscale("log")
-    for ax in axes[2]: ax.set_ylabel("Thresholded relative error"); ax.set_yscale("log")
+    for ax in axes[2]: ax.set_ylabel("Relative error"); ax.set_yscale("log")
     axes[2, 0].set_xlabel("E [MeV]"); axes[2, 1].set_xlabel(angle_label)
     if log_energy:
         for ax in axes[:, 0]: ax.set_xscale("log")

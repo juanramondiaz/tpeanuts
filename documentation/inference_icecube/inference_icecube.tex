@@ -1,0 +1,83 @@
+% =============================================================================
+%  inference_icecube.tex
+%  Real Weighted-MC Atmospheric theta_23/Delta m^2_3l Inference at IceCube DeepCore
+%  Fast Simulation of Neutrino Oscillations in Matter (MSc Thesis)
+% =============================================================================
+\documentclass[11pt,a4paper,openany]{report}
+
+\usepackage[a4paper,margin=2.6cm,marginparwidth=2.1cm,marginparsep=4mm]{geometry}
+\usepackage{tpeanuts-inference}
+
+\addbibresource{references.bib}
+
+\title{\Huge Real Weighted-MC Atmospheric $\theta_{23}$/$\Delta m^2_{3l}$ Inference at IceCube DeepCore with \texttt{tpeanuts}\\[4pt]
+  \Large Fast Simulation of Neutrino Oscillations in Matter}
+\author{Juan Ramon Diaz Santos}
+\date{August 2026 --- living document, generated from the source code}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.6cm}
+  {\Huge\bfseries\color{icecubeColor} Real Weighted-MC Atmospheric\\[4pt] $\theta_{23}$/$\Delta m^2_{3l}$ Inference at IceCube DeepCore with \texttt{tpeanuts}\par}
+  \vspace{0.8cm}
+  {\Large Fast Simulation of Neutrino Oscillations in Matter\par}
+  \vspace{1.5cm}
+  {\large MSc Thesis (Trabajo Fin de M\'aster) --- Inference Companion Document\par}
+  \vspace{0.3cm}
+  {\large Juan Ramon Diaz Santos \\ \texttt{diazjuan@alumni.uv.es}\par}
+  \vspace{0.6cm}
+  {\normalsize Supervisors: Roberto Ruiz de Austri Bazan \quad\&\quad Michele Lucente\par}
+  \vfill
+  {\normalsize August 2026\par}
+  \vspace{0.5cm}
+  \begin{tcolorbox}[colback=icecubeColor!5,colframe=icecubeColor,width=0.85\textwidth,sharp corners=all,rounded corners=all,arc=1mm]
+    \small
+    This document accompanies \texttt{notebooks/inference/inference5\_icecube.ipynb} and the
+    \texttt{tpeanuts.detector.icecube}/\texttt{tpeanuts.inference} code packages: it documents,
+    end to end, the real IceCube DeepCore 9-year "golden event" atmospheric-neutrino public data
+    release, the event-by-event weighted-Monte-Carlo reweighting forward model implemented in
+    \texttt{tpeanuts} (unlike every other detector in this project, which folds a continuous
+    differential cross section), the real detector-systematics hypersurface correction, the
+    gradient-based Poisson fit, and the resulting real $\theta_{23}$/$\Delta m^2_{3l}$
+    measurement, compared against IceCube's own published best fit -- together with a dedicated
+    audit of the fitted muon-background normalization scale against IceCube's own published
+    value. Blue boxes (\textbf{Theoretical Foundation}) contain the physics; green boxes
+    (\textbf{Implementation}) link that physics to actual \texttt{tpeanuts} code; orange boxes
+    collect approximations and limitations; cyan boxes (\textbf{Result}) report a concrete
+    numerical outcome of the notebook or of this project's own test suite. Text highlighted in
+    \keyresult{yellow} marks key results/equations.
+  \end{tcolorbox}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\listoftodos[Pending sections and notes]
+\clearpage
+\pagenumbering{arabic}
+
+% =============================================================================
+\chapter{Introduction to IceCube DeepCore}
+\input{chapters/01_introduction}
+
+% =============================================================================
+\chapter{The Official Data Release: Tables and Publications}
+\input{chapters/02_data_release}
+
+% =============================================================================
+\chapter{Detector Implementation in \texttt{tpeanuts}}
+\input{chapters/03_detector_implementation}
+
+% =============================================================================
+\chapter{The Inference Process}
+\input{chapters/04_inference_process}
+
+% =============================================================================
+\chapter{Results}
+\input{chapters/05_results}
+
+\clearpage
+\printbibliography[title={References}]
+
+\end{document}

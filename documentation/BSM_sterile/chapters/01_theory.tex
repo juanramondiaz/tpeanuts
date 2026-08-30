@@ -1,0 +1,156 @@
+\label{ch:sterile-theory}
+
+This chapter develops the physics of the 3+1 sterile-neutrino extension,
+from the short-baseline anomalies that originally motivated it to the exact
+matter-potential structure a fourth, gauge-singlet mass eigenstate implies.
+It is deliberately implementation-agnostic: \cref{ch:sterile-implementation}
+maps every equation derived here onto the concrete \texttt{tpeanuts} code
+that evaluates it.
+
+\section{Motivation: short-baseline anomalies}
+
+\begin{theorybox}
+The three-flavour paradigm, with two independent mass-squared splittings
+$\Delta m^2_{21}\sim7.4\times10^{-5}\ \mathrm{eV^2}$ and
+$\Delta m^2_{31}\sim2.5\times10^{-3}\ \mathrm{eV^2}$, accounts for the vast
+majority of solar, atmospheric, reactor, and accelerator oscillation data.
+A handful of short-baseline anomalies, however, are not accommodated by
+this picture and instead point to oscillations at a much larger
+mass-squared splitting, $\Delta m^2\sim\mathcal{O}(1)\ \mathrm{eV^2}$,
+requiring a third, independent splitting and hence (at least) a fourth mass
+eigenstate:
+\begin{itemize}
+  \item \textbf{LSND}: excess $\bar\nu_\mu\to\bar\nu_e$ appearance at
+    $L/E\sim1$~m/MeV~\parencite{Aguilar2001LSND}.
+  \item \textbf{MiniBooNE}: an independent, statistically significant
+    excess of electron-like events in both neutrino and antineutrino mode,
+    broadly consistent with the LSND
+    signal~\parencite{AguilarArevalo2018MiniBooNE}.
+  \item \textbf{The reactor antineutrino anomaly}: a $\sim6\%$ deficit
+    between measured and predicted $\bar\nu_e$ flux at short baseline from
+    reactor experiments, once reactor flux predictions were
+    revised~\parencite{Mention2011ReactorAnomaly}.
+  \item \textbf{The gallium anomaly}: a deficit in the $\nu_e$ event rate
+    measured during the radioactive-source calibration campaigns of the
+    GALLEX and SAGE solar-neutrino
+    experiments~\parencite{GiuntiLaveder2011GalliumAnomaly}.
+\end{itemize}
+The simplest new-physics explanation common to all four is a single
+additional mass eigenstate $\nu_4$, mostly composed of a new flavour
+eigenstate $\nu_s$ that does not participate in the weak interaction at
+all (a ``sterile'' neutrino) -- the ``3+1'' scheme. The appearance
+anomalies (LSND, MiniBooNE) and the disappearance anomalies (reactor,
+gallium) probe different combinations of the new mixing angles, and
+existing global fits are in tension between the two classes; this tension,
+and the different individual mixing angles preferred by different
+data sets, is exactly why \cref{ch:sterile-observables} offers several
+distinct named presets rather than a single best fit.
+\end{theorybox}
+
+\section{The 3+1 mixing matrix}
+
+\begin{theorybox}
+A fourth mass eigenstate $\nu_4$ and a fourth sterile flavour eigenstate
+$\nu_s$ are added to the three active ones. Because $\nu_s$ is a
+gauge-singlet, it does not receive the charged-current matter potential of
+\S\ref{sec:sterile-matter} below, and the $4\times4$ mixing matrix is
+parametrised, following the convention of
+\textcite{KoppMachadoMaltoniSchwetz2013}, by adding three active--sterile
+rotations $R_{14},R_{24},R_{34}$ to the standard 3-flavour structure,
+\begin{equation}
+  \keyresult{U_4 = R_{23}\,\Delta_4\,R_{24}\,R_{34}\,R_{13}\,\Delta_4^\dagger\,R_{12}\,R_{14}},
+  \label{eq:u4}
+\end{equation}
+where $\theta_{14},\theta_{24},\theta_{34}$ are the new active--sterile
+mixing angles and $\delta_{14},\delta_{24}$ their associated CP phases.
+\Cref{eq:u4} reduces exactly to the 3-flavour Standard Model matrix
+(\emph{embedded} in the larger $4\times4$ space) when
+$\theta_{14}=\theta_{24}=\theta_{34}=0$: the sterile row/column decouple
+completely and every propagation result of the pure Standard Model is
+recovered without approximation.
+\end{theorybox}
+
+\begin{notebox}
+\textbf{CP-phase counting.} For $N$ Dirac generations there are
+$(N-1)(N-2)/2$ independent physical CP phases. For $N=4$ this gives exactly
+\keyresult{three}: the standard phase $\delta_{13}$ (carried through
+$R_{13}$ by $\Delta_4$, exactly as in the 3-flavour case), the $e$--$s$
+phase $\delta_{14}$ (carried by $R_{14}$), and the $\mu$--$s$ phase
+$\delta_{24}$ (carried by $R_{24}$). $R_{34}$ is always a \emph{real}
+rotation: the fourth possible phase can be absorbed into a redefinition of
+the charged-lepton fields, so no sterile preset (\cref{ch:sterile-observables})
+ever needs a $\delta_{34}$ value.
+\end{notebox}
+
+\section{The matter potential: charged current versus neutral current}
+\label{sec:sterile-matter}
+
+\begin{theorybox}
+Because $\nu_s$ is a gauge singlet, it never receives the charged-current
+potential: in the extended flavour basis $(e,\mu,\tau,s)$, the CC term is
+simply the 3-flavour Wolfenstein potential~\parencite{Wolfenstein1978},
+zero-padded,
+\begin{equation}
+  H_{\rm mat}^{\rm CC} = \diag(V_{CC},0,0,0), \qquad V_{CC}=\pm\sqrt2\,G_F\,n_e\,L_{\rm scale}.
+\end{equation}
+The three \emph{active} flavours, in contrast, all share the same
+neutral-current potential $V_{NC}=\mp\frac{1}{\sqrt2}G_F\,n_n\,L_{\rm scale}$
+equally (lepton universality of the NC coupling). In the pure 3-flavour
+Standard Model this shared term is an unobservable global phase and is
+correctly never computed at all. Once a sterile state is present -- an
+NC-blind fourth entry -- it is no longer a pure phase: writing out the full
+diagonal and subtracting the common piece,
+\begin{equation}
+  \keyresult{
+    \diag(V_{CC}+V_{NC},\,V_{NC},\,V_{NC},\,0) - V_{NC}\,I_4
+    = \diag(V_{CC},\,0,\,0,\,-V_{NC})
+  },
+  \label{eq:sterile-nc}
+\end{equation}
+a genuine, physically observable relative potential of magnitude comparable
+to $V_{CC}$ itself survives on the sterile diagonal entry. This term is
+\emph{optional} in the sense that omitting it (the default) recovers the
+CC-only sterile Hamiltonian used throughout most of the sterile-oscillation
+literature and throughout earlier phases of this project -- unlike the
+purely 3-flavour case, though, omitting it is a genuine approximation, not
+an exact simplification, once $\theta_{24}$ or $\theta_{34}$ (which mix the
+sterile index into the $\mu$/$\tau$ sector via the outer block,
+\cref{ch:sterile-implementation}) are non-zero.
+\end{theorybox}
+
+\begin{notebox}
+This sterile neutral-current term is structurally independent of, but can
+be combined freely with, Non-Standard Interactions (a separate BSM
+extension; see the companion \texttt{BSM\_NSI} document): both consume the
+same underlying local neutron density $n_n(x)$, but they are additive,
+independently switchable contributions to the matter Hamiltonian.
+\end{notebox}
+
+\section{The two-flavour disappearance limit}
+
+\begin{theorybox}
+When every Standard Model active mixing angle is switched off
+($\theta_{12}=\theta_{13}=\theta_{23}=0$), the $\nu_e$ survival probability
+reduces exactly to the textbook two-flavour vacuum formula
+\begin{equation}
+  \keyresult{P_{ee} = 1 - \sin^2(2\theta_{14})\,\sin^2\!\left(1.267\,\frac{\Delta m^2_{41}\,[\mathrm{eV^2}]\,L\,[\mathrm{km}]}{E\,[\mathrm{GeV}]}\right)},
+\end{equation}
+for \emph{any} value of $\theta_{24}$, since $\theta_{24}$ lives entirely
+in the outer block $O_4$ (\cref{ch:sterile-implementation}), which leaves
+the electron index untouched. The analogous statement for $\nu_\mu$
+disappearance, $|U_{\mu4}|^2=\sin^2\theta_{24}$, holds exactly only when
+\emph{both} $\theta_{23}=0$ \emph{and} $\theta_{14}=0$: $R_{14}$ and
+$R_{24}$ both act on the sterile index and do not commute in general, so a
+small residual correction survives in the $\nu_\mu$ channel whenever
+$\theta_{14}$ and $\theta_{24}$ are simultaneously non-zero -- a property
+of the physics, not of the numerical implementation, and the subject of
+\cref{sec:results-kinematics}'s quantitative study.
+\end{theorybox}
+
+\begin{refbox}
+Short-baseline anomalies: \cite{Aguilar2001LSND,AguilarArevalo2018MiniBooNE,Mention2011ReactorAnomaly,GiuntiLaveder2011GalliumAnomaly}.
+3+1 mixing parametrisation: \cite{KoppMachadoMaltoniSchwetz2013}. Global 3+1
+fit: \cite{GariazzoGiuntiLavederLi2017}. IceCube atmospheric $\nu_\mu$
+disappearance search: \cite{IceCube2020SterileNumuDisappearance}. Standard
+matter potential: \cite{Wolfenstein1978}.
+\end{refbox}

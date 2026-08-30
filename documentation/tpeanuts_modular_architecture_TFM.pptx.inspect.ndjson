@@ -1,0 +1,53 @@
+{"kind":"deck","id":"pr/tzeate","name":"Deck"}
+{"kind":"layout","layoutId":"82bbc6da-59c4-4a81-aa17-5b95b01f7d00","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"5501f143-79e3-4bc4-81af-f3a17bce1da4","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/92h01o","slide":1,"title":"MASTER'S THESIS DEFENSE","textShapes":4}
+{"kind":"textbox","id":"sh/3uhcj2xk","slide":1,"name":"cover-kicker","text":"MASTER'S THESIS DEFENSE","textPreview":"MASTER'S THESIS DEFENSE","textChars":23,"textLines":1,"bbox":[72,62,430,30]}
+{"kind":"textbox","id":"sh/ovqdcne5","slide":1,"name":"cover-title","text":"Tpeanuts modular architecture","textPreview":"Tpeanuts modular architecture","textChars":29,"textLines":1,"bbox":[72,185,830,150]}
+{"kind":"textbox","id":"sh/pwzulsfq","slide":1,"name":"cover-subtitle","text":"A layered, differentiable framework for neutrino oscillation and flux propagation","textPreview":"A layered, differentiable framework for neutrino oscillation and flux propagation","textChars":81,"textLines":1,"bbox":[72,365,720,92]}
+{"kind":"shape","id":"sh/e5ov6dg3","slide":1,"name":"cover-accent","bbox":[1000,0,280,720]}
+{"kind":"shape","id":"sh/f6xcfixo","slide":1,"name":"cover-accent-strong","bbox":[1050,0,80,720]}
+{"kind":"textbox","id":"sh/g76d8nyt","slide":1,"name":"cover-footer","text":"Torch-based scientific software · Python","textPreview":"Torch-based scientific software · Python","textChars":40,"textLines":1,"bbox":[72,625,600,34]}
+{"kind":"notes","id":"nt/92h01o","slide":1,"text":""}
+{"kind":"slide","id":"sl/gfnwzd","slide":2,"title":"Modularity separates scientific concerns without breaking the propagation flow","textShapes":23}
+{"kind":"textbox","id":"sh/u9gnaxsj","slide":2,"name":"architecture-title","text":"Modularity separates scientific concerns without breaking the propagation flow","textPreview":"Modularity separates scientific concerns without breaking the propagation flow","textChars":78,"textLines":1,"bbox":[56,34,1168,58]}
+{"kind":"textbox","id":"sh/hw7mlcbu","slide":2,"name":"architecture-subtitle","text":"High-level workflows compose independent source, medium and physics components.","textPreview":"High-level workflows compose independent source, medium and physics components.","textChars":79,"textLines":1,"bbox":[56,96,1050,30]}
+{"kind":"shape","id":"sh/wvy5c7a9","slide":2,"name":"pipelines-base","bbox":[185,158,270,112]}
+{"kind":"shape","id":"sh/jy94nmt0","slide":2,"name":"inference-base","bbox":[505,158,270,112]}
+{"kind":"shape","id":"sh/ixgnehsf","slide":2,"name":"detectors-base","bbox":[825,158,270,112]}
+{"kind":"shape","id":"sh/50rmpcr6","slide":2,"name":"sources-base","bbox":[185,337,270,112]}
+{"kind":"shape","id":"sh/4zi5g7al","slide":2,"name":"media-base","bbox":[505,337,270,112]}
+{"kind":"shape","id":"sh/r294rm9w","slide":2,"name":"physics-core-base","bbox":[825,337,270,112]}
+{"kind":"shape","id":"sh/610nihsb","slide":2,"name":"foundations-base","bbox":[32,205,120,292]}
+{"kind":"shape","id":"sh/ofm9ovy5","slide":2,"name":"integration-base","bbox":[1128,205,120,292]}
+{"kind":"shape","id":"sh/pgvaxgfq","slide":2,"name":"legacy-base","bbox":[185,540,910,82]}
+{"kind":"shape","id":"sh/2dkrmlgz","slide":2,"bbox":[320,270,0,67]}
+{"kind":"shape","id":"sh/3etsvqxk","slide":2,"bbox":[640,270,0,67]}
+{"kind":"shape","id":"sh/cjm9sveh","slide":2,"bbox":[960,270,0,67]}
+{"kind":"shape","id":"sh/dkva10fm","slide":2,"bbox":[455,393,50,0]}
+{"kind":"shape","id":"sh/qh4rqlwb","slide":2,"bbox":[775,393,50,0]}
+{"kind":"shape","id":"sh/bidszqxw","slide":2,"bbox":[152,351,353,42]}
+{"kind":"shape","id":"sh/076twfed","slide":2,"bbox":[1095,351,33,42]}
+{"kind":"shape","id":"sh/l8fa50fy","slide":2,"bbox":[640,449,0,91]}
+{"kind":"textbox","id":"sh/t4ba9072","slide":2,"name":"application-layer","text":"APPLICATION LAYER","textPreview":"APPLICATION LAYER","textChars":17,"textLines":1,"bbox":[185,132,250,22]}
+{"kind":"textbox","id":"sh/8329gv6h","slide":2,"name":"domain-layer","text":"DOMAIN & COMPUTATION LAYER","textPreview":"DOMAIN & COMPUTATION LAYER","textChars":26,"textLines":1,"bbox":[185,311,350,22]}
+{"kind":"textbox","id":"sh/72ts7qpw","slide":2,"name":"pipelines-title","text":"Propagation pipelines","textPreview":"Propagation pipelines","textChars":21,"textLines":1,"bbox":[203,171,234,30]}
+{"kind":"textbox","id":"sh/m1kre5ob","slide":2,"name":"pipelines-detail","text":"Solar · Earth · Atmosphere\nCombined end-to-end workflows","textPreview":"Solar · Earth · Atmosphere | Combined end-to-end workflows","textChars":56,"textLines":2,"bbox":[203,206,234,54]}
+{"kind":"textbox","id":"sh/hsbadk7y","slide":2,"name":"inference-title","text":"Inference","textPreview":"Inference","textChars":9,"textLines":1,"bbox":[523,171,234,30]}
+{"kind":"textbox","id":"sh/gr29kf6t","slide":2,"name":"inference-detail","text":"Differentiable models\nLikelihoods · Fits · Scans","textPreview":"Differentiable models | Likelihoods · Fits · Scans","textChars":48,"textLines":2,"bbox":[523,206,234,54]}
+{"kind":"textbox","id":"sh/v6tsbap8","slide":2,"name":"detectors-title","text":"Detector models","textPreview":"Detector models","textChars":15,"textLines":1,"bbox":[843,171,234,30]}
+{"kind":"textbox","id":"sh/u5kri5on","slide":2,"name":"detectors-detail","text":"Responses · Observables\nSNO · Borexino · IceCube","textPreview":"Responses · Observables | SNO · Borexino · IceCube","textChars":48,"textLines":2,"bbox":[843,206,234,54]}
+{"kind":"textbox","id":"sh/xwrq1g7u","slide":2,"name":"sources-title","text":"Neutrino sources","textPreview":"Neutrino sources","textChars":16,"textLines":1,"bbox":[203,350,234,30]}
+{"kind":"textbox","id":"sh/cvi98b69","slide":2,"name":"sources-detail","text":"Solar · Atmospheric · Reactor\nProduction spectra and fluxes","textPreview":"Solar · Atmospheric · Reactor | Production spectra and fluxes","textChars":59,"textLines":2,"bbox":[203,385,234,54]}
+{"kind":"textbox","id":"sh/25wfmx0v","slide":2,"name":"media-title","text":"Propagation media","textPreview":"Propagation media","textChars":17,"textLines":1,"bbox":[523,350,234,30]}
+{"kind":"textbox","id":"sh/3q5gv21g","slide":2,"name":"media-detail","text":"Vacuum · Solar · Earth · Atmosphere\nGeometry, density and evolution","textPreview":"Vacuum · Solar · Earth · Atmosphere | Geometry, density and evolution","textChars":67,"textLines":2,"bbox":[523,385,234,54]}
+{"kind":"textbox","id":"sh/orexoni1","slide":2,"name":"core-title","text":"Physics core","textPreview":"Physics core","textChars":12,"textLines":1,"bbox":[843,350,234,30]}
+{"kind":"textbox","id":"sh/psnyxsjm","slide":2,"name":"core-detail","text":"Hamiltonians · PMNS · Potentials\nSM/BSM models · Numerical solvers","textPreview":"Hamiltonians · PMNS · Potentials | SM/BSM models · Numerical solvers","textChars":66,"textLines":2,"bbox":[843,385,234,54]}
+{"kind":"textbox","id":"sh/qtwfqx07","slide":2,"name":"foundations-title","text":"FOUNDATIONS","textPreview":"FOUNDATIONS","textChars":11,"textLines":1,"bbox":[42,222,100,46]}
+{"kind":"textbox","id":"sh/bu5gz21s","slide":2,"name":"foundations-detail","text":"Configuration\n\nTensor types\n\nRuntime context\n\nMath & I/O","textPreview":"Configuration |  | Tensor types |  | Runtime context |  | Math & I/O","textChars":56,"textLines":7,"bbox":[42,282,100,190]}
+{"kind":"textbox","id":"sh/cvexs7ix","slide":2,"name":"integration-title","text":"INTEGRATION","textPreview":"INTEGRATION","textChars":11,"textLines":1,"bbox":[1138,222,100,46]}
+{"kind":"textbox","id":"sh/dw7y1cji","slide":2,"name":"integration-detail","text":"Reference data\n\nnuSQuIDS\n\nMCEq · Honda\n\nPyMSIS","textPreview":"Reference data |  | nuSQuIDS |  | MCEq · Honda |  | PyMSIS","textChars":46,"textLines":7,"bbox":[1138,282,100,190]}
+{"kind":"textbox","id":"sh/6xcfedkn","slide":2,"name":"legacy-title","text":"Legacy compatibility and validation","textPreview":"Legacy compatibility and validation","textChars":35,"textLines":1,"bbox":[205,551,310,28]}
+{"kind":"textbox","id":"sh/rylwny18","slide":2,"name":"legacy-detail","text":"The NumPy/Numba peanuts package provides regression checks and backward compatibility.","textPreview":"The NumPy/Numba peanuts package provides regression checks and backward compatibility.","textChars":86,"textLines":1,"bbox":[515,551,555,50]}
+{"kind":"textbox","id":"sh/7udwrutc","slide":2,"name":"flow-label","text":"composition → propagation → prediction","textPreview":"composition → propagation → prediction","textChars":38,"textLines":1,"bbox":[430,652,420,26]}
+{"kind":"notes","id":"nt/gfnwzd","slide":2,"text":""}
