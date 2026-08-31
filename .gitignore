@@ -43,3 +43,11 @@ pyrightconfig.json
 
 # Local scratch files
 head.py
+/run_*.py
+
+# Thesis LaTeX source (build PDFs are published separately, not the source tree)
+documentation.thesis/
+
+# Companion documentation: keep only the compiled PDFs, not the LaTeX sources
+documentation/*
+!documentation/*.pdf
