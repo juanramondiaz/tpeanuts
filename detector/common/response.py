@@ -16,31 +16,14 @@
 #      June 2026
 # =============================================================================
 
-"""
-Gaussian energy-response (migration) matrix construction.
+"""Energy-response and grid-redistribution utilities.
 
-``gaussian_response_matrix`` is the generic response builder shared by
-detectors whose energy resolution is well described by a (possibly
-energy-dependent) Gaussian smearing of the true observable -- Borexino, SNO,
-Super-K. A detector with a Monte-Carlo migration matrix instead (e.g.
-IceCube's reconstructed-vs-true-energy matrix) supplies its own matrix
-directly to ``tpeanuts.detector.common.event_rate.apply_response`` and does
-not need this module.
-
-Module contents:
+Module functions:
     gaussian_response_matrix(...)
-        Build R(T'|T) on a (Tprime_grid, T_grid) pair as a normalized
-        Gaussian density on the full real line. A finite reconstructed
-        grid may therefore contain less than unit probability.
+        Evaluate a Gaussian response density on true and reconstructed grids.
     scatter_add_linear(...)
-        Redistribute point masses onto a fixed grid by linear interpolation,
-        conserving total mass. Shared low-level utility for any detector
-        that needs to move probability/cross-section mass from an
-        off-grid energy value onto its own fixed energy grid -- used by
-        ``tpeanuts.detector.dayabay.response`` (LSNL energy-scale warp) and
-        ``tpeanuts.detector.interaction.inverse_beta_decay`` (cos(theta) ->
-        prompt-energy redistribution of the order-1/M differential cross
-        section).
+        Deposit off-grid values onto neighboring grid points using linear
+        weights.
 """
 
 from __future__ import annotations

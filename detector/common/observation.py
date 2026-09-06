@@ -16,21 +16,12 @@
 #      June 2026
 # =============================================================================
 
-"""
-Observation: a detector-agnostic container for a published measurement.
-
-Formalizes the ad hoc ``pandas.read_csv(...)`` + column selection repeated
-across ``notebooks/inference/inference1_borexino.ipynb`` and
-``inference2_borexino_nsi.ipynb`` into a single reusable type, and extends
-it to binned spectra (bin width, symmetric uncertainty) alongside the
-pointwise, asymmetric-uncertainty convention those two notebooks already
-used.
+"""Data structure for pointwise or binned observations.
 
 Module contents:
     Observation
-        Value, one-sided uncertainties, and an energy/bin-center grid (with
-        an optional bin width for a binned spectrum), plus a ``label`` per
-        entry (e.g. a solar source name or a bin index).
+        Labels, coordinates, measured values and one-sided uncertainties,
+        with optional bin widths.
 """
 
 from __future__ import annotations
@@ -76,6 +67,14 @@ class Observation:
     bin_width_MeV: Optional[torch.Tensor] = None
 
     def __post_init__(self) -> None:
+        """Validate that all observation fields have the same length.
+
+        Args:
+            self: Observation instance being initialized.
+
+        Returns:
+            None.
+        """
         n = self.x_MeV.shape[0]
         for name, field in (
             ("labels", self.labels),
@@ -131,6 +130,12 @@ class Observation:
         ``[x_i - width_i/2, x_i + width_i/2]``; adjacent bins are not
         required to be contiguous (a gap or overlap raises no error here,
         the responsibility of whoever built ``x_MeV``/``bin_width_MeV``).
+
+        Args:
+            self: Binned observation containing centers and bin widths.
+
+        Returns:
+            Tensor of bin edges shaped ``(n+1,)``.
 
         Raises:
             ValueError: If ``bin_width_MeV`` is None (this observation is

@@ -37,7 +37,7 @@ Module contents:
         of the publication).
     THETA12_DEG, THETA13_DEG, DELTA13_DEG, DELTAMSQ21
         Fixed solar/reactor oscillation inputs (NuFit), not re-fit from
-        atmospheric data (see ``tpeanuts.inference.atmospheric_model``).
+        atmospheric data (see ``tpeanuts.inference.model_atmosphere``).
     PUBLISHED_SIN2_THETA23, PUBLISHED_DELTAMSQ32, PUBLISHED_MUON_SCALE
         The publication's own best-fit point (normal ordering), for
         reference/comparison only -- not used as a prior anywhere in this
@@ -102,7 +102,7 @@ BESTFIT_SYSTEMATICS: dict[str, float] = {
 
 # Real solar/reactor oscillation inputs (NuFit 6.1, normal ordering),
 # fixed rather than re-fit from atmospheric-only data -- see
-# tpeanuts.inference.atmospheric_model's module docstring.
+# tpeanuts.inference.model_atmosphere's module docstring.
 THETA12_DEG: float = 33.41
 THETA13_DEG: float = 8.58
 DELTA13_DEG: float = 197.0

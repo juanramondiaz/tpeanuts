@@ -8,7 +8,7 @@ from tpeanuts.detector.dayabay.event_rate import real_observed_counts
 from tpeanuts.detector.dayabay.inference_model import DayaBayDetectorModel
 from tpeanuts.detector.dayabay.io import load_survival_probability_truth
 from tpeanuts.detector.dayabay.parameters import FINAL_EREC_BIN_EDGES_MEV
-from tpeanuts.medium.vacuum.oscillation_model import VacuumOscillationModel
+from tpeanuts.inference.model_vacuum import VacuumOscillationModel
 from tpeanuts.util.context import RuntimeContext
 
 

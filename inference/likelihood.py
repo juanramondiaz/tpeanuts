@@ -19,46 +19,28 @@
 """
 -2 ln L statistics for comparing predictions to observed data points.
 
-Both functions here return a scalar ``-2 ln L`` (up to a likelihood-family-
-dependent constant), differentiable w.r.t. ``prediction``, so
-``tpeanuts.inference.fit.fit_lbfgs`` can minimize either one by gradient
-descent and reuse the same Laplace/Fisher covariance construction (Fisher
-information ``= 0.5 * Hessian(-2 ln L)`` regardless of the likelihood family).
+Every function here returns a scalar ``-2 ln L`` (up to a likelihood-
+family-dependent constant), differentiable w.r.t. ``prediction``, so
+``fit.fit_lbfgs`` can minimize any of them by gradient descent and reuse the
+same Laplace/Fisher covariance construction regardless of which was chosen.
 
-    chi2_asymmetric
-        Gaussian likelihood with a one-sided (asymmetric) uncertainty.
-        Appropriate for published *measurements with quoted +/- errors*, e.g.
-        Borexino's Nature 2018 P_ee(E) points
-        (``data/detector/borexino/probability/nature2018_pee_points.csv``).
-    poisson_nll
-        Poisson likelihood ratio (Baker & Cousins 1984) for *event counts*:
-        ``prediction``/``value`` are expected/observed counts per bin, not
-        probabilities. This is the statistic most neutrino event-rate
-        analyses actually minimize; nothing in this package builds event
-        counts yet (see ``tpeanuts.inference.model``'s P_ee-only forward
-        models), so it is provided ready for that extension.
-    correlated_gaussian_nll
-        Gaussian likelihood with a full covariance matrix between
-        observables (not just per-bin variances) -- needed whenever a
-        published result reports statistical/systematic *correlations*
-        between its own observables, e.g.
-        ``tpeanuts.detector.sno_ii``'s 38-observable SNO salt-phase vector
-        (Eq. 19-21 of its primary source). Not registered in
-        ``LIKELIHOODS`` (unlike the two above): it needs a mandatory
-        Cholesky-factor argument with no sensible default, so a bare
-        string lookup would immediately fail; bind the factor first via
-        ``functools.partial(correlated_gaussian_nll, cholesky_L=L)`` and
-        pass the *result* as ``tpeanuts.inference.fit.fit_lbfgs``'s
-        ``likelihood`` argument, which accepts such a callable directly.
-
-Every likelihood function above shares the call signature ``(prediction,
-value, sigma_minus=None, sigma_plus=None)`` -- ``poisson_nll`` and
-``correlated_gaussian_nll`` accept but reject/ignore a non-None
-``sigma_minus``/``sigma_plus`` (Poisson variance is fixed by the mean;
-the correlated-Gaussian case gets its uncertainty from the bound
-Cholesky factor instead) -- purely so ``tpeanuts.inference.fit.fit_lbfgs``
-can dispatch on ``likelihood`` uniformly, whether it is a registry string
-or a directly-supplied callable, without a family-specific call signature.
+Notes:
+    - Use ``chi2_asymmetric`` for published measurements with quoted +/-
+      errors, ``poisson_nll`` for raw event counts (expected vs. observed
+      per bin, not probabilities), and ``correlated_gaussian_nll`` when a
+      result's observables carry a full covariance matrix rather than
+      independent per-bin variances.
+    - ``correlated_gaussian_nll`` is not registered in ``LIKELIHOODS``: it
+      needs a mandatory Cholesky-factor argument with no sensible default.
+      Bind the factor first, e.g. ``functools.partial(correlated_gaussian_nll,
+      cholesky_L=L)``, and pass the result directly as ``fit_lbfgs``'s
+      ``likelihood`` argument, which accepts a callable as well as a
+      registry name.
+    - Every function shares the call signature ``(prediction, value,
+      sigma_minus=None, sigma_plus=None)``, so ``fit_lbfgs`` can dispatch on
+      ``likelihood`` uniformly; ``poisson_nll`` and ``correlated_gaussian_nll``
+      simply ignore ``sigma_minus``/``sigma_plus`` since their uncertainty
+      comes from elsewhere (the mean, or the bound Cholesky factor).
 
 Module contents:
     LIKELIHOODS

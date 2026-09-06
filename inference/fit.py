@@ -20,21 +20,16 @@
 Gradient-based point estimate and Laplace/Fisher uncertainty for any DifferentiableModel.
 
 ``fit_lbfgs`` minimizes a ``-2 ln L`` statistic -- selected by the
-``likelihood`` string, looked up in ``tpeanuts.inference.likelihood
-.LIKELIHOODS`` -- over a model's free parameters with ``torch.optim.LBFGS``,
-using autograd for the gradient (no finite differences). ``FitResult
-.covariance`` is the Laplace approximation built from the autograd Hessian
-of that statistic at the optimum: for any of these likelihood families,
-``-2 ln L = chi2 + const`` in the usual sense (exactly for
-``chi2_asymmetric``, asymptotically for ``poisson_nll`` via Wilks' theorem),
-so the Fisher information is ``0.5 * Hessian(-2 ln L)`` and the covariance is
-its inverse, ``2 * Hessian(-2 ln L)^-1`` -- the same construction regardless
-of which likelihood was selected.
+``likelihood`` string, looked up in ``likelihood.LIKELIHOODS`` -- over a
+model's free parameters with ``torch.optim.LBFGS``, using autograd for the
+gradient. ``FitResult.covariance`` is the Laplace approximation built from
+the autograd Hessian of that statistic at the optimum, the same
+construction (covariance ``= 2 * Hessian(-2 ln L)^-1``) regardless of which
+likelihood was selected.
 
 Medium/detector-agnostic: every model-specific input (solar profile,
 detector bin edges, reactor baselines, ...) is bound as a field on the
-concrete model itself (see ``tpeanuts.inference.model.DifferentiableModel``);
-this module only ever calls ``model.predict(theta)``.
+concrete model itself; this module only ever calls ``model.predict(theta)``.
 
 Module contents:
     FitResult
@@ -43,10 +38,9 @@ Module contents:
         Run the LBFGS point estimate and the Hessian-based uncertainty.
     minimize_lbfgs(...)
         The point-estimate-only half of ``fit_lbfgs`` (no Hessian/
-        covariance), factored out so
-        ``tpeanuts.inference.scan.loglik_grid``'s ``profile_others=True``
-        mode can re-minimize nuisance parameters at every grid point without
-        paying for a Hessian it would immediately discard.
+        covariance), factored out so a grid scan can re-minimize nuisance
+        parameters at every point without paying for a Hessian it would
+        immediately discard.
 """
 
 from __future__ import annotations

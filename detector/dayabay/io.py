@@ -17,53 +17,49 @@
 # =============================================================================
 
 """
-Loaders for the real Daya Bay data release, cached CSVs under ``data/detector/dayabay/``.
-
-Every function here reads a file written by
-``notebooks/external/dayabay/DayaBay1_generator.ipynb`` -- see that
-notebook and this package's own module docstring for provenance and scope.
+Loaders for the Daya Bay data release, cached CSVs under ``data/detector/dayabay/``.
 
 Module contents:
     load_baselines(...)
-        (detector, reactor) -> baseline in km, real published geometry.
+        (detector, reactor) -> baseline in km, published geometry.
     load_reactor_parameters(...)
-        Real fission fractions, energy-per-fission, and thermal power.
+        Fission fractions, energy-per-fission, and thermal power.
     load_huber_mueller_spectra(...)
-        Real per-isotope antineutrino spectrum, (E_MeV, N_per_fission_per_MeV)
+        Per-isotope antineutrino spectrum, (E_MeV, N_per_fission_per_MeV)
         pairs.
     load_n_protons(...)
-        Real target proton count per detector.
+        Target proton count per detector.
     load_eres_parameters(...)
-        Real 3-parameter energy-resolution formula coefficients.
+        3-parameter energy-resolution formula coefficients.
     load_ibd_spectrum(...)
-        Real observed IBD prompt-energy spectrum for one detector.
+        Observed IBD prompt-energy spectrum for one detector.
     load_background_rates(...)
-        Real background rates/uncertainties table (all detectors/categories).
+        Background rates/uncertainties table (all detectors/categories).
     load_background_shape(...)
-        Real normalized background spectrum shape for one (category, detector).
+        Normalized background spectrum shape for one (category, detector).
     load_exposure(...)
-        Real 8AD-period effective livetime per detector.
+        8AD-period effective livetime per detector.
     load_final_erec_bin_edges(...)
-        Real analysis-binning edges.
+        Analysis-binning edges.
     load_survival_probability_truth(...)
         Daya Bay's own published best-fit parameters, for comparison only.
     load_ibd_constants(...)
-        Real IBD cross-section coupling constants (f, g, f2, phase-space
+        IBD cross-section coupling constants (f, g, f2, phase-space
         factor).
     load_iav_matrix(...)
-        Real IAV energy-redistribution matrix, 240x240, 0-12 MeV.
+        IAV energy-redistribution matrix, 240x240, 0-12 MeV.
     load_lsnl_curve(...)
-        Real LSNL nominal energy-scale nonlinearity curve.
+        LSNL nominal energy-scale nonlinearity curve.
     load_lsnl_curve_pulls(...)
-        Real LSNL systematic-variation ("pull") curves, 4 of them.
+        LSNL systematic-variation ("pull") curves, 4 of them.
     load_nonequilibrium_correction(...)
-        Real per-isotope non-equilibrium flux correction (U235/Pu239/Pu241).
+        Per-isotope non-equilibrium flux correction (U235/Pu239/Pu241).
     load_snf_correction(...)
-        Real per-reactor spent-nuclear-fuel flux correction (R1-R6).
+        Per-reactor spent-nuclear-fuel flux correction (R1-R6).
     load_neutrino_rate_weekly(...)
-        Real weekly-resolved per-reactor antineutrino rate history.
+        Weekly-resolved per-reactor antineutrino rate history.
     load_global_normalization(...)
-        Daya Bay's own real nominal global-normalization value (1.0).
+        Daya Bay's own nominal global-normalization value (1.0).
 """
 
 from __future__ import annotations
@@ -81,7 +77,7 @@ _DAYABAY_DIR = package_dir() / "data" / "detector" / "dayabay"
 def load_baselines(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> dict[str, dict[str, torch.Tensor]]:
-    """Real baseline (km) for every (detector, reactor) pair.
+    """Baseline (km) for every (detector, reactor) pair.
 
     Returns:
         Nested dict ``{detector: {reactor: baseline_km_tensor}}``.
@@ -96,13 +92,13 @@ def load_baselines(
 
 
 def load_reactor_parameters() -> tuple[dict[str, float], dict[str, float], float]:
-    """Real fission fractions, energy-per-fission, and nominal thermal power.
+    """Fission fractions, energy-per-fission, and nominal thermal power.
 
     Returns:
         ``(fission_fractions, energy_per_fission_MeV, thermal_power_gw)``:
         the first two are ``{isotope: value}`` dicts (isotope in
         ``detector.dayabay.parameters.ISOTOPES``); the third is a scalar
-        float, GW, shared by every one of the 6 real reactor cores in this
+        float, GW, shared by every one of the 6 reactor cores in this
         data tier (see package module docstring).
     """
     table = pd.read_csv(_DAYABAY_DIR / "reactor_parameters.csv")
@@ -115,7 +111,7 @@ def load_reactor_parameters() -> tuple[dict[str, float], dict[str, float], float
 def load_huber_mueller_spectra(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
-    """Real per-isotope Huber-Mueller antineutrino spectrum.
+    """Per-isotope Huber-Mueller antineutrino spectrum.
 
     Returns:
         ``{isotope: (E_MeV, N_per_fission_per_MeV)}``, each a 1-D tensor,
@@ -134,7 +130,7 @@ def load_huber_mueller_spectra(
 def load_n_protons(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> dict[str, torch.Tensor]:
-    """Real target proton count per detector."""
+    """Target proton count per detector."""
     table = pd.read_csv(_DAYABAY_DIR / "n_protons.csv")
     return {
         row["detector"]: torch.tensor(float(row["n_protons"]), device=device, dtype=dtype)
@@ -143,14 +139,14 @@ def load_n_protons(
 
 
 def load_eres_parameters() -> tuple[float, float, float]:
-    """Real energy-resolution formula coefficients (a_nonuniform, b_stat, c_noise)."""
+    """Energy-resolution formula coefficients (a_nonuniform, b_stat, c_noise)."""
     table = pd.read_csv(_DAYABAY_DIR / "eres_parameters.csv")
     values = dict(zip(table["parameter"], table["value"]))
     return float(values["a_nonuniform"]), float(values["b_stat"]), float(values["c_noise"])
 
 
 def load_detector_efficiency() -> float:
-    """Real IBD-selection efficiency (Gd-capture + delayed-coincidence + analysis cuts).
+    """IBD-selection efficiency (Gd-capture + delayed-coincidence + analysis cuts).
 
     Loaded directly from ``parameters/detector_efficiency.yaml`` in the
     official data release. It is applied separately from the effective
@@ -164,14 +160,14 @@ def load_ibd_spectrum(
     detector: str,
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Real observed IBD prompt-energy spectrum for one detector, 0.05 MeV bins, 0-12 MeV.
+    """Observed IBD prompt-energy spectrum for one detector, 0.05 MeV bins, 0-12 MeV.
 
     Args:
         detector: Detector name, e.g. "AD11".
 
     Returns:
         ``(E_min_MeV, E_max_MeV, N)``, each shape ``(240,)``; ``N`` is the
-        real observed integer candidate count per bin.
+        observed integer candidate count per bin.
     """
     table = pd.read_csv(_DAYABAY_DIR / "ibd_spectra" / f"ibd_spectrum_{detector}.csv")
     return (
@@ -182,7 +178,7 @@ def load_ibd_spectrum(
 
 
 def load_background_rates() -> pd.DataFrame:
-    """Real background rates/uncertainties table, indexed by Label, one column per detector."""
+    """Background rates/uncertainties table, indexed by Label, one column per detector."""
     return pd.read_csv(_DAYABAY_DIR / "background_rates_8AD.csv").set_index("Label")
 
 
@@ -191,7 +187,7 @@ def load_background_shape(
     detector: str,
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
-    """Real normalized background spectrum shape (integrates to 1), 0.05 MeV bins, 0-12 MeV.
+    """Normalized background spectrum shape (integrates to 1), 0.05 MeV bins, 0-12 MeV.
 
     Args:
         category: One of "accidentals", "alpha_neutron", "amc",
@@ -199,7 +195,7 @@ def load_background_shape(
         detector: Detector name, e.g. "AD11".
 
     Returns:
-        Real tensor shaped ``(240,)``.
+        Tensor shaped ``(240,)``.
     """
     table = pd.read_csv(_DAYABAY_DIR / "background_shapes" / f"spectrum_shape_{category}_{detector}.csv")
     return torch.tensor(table["N"].to_numpy(), device=device, dtype=dtype)
@@ -208,7 +204,7 @@ def load_background_shape(
 def load_exposure(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> dict[str, torch.Tensor]:
-    """Real 8AD-period effective livetime (seconds, already efficiency-corrected) per detector."""
+    """8AD-period effective livetime (seconds, already efficiency-corrected) per detector."""
     table = pd.read_csv(_DAYABAY_DIR / "exposure_8AD.csv")
     return {
         row["detector"]: torch.tensor(float(row["eff_livetime_seconds"]), device=device, dtype=dtype)
@@ -219,7 +215,7 @@ def load_exposure(
 def load_final_erec_bin_edges(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
-    """Real (non-uniform) analysis-binning edges, 0.7-12.0 MeV, shape (27,)."""
+    """Non-uniform analysis-binning edges, 0.7-12.0 MeV, shape (27,)."""
     table = pd.read_csv(_DAYABAY_DIR / "final_erec_bin_edges.csv")
     return torch.tensor(table["E_rec_MeV"].to_numpy(), device=device, dtype=dtype)
 
@@ -231,7 +227,7 @@ def load_survival_probability_truth() -> dict[str, float]:
 
 
 def load_ibd_constants() -> dict[str, float]:
-    """Real IBD cross-section coupling constants: f, g, f2, PhaseSpaceFactor."""
+    """IBD cross-section coupling constants: f, g, f2, PhaseSpaceFactor."""
     table = pd.read_csv(_DAYABAY_DIR / "ibd_constants.csv")
     return dict(zip(table["parameter"], table["value"]))
 
@@ -239,13 +235,13 @@ def load_ibd_constants() -> dict[str, float]:
 def load_iav_matrix(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
-    """Real IAV energy-redistribution matrix R(reco|true), 240x240, 0.05 MeV bins, 0-12 MeV.
+    """IAV energy-redistribution matrix R(reco|true), 240x240, 0.05 MeV bins, 0-12 MeV.
 
     Columns sum to 1 (probability mass, not a density -- see
     ``detector.dayabay.response`` for the density conversion).
 
     Returns:
-        Real tensor shaped ``(240, 240)``.
+        Tensor shaped ``(240, 240)``.
     """
     table = pd.read_csv(_DAYABAY_DIR / "iav_matrix.csv", header=None)
     return torch.tensor(table.to_numpy(), device=device, dtype=dtype)
@@ -254,7 +250,7 @@ def load_iav_matrix(
 def load_lsnl_curve(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Real LSNL nominal energy-scale nonlinearity curve, f(E) = E_reco / E_true_deposited.
+    """LSNL nominal energy-scale nonlinearity curve, f(E) = E_reco / E_true_deposited.
 
     Returns:
         ``(E_MeV, f)``, each 1-D tensor, sorted by energy.
@@ -269,11 +265,11 @@ def load_lsnl_curve(
 def load_lsnl_curve_pulls(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> list[tuple[torch.Tensor, torch.Tensor]]:
-    """Real LSNL systematic-variation ("pull") curves, f_k(E), k=0..3.
+    """LSNL systematic-variation ("pull") curves, f_k(E), k=0..3.
 
     Combined with the nominal curve via the official linear model
     ``f(E) = f0(E) + sum_k a_k*(f_k(E)-f0(E))``
-    (``parameters/detector_lsnl.yaml``), each ``a_k`` a real free nuisance
+    (``parameters/detector_lsnl.yaml``), each ``a_k`` a free nuisance
     with a unit Gaussian prior -- see ``detector.dayabay.response``.
 
     Returns:
@@ -294,7 +290,7 @@ def load_lsnl_curve_pulls(
 def load_nonequilibrium_correction(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
-    """Real per-isotope non-equilibrium flux correction C(E) (U235, Pu239, Pu241 only).
+    """Per-isotope non-equilibrium flux correction C(E) (U235, Pu239, Pu241 only).
 
     Returns:
         ``{isotope: (E_MeV, C)}``, each a 1-D tensor, sorted by energy.
@@ -313,7 +309,7 @@ def load_nonequilibrium_correction(
 def load_snf_correction(
     *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
 ) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
-    """Real per-reactor spent-nuclear-fuel flux correction C(E), all 6 real cores.
+    """Per-reactor spent-nuclear-fuel flux correction C(E), all 6 cores.
 
     Returns:
         ``{reactor: (E_MeV, C)}``, each a 1-D tensor, sorted by energy.
@@ -330,16 +326,16 @@ def load_snf_correction(
 
 
 def load_neutrino_rate_weekly() -> pd.DataFrame:
-    """Real weekly-resolved per-reactor antineutrino rate history, full 2011-2020 data-taking period.
+    """Weekly-resolved per-reactor antineutrino rate history, full 2011-2020 data-taking period.
 
     Returns:
         A single ``pandas.DataFrame`` with columns ``reactor, period, day,
         start_utc, end_utc, n_days, n_det, n_det_mask, neutrino_rate_per_s``,
-        all 6 real reactor cores concatenated.
+        all 6 reactor cores concatenated.
     """
     return pd.read_csv(_DAYABAY_DIR / "neutrino_rate_weekly.csv")
 
 
 def load_global_normalization() -> float:
-    """Daya Bay's own real nominal global-normalization value (``detector_normalization.yaml``, 1.0)."""
+    """Daya Bay's own nominal global-normalization value (``detector_normalization.yaml``, 1.0)."""
     return float((_DAYABAY_DIR / "global_normalization.txt").read_text())

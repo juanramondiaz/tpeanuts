@@ -19,23 +19,10 @@
 """
 Structural contract shared by every fittable model.
 
-``DifferentiableModel`` is the entire interface ``tpeanuts.inference.fit
-.fit_lbfgs``/``tpeanuts.inference.scan.loglik_grid`` require: a free-
-parameter name tuple and a single-argument ``predict(theta)``. It carries
-no medium or detector concept -- every concrete model lives with the
-physics it wraps instead:
-
-    inference.solar_model
-        SolarSMOscillationModel, SolarNSIOscillationModel, SolarPointModel
-        -- solar P_ee(E), shared by any solar-fed detector.
-    medium.vacuum.oscillation_model
-        VacuumOscillationModel -- reactor P_ee(E, L) in vacuum, shared by
-        any reactor experiment.
-    detector.borexino.inference_model, detector.sno.inference_model,
-    detector.dayabay.inference_model
-        Detector-composition layers wrapping the medium models above with
-        each detector's own target/response/binning, already implementing
-        ``predict(theta)`` directly.
+``DifferentiableModel`` is a ``typing.Protocol``: any object exposing a
+``free`` parameter-name tuple and a single-argument ``predict(theta)``
+satisfies it, with no need to inherit from it. ``fit.fit_lbfgs`` and
+``scan.loglik_grid`` require nothing else from a model.
 
 Module contents:
     DifferentiableModel

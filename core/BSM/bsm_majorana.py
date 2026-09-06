@@ -22,55 +22,46 @@ Majorana-neutrino extension of the 3-flavour PMNS matrix.
 Physics background
 -------------------
 Whether neutrinos are Dirac or Majorana particles is itself a BSM question
-(the Standard Model has no right-handed neutrino field and no
-lepton-number-violating mass term at all), so this extension lives here,
-alongside NSI (``bsm_nsi.py``) and the 3+1 sterile scheme
-(``bsm_sterile.py``), rather than inside ``core.SM`` or being bolted onto
-``PMNSParams``/``PMNS_SM``. It follows exactly the same pattern as
-``PMNS_sterile``: a companion parameter dataclass
-(``MajoranaPhases``, mirroring ``PMNSSterileParams``) plus a sibling
-``PMNS`` subclass (``PMNS_Majorana``, mirroring ``PMNS_sterile``) that
-reuses the shared rotation/phase generators (``R12``, ``R13``, ``R23``,
-``Delta``, ``_phase_diag`` -- all inherited unchanged from
-``tpeanuts.core.common.pmns.PMNS``) without requiring any change to
-``core.common`` or ``core.SM``.
+ - The Standard Model has no right-handed neutrino field and no
+    lepton-number-violating mass term at all, so this extension lives here.
+ 
+ - Parameter dataclass ``MajoranaPhases`` plus a sibling ``PMNS`` subclass 
+    ``PMNS_Majorana``, that reuses the shared rotation/phase generators:
+      ``R12``, ``R13``, ``R23``,``Delta``, ``_phase_diag``    
+   all inherited unchanged from ``tpeanuts.core.common.pmns.PMNS``
 
-If neutrinos are Majorana particles, the PMNS matrix carries two additional
-physical phases beyond the Dirac phase delta, conventionally attached to
-mass eigenstates 2 and 3:
+   - If neutrinos are Majorana particles, the PMNS matrix carries two additional
+    physical phases beyond the Dirac phase delta, conventionally attached to
+    mass eigenstates 2 and 3:
 
     U = U_Dirac @ P,   P = diag(1, exp(i alpha21/2), exp(i alpha31/2))
 
-By a standard theorem, these phases have **no effect on any oscillation
-probability**: in the amplitude A(nu_a -> nu_b) = sum_i U_bi U*_ai
-exp(-i k_i x), the factor P_ii contributed by U_bi cancels exactly against
-P_ii* from U*_ai, for every i, independent of k_i, of the matter profile,
-and of the propagation method. This is a rephasing-invariance statement,
-not an approximation, and it holds for every pipeline in this project
-(solar, atmospheric, Earth-regeneration, analytic or numerical), since all
-of them build their amplitudes from the same U returned by
-``pmns_matrix()``/``reduced()`` (see
-``documentation/guide/chapters/03_core_bsm.tex``).
+ - By a standard theorem, these phases have **no effect on any oscillation
+    probability**. In the amplitude:
+    
+    A(nu_a -> nu_b) = sum_i U_bi U*_ai exp(-i k_i x), 
+    
+    the factor P_ii contributed by U_bi cancels exactly against
+      P_ii* from U*_ai,
+    for every i, independent of k_i, of the matter profile, and of the 
+    propagation method. 
+    
+ -This is a rephasing-invariance statement, not an approximation, 
+    and it holds for every pipeline in this project (solar, atmospheric, 
+    Earth-regeneration, analytic or numerical), since all of them build their
+    amplitudes from the same U returned by ``pmns_matrix()``/``reduced()``
+     
+- Consequently, ``PMNS_Majorana`` is a pure drop-in replacement for 
+    ``PMNS_SM`` wherever a mixing object is consumed.
 
-Consequently, ``PMNS_Majorana`` is a pure drop-in replacement for
-``PMNS_SM`` wherever a mixing object is consumed: the matter Hamiltonian
-(``core.common.hamiltonian``), every evolutor (``core.numerical``,
-``core.perturbative``), and every probability/flux function are completely
-unaffected by which of the two is used with the same angles -- BSM
-extension in name (it lives here, not in ``core.SM``), but a no-op in
-every propagation code path in this project. It matters only for
-observables that read U directly rather than through an oscillation
-probability, such as the effective Majorana mass
-``effective_majorana_mass`` below, which is quadratic (not linear) in the
-electron row and therefore does not enjoy the same cancellation. It
-governs the rate of neutrinoless double-beta decay and has no relation to
-oscillation baselines, matter profiles, or propagation methods.
+- ``effective_majorana_mass`` below, which is quadratic (not linear) in the
+    electron row and therefore does not enjoy the same cancellation. It
+    governs the rate of neutrinoless double-beta decay and has no relation to
+    oscillation baselines, matter profiles, or propagation methods.
 
 Module contents:
     MajoranaPhases
-        Immutable container for the two Majorana CP phases alpha21, alpha31
-        (companion to a ``PMNSParams`` SM-sector object, exactly like
-        ``PMNSSterileParams``).
+        Immutable container for the two Majorana CP phases alpha21, alpha31        
     PMNS_Majorana
         3-flavour ``PMNS`` subclass, sibling of ``PMNS_SM``: identical
         ``outer_block``, and ``pmns_matrix``/``reduced`` right-multiplied by
@@ -78,7 +69,6 @@ Module contents:
     effective_majorana_mass(...)
         m_bb = | sum_i U_ei^2 m_i |, from a full PMNS matrix and the
         absolute active-sector mass-squared vector
-        (``core.common.mass_spectrum.MassSpectrum.absolute_mass_squared_vector``).
 """
 
 from __future__ import annotations

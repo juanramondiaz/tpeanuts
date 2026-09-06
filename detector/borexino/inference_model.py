@@ -41,7 +41,7 @@ import torch
 import tpeanuts.detector.borexino.parameters as borexino_parameters
 from tpeanuts.detector.borexino.backgrounds import backgrounds_MeV
 from tpeanuts.detector.borexino.event_rate import event_rate, line_event_rate
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.solar.probability import solar_probability_state
 from tpeanuts.medium.solar.profile import SolarMediumProfile
 from tpeanuts.source.solar import SolarNeutrinoSource
@@ -57,7 +57,7 @@ class BorexinoEventRateModel:
     oscillation_model:
         A ``SolarSMOscillationModel`` supplying ``free``/``oscillation(theta)``
         (theta12/theta13/DeltamSq21/DeltamSq3l -- the plain SM path; NSI is
-        not wired in here yet, see ``tpeanuts.inference.solar_model
+        not wired in here yet, see ``tpeanuts.inference.model_solar
         .SolarNSIOscillationModel`` for the differentiable NSI oscillation
         machinery this could be extended to reuse).
     medium:

@@ -16,59 +16,24 @@
 #      June 2026
 # =============================================================================
 
-"""
-Neutrino-deuteron breakup cross sections (SNO's CC and NC channels), from
-the real published Nakamura et al. calculation.
+"""Neutrino-deuteron breakup cross sections.
 
     Charged current:  nu_e   + d -> p + p + e-   (Q = Q_CC_DEUTERON_MEV)
     Neutral current:  nu_x   + d -> p + n + nu_x (Q = Q_NC_DEUTERON_MEV,
                                                     the deuteron binding energy)
 
-**No longer an illustrative placeholder.** ``sigma_cc_total``/``sigma_nc_total``/
-``cc_cross_section_grid`` below interpolate the real tables of Nakamura,
-Sato, Ando, Park, Myhrer, Gudkov & Kubodera, Nucl. Phys. A707 (2002) 561
-(nucl-th/0201062), fetched from the authors' own online tables and converted
-to `.csv` by ``notebooks/external/nakamura/Nakamura1_generator.ipynb`` into
-``data/detector/sno/nakamura/``:
-
-    total_cross_sections.csv
-        (E_nu_MeV, sigma_cc_cm2, sigma_nc_cm2, sigma_cc_bar_cm2,
-        sigma_nc_bar_cm2), 1.5-170 MeV. Only the neutrino (not antineutrino)
-        columns are used here -- SNO sees solar nu_e, not reactor/supernova
-        nu_e_bar.
-    cc_electron_spectrum.csv
-        (E_nu_MeV, E_e_MeV, p_e_MeV, dsigma_dpe_cm2_per_MeV), the CC
-        reaction's outgoing-electron momentum distribution at each of 63
-        tabulated E_nu (1.5-20 MeV, SNO's solar-neutrino range).
-
-``cc_cross_section_grid`` converts the tabulated dsigma/dp_e into dsigma/dT_e
-(T_e = E_e - m_e, the kinetic energy convention every other cross section in
-this project uses) via the exact kinematic Jacobian dp_e/dT_e = E_e/p_e, and
-linearly interpolates between the two tabulated E_nu curves bracketing each
-requested grid energy -- this replaces the previous version's illustrative
-"outgoing electron is monoenergetic at T_e = E_nu - Q_CC" two-body-like
-narrow-kernel approximation with the real tabulated 3-body (p, p, e-)
-electron spectrum shape, so the physical recoil spread this project's
-detector response then convolves is now itself real, not a numerical
-stand-in for an unmodeled spread (contrast the previous module docstring,
-and the ``detector.sno.response``/``detector.interaction.inverse_beta_decay``
-docstrings this replaced pattern still appears in for other channels).
-
-No NC differential cross section is exposed here: SNO's NC channel is
-detected via a neutron-capture gamma cascade with no electron-recoil energy
-tied to E_nu the way CC's outgoing electron is, so ``sigma_nc_total`` alone
-(the total breakup rate) is what ``detector.sno.event_rate.nc_event_rate``
-needs -- see that function's own docstring for how the captured-neutron
-visible-energy response is built instead (a fixed capture-gamma energy, not
-a function of E_nu).
+The tabulated values are from Nakamura et al., Nucl. Phys. A707 (2002) 561.
+The charged-current spectrum is converted from dsigma/dp_e to dsigma/dT_e
+with dp_e/dT_e = E_e/p_e and interpolated in neutrino energy. Only a total
+cross section is provided for the neutral-current process.
 
 Module contents:
-    sigma_cc_total(...), sigma_nc_total(...)
-        Real tabulated total cross sections, linearly interpolated (and
-        floored to exactly 0 below each reaction's threshold).
+    sigma_cc_total(...)
+        Interpolate the total charged-current cross section.
+    sigma_nc_total(...)
+        Interpolate the total neutral-current cross section.
     cc_cross_section_grid(...)
-        Real tabulated differential CC cross section on an (E_nu_grid,
-        T_grid) pair, ready for ``event_rate.true_observable_spectrum``.
+        Evaluate the differential charged-current cross section on a grid.
 """
 
 from __future__ import annotations
@@ -89,7 +54,14 @@ _NAKAMURA_DIR = package_dir() / "data" / "detector" / "sno" / "nakamura"
 
 @functools.lru_cache(maxsize=1)
 def _load_total_table() -> pd.DataFrame:
-    """Load and cache ``total_cross_sections.csv``, sorted by E_nu_MeV."""
+    """Load the total cross-section table sorted by neutrino energy.
+
+    Args:
+        None.
+
+    Returns:
+        Table sorted by its ``E_nu_MeV`` column.
+    """
     path = _NAKAMURA_DIR / "total_cross_sections.csv"
     return pd.read_csv(path).sort_values("E_nu_MeV").reset_index(drop=True)
 
@@ -97,6 +69,9 @@ def _load_total_table() -> pd.DataFrame:
 @functools.lru_cache(maxsize=1)
 def _load_cc_electron_curves() -> Tuple[np.ndarray, Dict[float, Tuple[np.ndarray, np.ndarray]]]:
     """Load, Jacobian-convert, and cache the CC electron spectrum per tabulated E_nu.
+
+    Args:
+        None.
 
     Returns:
         ``(energies, curves)``: ``energies`` is the sorted array of
@@ -129,6 +104,16 @@ def _load_cc_electron_curves() -> Tuple[np.ndarray, Dict[float, Tuple[np.ndarray
 
 
 def _interp_total(E_nu_MeV: torch.Tensor, column: str, threshold_MeV: float) -> torch.Tensor:
+    """Interpolate one total cross-section column at requested energies.
+
+    Args:
+        E_nu_MeV: Neutrino energies in MeV, with any shape.
+        column: Name of the cross-section column to interpolate.
+        threshold_MeV: Reaction threshold in MeV; lower energies return zero.
+
+    Returns:
+        Cross sections in cm^2 with the shape of ``E_nu_MeV``.
+    """
     table = _load_total_table()
     E_np = to_numpy(E_nu_MeV)
     x = table["E_nu_MeV"].to_numpy()
@@ -141,8 +126,8 @@ def _interp_total(E_nu_MeV: torch.Tensor, column: str, threshold_MeV: float) -> 
 def sigma_cc_total(E_nu_MeV: torch.Tensor) -> torch.Tensor:
     """Real (Nakamura et al. 2002) total CC cross section sigma(nu_e + d -> p + p + e-), cm^2.
 
-    Linearly interpolated on the tabulated 1.5-170 MeV grid (see module
-    docstring); flat-extrapolated above 170 MeV, floored to exactly 0 below
+    Linearly interpolated on the tabulated 1.5-170 MeV grid,
+    flat-extrapolated above 170 MeV and set to exactly 0 below
     ``constant.Q_CC_DEUTERON_MEV``.
 
     Args:
@@ -157,12 +142,9 @@ def sigma_cc_total(E_nu_MeV: torch.Tensor) -> torch.Tensor:
 def sigma_nc_total(E_nu_MeV: torch.Tensor) -> torch.Tensor:
     """Real (Nakamura et al. 2002) total NC cross section sigma(nu_x + d -> p + n + nu_x), cm^2.
 
-    Linearly interpolated on the tabulated 1.5-170 MeV grid (see module
-    docstring); flat-extrapolated above 170 MeV, floored to exactly 0 below
-    ``constant.Q_NC_DEUTERON_MEV``. Consumed by
-    ``detector.sno.event_rate.nc_event_rate`` (the total NC breakup rate,
-    convolved there with a fixed-energy neutron-capture response rather than
-    an E_nu-dependent differential cross section -- see that function).
+    Linearly interpolated on the tabulated 1.5-170 MeV grid,
+    flat-extrapolated above 170 MeV and set to exactly 0 below
+    ``constant.Q_NC_DEUTERON_MEV``.
 
     Args:
         E_nu_MeV: Neutrino energy, any shape.
@@ -186,6 +168,15 @@ def _dsigma_dTe_at_energy(
     which grows with E_nu), then the two resulting arrays are linearly
     interpolated in E_nu. Energies outside the tabulated range use the
     nearest edge curve unchanged (flat extrapolation).
+
+    Args:
+        E_nu: Neutrino energy in MeV.
+        T_grid: Electron kinetic-energy grid in MeV.
+        energies: Sorted tabulated neutrino energies in MeV.
+        curves: Differential cross-section curve for each tabulated energy.
+
+    Returns:
+        Differential cross section in cm^2/MeV on ``T_grid``.
     """
     if E_nu <= energies[0]:
         idx_lo = idx_hi = 0
@@ -213,8 +204,8 @@ def cc_cross_section_grid(
 ) -> torch.Tensor:
     """Real (Nakamura et al. 2002) differential CC cross section dsigma_CC/dT on an (E_nu_grid, T_grid) pair.
 
-    See module docstring for the Jacobian conversion (dsigma/dp_e ->
-    dsigma/dT_e) and the bracketing-E_nu interpolation scheme.
+    Tabulated dsigma/dp_e values are converted to dsigma/dT_e and linearly
+    interpolated between neighboring neutrino energies.
 
     Args:
         E_nu_grid_MeV: True neutrino energy grid, shape ``(n_E,)``.

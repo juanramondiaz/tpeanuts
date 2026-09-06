@@ -76,7 +76,7 @@ from tpeanuts.detector.sno_ii.parameters import (
     E_NU_GRID_MEV,
     HEP_FLUX_CM2S,
 )
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.earth.probability import earth_probability_state
 from tpeanuts.medium.solar.probability import solar_probability_mass
 from tpeanuts.medium.solar.profile import SolarMediumProfile

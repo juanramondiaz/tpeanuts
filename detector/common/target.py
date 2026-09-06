@@ -16,27 +16,15 @@
 #      June 2026
 # =============================================================================
 
-"""
-Number of target electrons/nucleons from material stoichiometry.
-
-Derives the target particle count from chemistry (molecular composition,
-molar mass, target mass) rather than quoting a detector's published target
-count directly: a stoichiometric derivation is independently checkable
-against textbook atomic numbers and molar masses, the same preference this
-project already applies to ``medium.solar.io.load_solar_composition``'s
-neutron-density derivation (composition-derived, not a hardcoded ratio).
+"""Target-particle counts derived from molecular composition and mass.
 
 Module contents:
     ATOMIC_NUMBER
-        Electrons per neutral atom, for the light elements relevant to
-        liquid-scintillator/water targets.
+        Atomic numbers used to count electrons in neutral matter.
     n_electrons(...)
-        Total target electron count from a molecular formula, molar mass,
-        and target mass.
+        Calculate the number of electrons in a molecular target.
     n_atoms(...)
-        Total count of one element's atoms in a molecular target -- e.g.
-        hydrogen atoms, whose nuclei are the free protons
-        ``tpeanuts.detector.dayabay`` folds inverse beta decay against.
+        Calculate the number of atoms of one element in a molecular target.
 """
 
 from __future__ import annotations

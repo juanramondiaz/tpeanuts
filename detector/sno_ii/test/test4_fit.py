@@ -11,7 +11,7 @@ from tpeanuts.detector.sno_ii.inference_model import SNOPhaseIIObservableModel
 from tpeanuts.detector.sno_ii.io import load_observed_vector_and_covariance
 from tpeanuts.inference.fit import fit_lbfgs
 from tpeanuts.inference.likelihood import cholesky_from_covariance, correlated_gaussian_nll
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.earth.profile import EarthParameters, build_earth_profile
 from tpeanuts.medium.solar.profile import build_solar_medium
 from tpeanuts.source.solar import build_solar_source

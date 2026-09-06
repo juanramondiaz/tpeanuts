@@ -16,8 +16,7 @@
 #      June 2026
 # =============================================================================
 
-"""
-Neutrino-electron elastic scattering, Standard Model tree level.
+"""Tree-level Standard Model neutrino-electron elastic scattering.
 
 nu + e^- -> nu + e^-, differential in the electron recoil kinetic energy T:
 
@@ -30,19 +29,17 @@ with couplings
     nu_e         (CC + NC): g_L = 1/2 + sin^2(theta_W), g_R = sin^2(theta_W)
     nu_mu, nu_tau (NC only): g_L = -1/2 + sin^2(theta_W), g_R = sin^2(theta_W)
 
--- the standard parametrization (e.g. Bahcall, Kamionkowski & Sirlin, Phys.
-Rev. D 51, 6146 (1995); Particle Data Group review, "Neutrino cross section
-measurements"). Radiative corrections are not included.
+Radiative corrections are not included.
 
 Module contents:
     NUE_COUPLINGS, NUMUTAU_COUPLINGS
         (g_L, g_R) pairs for the electron-flavour and mu/tau-flavour cases.
     dsigma_dT(...)
-        The differential cross section for one (E_nu, T) coupling choice.
-    nue_cross_section_grid(...), numutau_cross_section_grid(...)
-        dsigma/dT pre-evaluated on an outer-product (E_nu_grid, T_grid),
-        ready for ``tpeanuts.detector.common.event_rate
-        .true_observable_spectrum``'s ``cross_section_e``/``cross_section_x``.
+        Calculate the differential cross section for specified couplings.
+    nue_cross_section_grid(...)
+        Evaluate the electron-neutrino cross section on an energy grid.
+    numutau_cross_section_grid(...)
+        Evaluate the muon/tau-neutrino cross section on an energy grid.
 """
 
 from __future__ import annotations
@@ -107,7 +104,16 @@ def _cross_section_grid(
     T_grid_MeV: torch.Tensor,
     couplings: _Couplings,
 ) -> torch.Tensor:
-    """dsigma/dT on the outer-product grid (E_nu_grid_MeV, T_grid_MeV)."""
+    """Evaluate a differential cross section on an outer-product grid.
+
+    Args:
+        E_nu_grid_MeV: Neutrino energy grid in MeV, shape ``(n_E,)``.
+        T_grid_MeV: Electron recoil grid in MeV, shape ``(n_T,)``.
+        couplings: Left- and right-handed interaction couplings.
+
+    Returns:
+        Differential cross section in cm^2/MeV, shape ``(n_E, n_T)``.
+    """
     E = E_nu_grid_MeV[:, None]
     T = T_grid_MeV[None, :]
     return dsigma_dT(E, T, couplings.g_L, couplings.g_R)
@@ -117,7 +123,15 @@ def nue_cross_section_grid(
     E_nu_grid_MeV: torch.Tensor,
     T_grid_MeV: torch.Tensor,
 ) -> torch.Tensor:
-    """dsigma_e/dT for nu_e, shape ``(n_E, n_T)``, ready for ``event_rate.true_observable_spectrum``."""
+    """Evaluate the electron-neutrino elastic cross section on a grid.
+
+    Args:
+        E_nu_grid_MeV: Neutrino energy grid in MeV, shape ``(n_E,)``.
+        T_grid_MeV: Electron recoil grid in MeV, shape ``(n_T,)``.
+
+    Returns:
+        Differential cross section in cm^2/MeV, shape ``(n_E, n_T)``.
+    """
     return _cross_section_grid(E_nu_grid_MeV, T_grid_MeV, NUE_COUPLINGS)
 
 
@@ -125,5 +139,13 @@ def numutau_cross_section_grid(
     E_nu_grid_MeV: torch.Tensor,
     T_grid_MeV: torch.Tensor,
 ) -> torch.Tensor:
-    """dsigma_x/dT for nu_mu/nu_tau, shape ``(n_E, n_T)``, ready for ``event_rate.true_observable_spectrum``."""
+    """Evaluate the muon/tau-neutrino elastic cross section on a grid.
+
+    Args:
+        E_nu_grid_MeV: Neutrino energy grid in MeV, shape ``(n_E,)``.
+        T_grid_MeV: Electron recoil grid in MeV, shape ``(n_T,)``.
+
+    Returns:
+        Differential cross section in cm^2/MeV, shape ``(n_E, n_T)``.
+    """
     return _cross_section_grid(E_nu_grid_MeV, T_grid_MeV, NUMUTAU_COUPLINGS)

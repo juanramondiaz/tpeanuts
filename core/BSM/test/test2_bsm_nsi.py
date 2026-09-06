@@ -165,7 +165,7 @@ def test_epsilon_n_tensor_field_keeps_gradient_connected():
 def test_eps_ee_gradient_flows_through_hamiltonian_reduced():
     """End-to-end check: a differentiable eps_ee must produce a finite,
     non-zero gradient on the assembled Hamiltonian, matching the pattern
-    inference.solar_model.SolarNSIOscillationModel relies on."""
+    inference.model_solar.SolarNSIOscillationModel relies on."""
     ctx = make_context()
     x = torch.tensor(0.1, dtype=DTYPE, requires_grad=True)
     osc = dataclasses.replace(

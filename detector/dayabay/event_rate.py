@@ -17,63 +17,43 @@
 # =============================================================================
 
 """
-Composed Daya Bay IBD event-rate function: real multi-reactor fold per detector.
+Composed Daya Bay IBD event-rate function: multi-reactor fold per detector.
 
-``ibd_event_rate`` is the one place this package's real 6-reactor geometry,
-real flux, real IBD cross section, real response, and real background come
-together: each detector sees **6 real reactor cores at 6 real, different
-baselines**:
+``ibd_event_rate`` is where this package's 6-reactor geometry, flux, IBD
+cross section, response and background come together: each detector sees
+6 reactor cores at 6 different baselines,
 
     flux_e(E) = sum_r Phi_detector(E, L_{r,d}) * P_ee(E, L_{r,d})
 
-with ``Phi_detector`` from ``detector.dayabay.flux.flux_at_detector`` and
-``P_ee(E, L_r)`` supplied by the caller (one tensor per reactor, already
-oscillated at that reactor's own baseline -- oscillation itself is not
-computed here, matching every other detector package in this project;
-see ``tpeanuts.detector.dayabay.inference_model.DayaBayDetectorModel``,
-which computes the 6 ``P_ee`` curves via
-``tpeanuts.medium.vacuum.oscillation_model.VacuumOscillationModel``).
+with ``Phi_detector`` from ``flux.flux_at_detector`` and ``P_ee(E, L_r)``
+supplied by the caller, one already-oscillated tensor per reactor
+(oscillation itself is not computed here; see
+``inference_model.DayaBayDetectorModel``).
 
-The real IBD-selection efficiency (``detector.dayabay.parameters
-.DETECTOR_EFFICIENCY``, Gd-capture + delayed-coincidence + analysis cuts)
-is applied here as a flat efficiency factor, separate from and on top of
-the effective livetime, following the official data-release parameterization.
-The absolute prediction is not exactly calibrated to the observed total (a
-real ~20% gap remains even with every correction below applied -- Daya
-Bay's own official analysis does not fix this either, instead leaving a
-free ``global_normalization`` nuisance parameter,
-``detector.dayabay.parameters.GLOBAL_NORMALIZATION_NOMINAL`` = 1.0, in its
-combined fit; ``signal_scale`` below is that same real, official knob, not
-an ad hoc rescaling introduced by this project -- see
-``detector.dayabay.inference_model``).
-
-The cross section (``detector.interaction.inverse_beta_decay
-.ibd_cross_section_grid_precise``, Daya Bay's own real coupling constants
-via ``detector.dayabay.parameters.IBD_CONSTANTS``), the response
-(``detector.dayabay.response.response_matrix``, real IAV + LSNL + Gaussian
-resolution chain), and the flux (``detector.dayabay.flux.flux_at_detector``,
-real per-isotope non-equilibrium and per-reactor SNF/relative-power
-corrections) are each real, per-reactor where applicable.
-
-The real observed IBD spectrum and real background-shape histograms are
-**discrete per-bin counts/probabilities** (confirmed: each column sums to
-exactly 1 for the background shapes, and to the real integer candidate
-count for the IBD spectra), not densities -- so rebinning them onto the
-real (non-uniform) analysis edges is a plain per-bin sum
-(``rebin_discrete_counts``), not the trapezoidal-density integral
-``detector.common.event_rate.bin_counts`` performs for the (continuous)
-folded *signal* spectrum.
+Notes:
+    - The IBD-selection efficiency is applied as a flat factor on top of
+      the effective livetime. The absolute prediction is not exactly
+      calibrated to the observed total (a ~20% gap remains even with every
+      correction applied); Daya Bay's own analysis leaves this open too,
+      via the free ``global_normalization`` nuisance -- ``signal_scale``
+      below is that same official knob, not an ad hoc rescaling.
+    - The observed IBD spectrum and background-shape histograms are
+      discrete per-bin counts/probabilities, not densities, so rebinning
+      them onto the analysis edges is a plain per-bin sum
+      (``rebin_discrete_counts``), not the trapezoidal-density integral
+      ``detector.common.event_rate.bin_counts`` uses for the continuous
+      folded signal spectrum.
 
 Module contents:
     rebin_discrete_counts(...)
-        Sum fine (0.05 MeV) bins into the real analysis bin edges.
+        Sum fine (0.05 MeV) bins into the analysis bin edges.
     real_background_counts(...)
-        Real background rate x real shape x real exposure, rebinned.
+        Background rate x shape x exposure, rebinned.
     real_observed_counts(...)
-        Real observed IBD spectrum, rebinned.
+        Observed IBD spectrum, rebinned.
     ibd_event_rate(...)
-        The full real multi-reactor signal-plus-background fold, one
-        detector at a time.
+        The full multi-reactor signal-plus-background fold, one detector
+        at a time.
 """
 
 from __future__ import annotations
@@ -117,10 +97,9 @@ def rebin_discrete_counts(
 ) -> torch.Tensor:
     """Sum discrete fine-bin counts into coarser, possibly non-uniform, bins.
 
-    Every real Daya Bay analysis bin edge lands exactly on a 0.05 MeV fine-
-    bin boundary (verified against ``final_erec_bin_edges.csv``), so a fine
-    bin is assigned to exactly one coarse bin by its center; no fine bin
-    straddles two coarse bins.
+    Every Daya Bay analysis bin edge lands exactly on a 0.05 MeV fine-bin
+    boundary, so a fine bin is assigned to exactly one coarse bin by its
+    center; no fine bin straddles two coarse bins.
 
     Args:
         fine_low_MeV, fine_high_MeV: Fine-bin edges, shape ``(n_fine,)``.
@@ -128,7 +107,7 @@ def rebin_discrete_counts(
         bin_edges_MeV: Target (coarse) bin edges, shape ``(n_bins + 1,)``.
 
     Returns:
-        Real tensor shaped ``(n_bins,)``.
+        Tensor shaped ``(n_bins,)``.
     """
     fine_center = 0.5 * (fine_low_MeV + fine_high_MeV)
     n_bins = bin_edges_MeV.shape[0] - 1
@@ -148,22 +127,21 @@ def real_background_counts(
     dtype: torch.dtype = torch.float64,
     category_scale: Optional[dict[str, TensorLike]] = None,
 ) -> torch.Tensor:
-    """Real background counts per analysis bin: real rate x real shape x real exposure.
+    """Background counts per analysis bin: rate x shape x exposure.
 
     Args:
         detector: Detector name, e.g. "AD11".
-        exposure_seconds: Override exposure; None loads the real 8AD-period
-            value (``detector.dayabay.io.load_exposure``).
+        exposure_seconds: Override exposure; None loads the 8AD-period
+            value.
         bin_edges_MeV: Target analysis bin edges.
         device, dtype: Target tensor device/dtype.
         category_scale: Optional ``{category: scale}`` nuisance multiplying
-            that category's real rate (nominal 1.0); categories not present
-            default to 1.0. Differentiable w.r.t. a tensor ``scale`` --
-            see ``detector.dayabay.parameters.BACKGROUND_CATEGORY_SIGMA``
-            for the real prior uncertainty to constrain it with.
+            that category's rate (nominal 1.0); categories not present
+            default to 1.0. Differentiable w.r.t. a tensor ``scale`` -- see
+            ``parameters.BACKGROUND_CATEGORY_SIGMA`` for its prior width.
 
     Returns:
-        Real tensor shaped ``(n_bins,)``, summed over all 5 real background
+        Tensor shaped ``(n_bins,)``, summed over all 5 background
         categories.
     """
     rates = load_background_rates()
@@ -191,7 +169,7 @@ def real_observed_counts(
     device: Optional[torch.device] = None,
     dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
-    """Real observed IBD candidate counts per analysis bin (signal + background, as recorded).
+    """Observed IBD candidate counts per analysis bin (signal + background, as recorded).
 
     Args:
         detector: Detector name, e.g. "AD11".
@@ -199,7 +177,7 @@ def real_observed_counts(
         device, dtype: Target tensor device/dtype.
 
     Returns:
-        Real tensor shaped ``(n_bins,)``.
+        Tensor shaped ``(n_bins,)``.
     """
     fine_low, fine_high, fine_counts = load_ibd_spectrum(detector, device=device, dtype=dtype)
     return rebin_discrete_counts(fine_low, fine_high, fine_counts, bin_edges_MeV)
@@ -220,41 +198,33 @@ def ibd_event_rate(
     background_category_scale: Optional[dict[str, TensorLike]] = None,
     lsnl_pulls: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Predicted Daya Bay IBD counts per analysis bin for one detector, real 6-reactor fold.
+    """Predicted Daya Bay IBD counts per analysis bin for one detector, 6-reactor fold.
 
     Args:
         detector: Detector name, e.g. "AD11".
-        p_ee_per_reactor: ``{reactor_name: P_ee(E)}``, one tensor per entry
-            of ``detector.dayabay.parameters.REACTORS``, each shape
-            ``(n_E,)`` on ``E_nu_grid_MeV``, already oscillated at that
-            reactor's own real baseline. Differentiable w.r.t. oscillation
-            parameters.
+        p_ee_per_reactor: ``{reactor_name: P_ee(E)}``, one tensor per
+            reactor, each shape ``(n_E,)`` on ``E_nu_grid_MeV``, already
+            oscillated at that reactor's own baseline. Differentiable
+            w.r.t. oscillation parameters.
         E_nu_grid_MeV: True antineutrino energy grid.
-        T_grid_MeV: True visible prompt-energy grid (real 0.05 MeV bins).
-        Tprime_grid_MeV: Reconstructed prompt-energy grid; must
-            equal ``T_grid_MeV`` (see ``detector.common.event_rate
-            .predicted_counts``).
-        bin_edges_MeV: Real analysis bin edges.
-        n_target: Target free-proton count; None uses the real
-            ``detector.dayabay.parameters.N_PROTONS[detector]``.
-        exposure_seconds: Real exposure; None loads
-            ``detector.dayabay.io.load_exposure()[detector]``.
-        background_counts: Real background; None computes it via
-            ``real_background_counts``. If given explicitly,
-            ``background_category_scale`` is ignored (it only affects the
-            internally computed default).
-        signal_scale: Daya Bay's own real ``global_normalization`` nuisance
-            (see module docstring), multiplying the predicted signal only
-            (not ``background_counts``, which is separately measured).
-            Defaults to 1.0 (``detector.dayabay.parameters
-            .GLOBAL_NORMALIZATION_NOMINAL``, unscaled).
-        background_category_scale: Optional real per-category background-
-            rate nuisance, forwarded to ``real_background_counts`` when
-            ``background_counts`` is None (see that function and
-            ``detector.dayabay.parameters.BACKGROUND_CATEGORY_SIGMA``).
-        lsnl_pulls: Optional real LSNL pull-curve nuisances, shape ``(4,)``,
-            forwarded to ``detector.dayabay.response.response_matrix``;
-            None uses the real nominal LSNL curve unchanged.
+        T_grid_MeV: True visible prompt-energy grid (0.05 MeV bins).
+        Tprime_grid_MeV: Reconstructed prompt-energy grid; must equal
+            ``T_grid_MeV``.
+        bin_edges_MeV: Analysis bin edges.
+        n_target: Target free-proton count; None uses
+            ``parameters.N_PROTONS[detector]``.
+        exposure_seconds: None loads ``io.load_exposure()[detector]``.
+        background_counts: None computes it via ``real_background_counts``.
+            If given explicitly, ``background_category_scale`` is ignored.
+        signal_scale: Daya Bay's own ``global_normalization`` nuisance (see
+            module docstring), multiplying the predicted signal only (not
+            ``background_counts``, which is separately measured). Defaults
+            to 1.0, unscaled.
+        background_category_scale: Optional per-category background-rate
+            nuisance, forwarded to ``real_background_counts`` when
+            ``background_counts`` is None.
+        lsnl_pulls: Optional LSNL pull-curve nuisances, shape ``(4,)``;
+            None uses the nominal LSNL curve unchanged.
 
     Returns:
         Predicted counts per analysis bin, shape ``(n_bins,)``.

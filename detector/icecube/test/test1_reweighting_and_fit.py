@@ -14,7 +14,7 @@ from tpeanuts.detector.icecube.event_rate import (
 )
 from tpeanuts.detector.icecube.inference_model import IceCubeDetectorModel
 from tpeanuts.detector.icecube.parameters import N_BINS
-from tpeanuts.inference.atmospheric_model import AtmosphericOscillationModel
+from tpeanuts.inference.model_atmosphere import AtmosphericOscillationModel
 from tpeanuts.inference.fit import fit_lbfgs
 from tpeanuts.medium.earth.probability import earth_probability_transition
 from tpeanuts.medium.earth.profile import EarthParameters, build_earth_profile

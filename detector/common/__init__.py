@@ -16,22 +16,19 @@
 #      June 2026
 # =============================================================================
 
-"""
-Detector-agnostic event-rate building blocks.
+"""Shared detector utilities.
 
-Package modules:
+Module contents:
     observation
-        Observation: a small container for a published binned/pointwise
-        measurement (value, uncertainty, bin/energy grid), detector-agnostic.
+        Container for pointwise and binned measurements.
     target
-        Number of target electrons/nucleons from material stoichiometry.
+        Target-particle counts derived from material composition.
     response
-        Gaussian energy-response (migration) matrix construction.
+        Energy-response matrices and grid redistribution.
     efficiency
-        Detection/selection efficiency application.
+        Detection-efficiency utilities.
     background
-        Background-rate placeholder interface.
+        Construction of background-count vectors.
     event_rate
-        The single event-rate folding assembly: true spectrum -> response ->
-        efficiency -> binned, exposure-scaled counts (+ optional background).
+        Spectrum folding, detector response and bin integration.
 """

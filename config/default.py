@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-# -*- coding: utf-8 -*-
-
 # =============================================================================
 #  This module is part of the Master's Thesis (MSc Dissertation):
 #  - Fast Simulation of Neutrino Oscillations in Matter
@@ -97,7 +94,7 @@ atmosphere_density_file = (
 )
 
 # Default directory containing canonical Honda/HKKM tables.
-honda_dataset = "data/atmosphere/honda"
+honda_dataset = "data/atmosphere/honda/raw"
 
 # Default file extension used when saving torch tensors to disk.
 torch_default_extension = ".pt"

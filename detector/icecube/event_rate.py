@@ -383,7 +383,7 @@ def predicted_neutrino_counts(
 
     Args:
         theta23, deltam_sq_3l: The two free oscillation parameters (see
-            ``tpeanuts.inference.atmospheric_model.AtmosphericOscillationModel``).
+            ``tpeanuts.inference.model_atmosphere.AtmosphericOscillationModel``).
         oscillation_model: An ``AtmosphericOscillationModel``.
         earth_profile: Earth density profile
             (``tpeanuts.medium.earth.profile.build_earth_profile``'s return

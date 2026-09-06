@@ -1,4 +1,4 @@
-"""Tests for tpeanuts.inference.solar_model.
+"""Tests for tpeanuts.inference.model_solar.
 
 SolarNSIOscillationModel used to build its NSIConfig via
 NSIConfig.from_raw_epsilon (see core.BSM.bsm_nsi._hermitian_3x3's rewrite to
@@ -8,7 +8,7 @@ that model, added alongside the migration off from_raw_epsilon.
 
 import torch
 
-from tpeanuts.inference.solar_model import (
+from tpeanuts.inference.model_solar import (
     NSI_FREE_PARAM_KEYS,
     SolarNSIOscillationModel,
     SolarPointModel,

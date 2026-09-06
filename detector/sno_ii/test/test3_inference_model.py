@@ -6,7 +6,7 @@ import torch
 from tpeanuts.detector.sno_ii.inference_model import SNOPhaseIIObservableModel
 from tpeanuts.detector.sno_ii.io import load_integrated_fluxes_day_night
 from tpeanuts.detector.sno_ii.parameters import N_OBSERVABLES_TOTAL
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.earth.profile import EarthParameters, build_earth_profile
 from tpeanuts.medium.solar.profile import build_solar_medium
 from tpeanuts.source.solar import build_solar_source

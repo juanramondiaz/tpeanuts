@@ -29,7 +29,7 @@ from tpeanuts.detector.interaction.inverse_beta_decay import (
     sigma_ibd,
 )
 from tpeanuts.inference.fit import fit_lbfgs
-from tpeanuts.medium.vacuum.oscillation_model import VacuumOscillationModel
+from tpeanuts.inference.model_vacuum import VacuumOscillationModel
 from tpeanuts.util.context import RuntimeContext
 
 

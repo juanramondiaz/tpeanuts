@@ -17,44 +17,26 @@
 # =============================================================================
 
 """
-Differentiable atmospheric-medium oscillation model: theta23/DeltamSq3l, Earth matter.
+Differentiable atmospheric-medium oscillation model: 
+    theta23/DeltamSq3l, 
+    Earth matter.
 
-``AtmosphericOscillationModel`` is the mirror image of
-``tpeanuts.medium.vacuum.oscillation_model.VacuumOscillationModel``: same SM
-PMNS_SM/MassSpectrum_SM construction, but frees the *other* two oscillation
-parameters -- theta23 and DeltamSq3l are what an atmospheric-neutrino
-measurement (e.g. IceCube DeepCore) actually constrains, while theta12/
-theta13/DeltamSq21 are fixed at their real (NuFit) values, the reverse of
-``tpeanuts.inference.solar_model.SolarSMOscillationModel``/
-``VacuumOscillationModel``'s theta12/theta13/DeltamSq21-free,
-theta23-fixed split. Both splits follow from the same |U_ei|^2 product
-structure (``core.SM.sm_pmns.PMNS_SM.pmns_matrix``): P_ee depends only on
-theta12/theta13/DeltamSq21 (theta23/delta drop out), while atmospheric
-nu_mu disappearance/nu_tau appearance depend on all six parameters in
-general, but are overwhelmingly dominated by theta23/DeltamSq3l/DeltamSq21's
-already-tiny splitting relative to DeltamSq3l -- theta12/theta13/DeltamSq21
-are held fixed here at their solar/reactor-measured values rather than
-re-fit from atmospheric data alone, matching how every published
-atmospheric-neutrino oscillation analysis treats them.
+Mirrors ``VacuumOscillationModel``'s SM construction, but frees the other
+two oscillation parameters: theta23 and DeltamSq3l are what an atmospheric
+measurement (e.g. IceCube DeepCore) actually constrains, while theta12,
+theta13 and DeltamSq21 are fixed at their solar/reactor-measured values,
+matching how published atmospheric-oscillation analyses treat them.
 
-Unlike ``SolarSMOscillationModel``/``VacuumOscillationModel`` (whose
-``antinu`` flag is fixed once at construction, since a solar analysis only
-ever sees neutrinos and a reactor analysis only ever sees antineutrinos),
-``AtmosphericOscillationModel.oscillation`` takes ``antinu`` as a call-time
-argument: a real atmospheric-neutrino sample (e.g. IceCube's event-by-event
-Monte Carlo, tagged by PDG code sign) genuinely mixes neutrinos and
-antineutrinos within the same fit, and ``core.common.oscillation
-.OscillationParameters.antinu``/``core.common.pmns.PMNS.select_antinu``
-already support a per-event boolean tensor mask for exactly this reason.
-
-Does not itself compute a transition probability (unlike
-``SolarSMOscillationModel.predict_pee``/``VacuumOscillationModel
-.predict_pee``, which have one natural scalar observable, P_ee): an
-atmospheric detector needs the full flavour-transition matrix through
-Earth matter at each event's own (energy, nadir angle), which
-``tpeanuts.medium.earth.probability.earth_probability_transition`` already
-provides directly from an ``OscillationParameters`` object -- see
-``tpeanuts.detector.icecube.event_rate`` for that composition.
+Notes:
+    - Unlike the solar/vacuum models, ``antinu`` is a call-time argument to
+      ``oscillation`` rather than fixed at construction, since a real
+      atmospheric sample genuinely mixes neutrinos and antineutrinos within
+      the same fit.
+    - Does not itself compute a transition probability: unlike the solar
+      and vacuum models' single P_ee observable, an atmospheric detector
+      needs the full flavour-transition matrix through Earth matter at
+      each event's own (energy, nadir angle), computed directly from the
+      ``OscillationParameters`` this model builds.
 
 Module contents:
     FREE_PARAM_KEYS

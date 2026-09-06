@@ -24,7 +24,7 @@ import torch
 
 from tpeanuts.detector.borexino.event_rate import line_event_rate
 from tpeanuts.detector.borexino.inference_model import BorexinoEventRateModel
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.solar.probability import solar_probability_state
 from tpeanuts.medium.solar.profile import build_solar_medium
 from tpeanuts.source.solar import build_solar_source

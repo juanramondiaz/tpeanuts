@@ -16,23 +16,14 @@
 #      June 2026
 # =============================================================================
 
-"""
-Background-rate placeholder interface.
+"""Background-count utilities.
 
-No real per-experiment background model is implemented yet: Borexino's own
-backgrounds alone (14C, 210Po, 85Kr, 210Bi, cosmogenic isotopes, external
-gammas, ...) are a dedicated analysis in the source papers, not something to
-approximate here without a citable model. ``zero_background`` is the
-explicit placeholder every detector's ``event_rate.py`` uses until a real
-one is added -- explicit and zero, not silently omitted, so a future
-Poisson fit against real spectral data knows exactly what it is (and is
-not) accounting for.
+No experiment-specific background model is defined in this module. It only
+provides a zero-valued vector for calculations without a background model.
 
-Module contents:
+Module functions:
     zero_background(...)
-        A zero background-count vector, shaped for
-        ``tpeanuts.detector.common.event_rate.predicted_counts``'s
-        ``background_counts`` argument.
+        Return one zero background count per observed bin.
 """
 
 from __future__ import annotations

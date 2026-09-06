@@ -24,15 +24,14 @@ This package sits above ``tpeanuts.medium``/``tpeanuts.core`` the same way
 probabilities/rates, recover the oscillation parameters that best reproduce
 them, using PyTorch autograd rather than a derivative-free optimizer.
 
-Medium/detector-agnostic by design: this package carries no medium or
-detector concept of its own. Every concrete differentiable model lives with
-the physics it wraps instead --
-``tpeanuts.inference.solar_model``/``tpeanuts.medium.vacuum
-.oscillation_model`` for medium-level P_ee models, and each
-``tpeanuts.detector.<name>.inference_model`` for the detector-composition
-layer built on top -- and only needs to satisfy ``model.DifferentiableModel``
-(a ``free`` tuple and a single-argument ``predict(theta)``) to be usable by
-every function here.
+Medium/detector-agnostic by design: the medium-level P_ee models --
+``tpeanuts.inference.model_solar``, ``tpeanuts.inference.model_vacuum``,
+``tpeanuts.inference.model_atmosphere``, one per propagation medium -- live
+here directly, while each ``tpeanuts.detector.<name>.inference_model``
+composes the relevant one for the detector-composition layer built on top.
+Every such model, medium-level or detector-composed, only needs to satisfy
+``model.DifferentiableModel`` (a ``free`` tuple and a single-argument
+``predict(theta)``) to be usable by every function here.
 
 Package modules:
     model

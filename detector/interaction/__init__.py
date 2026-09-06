@@ -16,14 +16,13 @@
 #      June 2026
 # =============================================================================
 
-"""
-Neutrino interaction cross sections, organized by physical process.
+"""Cross sections for neutrino interaction processes.
 
-Organized by process rather than by detector, so a channel shared by two
-experiments (e.g. neutrino-electron elastic scattering, used by both
-Borexino and SNO's ES channel) is implemented once.
-
-Package modules:
+Module contents:
     neutrino_electron
-        Neutrino-electron elastic scattering, Standard Model tree level.
+        Elastic neutrino-electron scattering.
+    inverse_beta_decay
+        Electron-antineutrino inverse beta decay on free protons.
+    deuteron
+        Charged- and neutral-current neutrino-deuteron breakup.
 """

@@ -17,65 +17,51 @@
 # =============================================================================
 
 """
-Differentiable Daya Bay event-count model: real 6-reactor vacuum oscillation x real detector.
+Differentiable Daya Bay event-count model: 6-reactor vacuum oscillation x detector.
 
-``DayaBayDetectorModel`` wraps one of the 8 real Daya Bay detectors around a
-``tpeanuts.medium.vacuum.oscillation_model.VacuumOscillationModel``: it
-evaluates ``VacuumOscillationModel.predict_pee`` once per reactor (6 cheap
-vacuum-probability calls, each at that reactor's own real baseline), then
-calls ``tpeanuts.detector.dayabay.event_rate.ibd_event_rate`` to fold the
-real 6-reactor flux sum through the real IBD cross section, real response,
-and real background. ``JointDayaBayModel`` concatenates all 8 detectors'
-predictions for a single combined fit.
+``DayaBayDetectorModel`` wraps one of the 8 Daya Bay detectors around a
+``VacuumOscillationModel``: it evaluates ``predict_pee`` once per reactor
+(6 vacuum-probability calls, each at that reactor's own baseline), then
+folds the resulting flux sum through the IBD cross section, response and
+background via ``event_rate.ibd_event_rate``. ``JointDayaBayModel``
+concatenates all 8 detectors' predictions for a combined fit.
 
-When ``normalization_free=True`` (the default), ``DayaBayDetectorModel``
-appends one extra free parameter, ``global_normalization``, to
-``oscillation_model.free``: Daya Bay's own real, official free-normalization
-nuisance (``parameters/detector_normalization.yaml``, nominal value
-``detector.dayabay.parameters.GLOBAL_NORMALIZATION_NOMINAL`` = 1.0), fit
-alongside the oscillation parameters rather than fixed. Without it, a
-rate-only (or even a full-shape) fit with millions of real events has
-essentially zero Poisson error on the total rate and is forced to distort
-the oscillation parameters themselves to absorb the real, documented ~20%
-gap between this project's absolute prediction and the observed total (see
-``detector.dayabay.event_rate`` module docstring) -- exactly the failure
-mode ``normalization_free`` exists to avoid.
-
-When ``background_free=True`` (default False), ``DayaBayDetectorModel``
-further appends 5 real per-category background-rate nuisances,
-``BACKGROUND_NUISANCE_PARAMS`` (one real correlated scale per
-``detector.dayabay.parameters.BG_CATEGORIES`` entry, nominal 1.0), meant to
-be fit with a Gaussian prior of width
-``detector.dayabay.parameters.BACKGROUND_CATEGORY_SIGMA`` (see
-``tpeanuts.inference.likelihood.gaussian_prior_penalty`` and
-``tpeanuts.inference.fit.fit_lbfgs``'s ``penalty_fn``) -- a real, externally
-measured constraint, not a free-floating extra degree of freedom. Even after
-``normalization_free`` fixes the rate-only fit, a full-shape fit still runs
-to unphysical oscillation parameters at Daya Bay's real ~3-million-event
-statistics, because a single flat ``global_normalization`` cannot absorb
-energy-dependent residuals; letting the background-rate
-nuisances float (within their real uncertainties) gives the fit real degrees
-of freedom to absorb some of that residual shape mismatch instead of
-distorting theta13/DeltamSq31.
+Notes:
+    - When ``normalization_free=True`` (default), the model appends one
+      extra free parameter, ``global_normalization`` (Daya Bay's own
+      free-normalization nuisance, nominal 1.0), fit alongside the
+      oscillation parameters. Without it, a fit with millions of events
+      has essentially zero Poisson error on the total rate and is forced
+      to distort the oscillation parameters themselves to absorb the
+      documented ~20% gap between this project's absolute prediction and
+      the observed total (see ``event_rate`` module docstring).
+    - When ``background_free=True`` (default False), the model further
+      appends 5 per-category background-rate nuisances,
+      ``BACKGROUND_NUISANCE_PARAMS`` (nominal 1.0), meant to be fit with a
+      Gaussian prior of width ``parameters.BACKGROUND_CATEGORY_SIGMA`` -- an
+      externally measured constraint, not a free-floating degree of
+      freedom. Even after ``normalization_free``, a full-shape fit can
+      still run to unphysical oscillation parameters, since a single flat
+      normalization cannot absorb energy-dependent residuals; the
+      background nuisances give the fit real freedom to absorb some of
+      that residual shape mismatch instead.
 
 Module contents:
     DayaBayDetectorModel
-        One real detector's predicted counts per analysis bin, as a
-        function of oscillation parameters (+ global_normalization,
-        + background-rate nuisances, + LSNL pull-curve nuisances).
+        One detector's predicted counts per analysis bin, as a function of
+        oscillation parameters (+ global_normalization, + background-rate
+        nuisances, + LSNL pull-curve nuisances).
     DayaBayExperimentalModel
         Reparametrizes a Daya Bay model's free vector as
         (sin^2(2 theta13), Delta m^2_ee) instead of the bare PMNS
         (theta13, Delta m^2_3l) -- Daya Bay's own reported observables.
     JointDayaBayModel
         Concatenates several DayaBayDetectorModel predictions sharing one
-        theta -- pass all 8 real detectors for the full combined fit.
+        theta -- pass all 8 detectors for the full combined fit.
     NearFarRatioDayaBayModel
-        Predicts the real far-hall/near-hall per-bin count ratio instead of
-        absolute counts -- cancels systematics common to every detector
-        (``global_normalization``, and much of any residual IAV/LSNL/cross-
-        section *shape* mismatch, exactly by construction) the way Daya
-        Bay's own original near/far measurement strategy does.
+        Predicts the far-hall/near-hall per-bin count ratio instead of
+        absolute counts, cancelling systematics common to every detector
+        the way Daya Bay's own original near/far measurement strategy does.
 """
 
 from __future__ import annotations
@@ -96,7 +82,7 @@ from tpeanuts.detector.dayabay.parameters import (
     N_PROTONS,
     REACTORS,
 )
-from tpeanuts.medium.vacuum.oscillation_model import VacuumOscillationModel
+from tpeanuts.inference.model_vacuum import VacuumOscillationModel
 
 NORMALIZATION_PARAM: str = "global_normalization"
 BACKGROUND_NUISANCE_PARAMS: tuple[str, ...] = tuple(f"bg_scale_{category}" for category in BG_CATEGORIES)
@@ -105,7 +91,7 @@ LSNL_PULL_PARAMS: tuple[str, ...] = tuple(f"lsnl_pull_{k}" for k in range(4))
 
 @dataclass(frozen=True)
 class DayaBayDetectorModel:
-    """Predicted Daya Bay IBD counts per analysis bin for one real detector.
+    """Predicted Daya Bay IBD counts per analysis bin for one detector.
 
     Parameters
     ----------
@@ -114,30 +100,25 @@ class DayaBayDetectorModel:
         ``free``/``predict_pee(theta, L_km, E_grid)``, shared by every
         detector and every one of its 6 reactors in a joint fit.
     detector:
-        Detector name, e.g. "AD11" (see
-        ``detector.dayabay.parameters.DETECTORS``).
+        Detector name, e.g. "AD11".
     n_target, exposure_seconds, background_counts:
-        Optional overrides forwarded to
-        ``detector.dayabay.event_rate.ibd_event_rate``; None uses that
-        function's own real-data defaults (real target protons, real
-        8AD-period exposure, real background).
+        Optional overrides forwarded to ``event_rate.ibd_event_rate``;
+        None uses that function's own defaults.
     normalization_free:
-        If True (default), ``theta`` carries Daya Bay's own real
-        ``global_normalization`` nuisance (see module docstring) right
-        after the oscillation parameters; if False, it is omitted and the
-        signal is left unscaled (``signal_scale=1.0``).
+        If True (default), ``theta`` carries the ``global_normalization``
+        nuisance (see module docstring) right after the oscillation
+        parameters; if False, it is omitted and the signal is left
+        unscaled (``signal_scale=1.0``).
     background_free:
         If True (default False), ``theta``'s next 5 entries (after
-        ``global_normalization``, if present) are the real per-category
-        background-rate nuisances, ``BACKGROUND_NUISANCE_PARAMS`` (see
-        module docstring); if False, every category is left at its real
-        nominal rate (scale 1.0).
+        ``global_normalization``, if present) are the per-category
+        background-rate nuisances, ``BACKGROUND_NUISANCE_PARAMS``; if
+        False, every category is left at its nominal rate (scale 1.0).
     lsnl_free:
-        If True (default False), ``theta``'s final 4 entries are the real
-        LSNL pull-curve nuisances, ``LSNL_PULL_PARAMS`` (official prior:
-        independent, zero-mean, unit-sigma -- see
-        ``detector.dayabay.response._lsnl_warp_matrix``); if False, the
-        real nominal LSNL curve is used unchanged.
+        If True (default False), ``theta``'s final 4 entries are the LSNL
+        pull-curve nuisances, ``LSNL_PULL_PARAMS`` (official prior:
+        independent, zero-mean, unit-sigma); if False, the nominal LSNL
+        curve is used unchanged.
     """
 
     oscillation_model: VacuumOscillationModel
@@ -162,7 +143,7 @@ class DayaBayDetectorModel:
         return free
 
     def predict(self, theta: torch.Tensor) -> torch.Tensor:
-        """Predict this detector's real analysis-bin counts from ``theta``.
+        """Predict this detector's analysis-bin counts from ``theta``.
 
         Args:
             theta: 1-D free-parameter tensor in ``self.free`` order (see
@@ -213,9 +194,9 @@ class JointDayaBayModel:
     Parameters
     ----------
     models:
-        ``DayaBayDetectorModel`` instances (typically all 8 real
-        detectors), evaluated at the same ``theta`` and concatenated in
-        the given order.
+        ``DayaBayDetectorModel`` instances (typically all 8 detectors),
+        evaluated at the same ``theta`` and concatenated in the given
+        order.
     """
 
     models: tuple[DayaBayDetectorModel, ...]
@@ -245,35 +226,26 @@ EXPERIMENTAL_PARAM_KEYS: tuple[str, ...] = ("SinSq2Theta13", "DeltamSqEE")
 class DayaBayExperimentalModel:
     """Reparametrizes a Daya Bay model's first two free parameters as (sin^2(2 theta13), Delta m^2_ee).
 
-    Daya Bay's own combined analyses report (F. P. An et al., Phys. Rev.
-    Lett. 130, 161802 (2023), the notebook's reference [2]; the ``Delta
-    m^2_ee`` construction itself is due to H. Nunokawa, S. Parke, R.
-    Zukanovich Funchal, Phys. Rev. D 72, 013009 (2005)) their oscillation
-    result as ``sin^2(2 theta13)`` and the effective splitting
+    Daya Bay's own combined analyses (An et al., PRL 130, 161802 (2023))
+    report their oscillation result as ``sin^2(2 theta13)`` and the
+    effective splitting
 
         Delta m^2_ee = cos^2(theta12) Delta m^2_31 + sin^2(theta12) Delta m^2_32,
 
     not the bare PMNS ``(theta13, Delta m^2_3l)`` this package's
     ``VacuumOscillationModel`` natively exposes. With ``theta12``/``Delta
-    m^2_21`` fixed (this package's convention throughout, see
-    ``detector.dayabay.inference_model`` module docstring), the two
-    parametrizations carry identical information -- ``Delta m^2_ee`` and
-    ``Delta m^2_31`` differ only by the fixed offset
+    m^2_21`` fixed, the two parametrizations carry identical information --
+    ``Delta m^2_ee`` and ``Delta m^2_31`` differ only by the fixed offset
 
         Delta m^2_31 = Delta m^2_ee + sin^2(theta12) Delta m^2_21
 
-    (substituting ``Delta m^2_32 = Delta m^2_31 - Delta m^2_21`` into the
-    ``Delta m^2_ee`` definition above and solving) -- so this wrapper is a
-    pure change of variables, not a different fit; it exists so a fit's
-    free-parameter vector and any resulting contour are directly comparable
-    to Daya Bay's own published numbers/plots without a manual conversion
-    step, and so LBFGS sees two parameters of comparable, well-conditioned
-    magnitude (both real Daya Bay ``theta13`` and ``Delta m^2_3l`` already
-    differ by ~4 orders of magnitude in radians/eV^2; ``Delta m^2_ee`` has
-    the same magnitude as ``Delta m^2_3l`` so this wrapper does not change
-    that particular conditioning, but ``sin^2(2 theta13)`` -- an amplitude
-    in [0, 1] -- is often better conditioned than an angle in radians for a
-    fit started far from its optimum).
+    so this wrapper is a pure change of variables, not a different fit; it
+    exists so a fit's free-parameter vector and any resulting contour are
+    directly comparable to Daya Bay's own published numbers without a
+    manual conversion step, and so LBFGS sees better-conditioned parameters
+    (``sin^2(2 theta13)``, an amplitude in [0, 1], is often better
+    conditioned than an angle in radians for a fit started far from its
+    optimum).
 
     Parameters
     ----------
@@ -321,43 +293,35 @@ class DayaBayExperimentalModel:
 
 @dataclass(frozen=True)
 class NearFarRatioDayaBayModel:
-    """Predicts the real far-hall/near-hall per-analysis-bin count ratio.
+    """Predicts the far-hall/near-hall per-analysis-bin count ratio.
 
-    Daya Bay's original 2012 discovery of theta13 (F. P. An et al., Phys.
-    Rev. Lett. 108, 171803 (2012), this package's notebook reference [3])
-    was a near/far *comparison*: EH1 (AD11/AD12) and EH2 (AD21/AD22) sit at
-    real flux-weighted baselines short enough (~560/600 m) that they are
-    only weakly oscillated, while EH3 (AD31-AD34, ~1640 m) sees the full
-    real oscillation deficit -- so a far/near ratio isolates the
-    oscillation signal while cancelling, by construction, every systematic
-    common to all 8 real detectors:
+    Daya Bay's original 2012 discovery of theta13 (An et al., PRL 108,
+    171803 (2012)) was a near/far comparison: EH1 (AD11/AD12) and EH2
+    (AD21/AD22) sit at baselines short enough (~560/600 m) to be only
+    weakly oscillated, while EH3 (AD31-AD34, ~1640 m) sees the full
+    oscillation deficit -- so a far/near ratio isolates the oscillation
+    signal while cancelling, by construction, every systematic common to
+    every detector:
 
         R_k(theta) = N_k^far(theta) / N_k^near(theta),
         N_k^{near,far}(theta) = sum_{d in NEAR_DETECTORS,FAR_DETECTORS} N_{k,d}(theta),
 
-    with ``N_{k,d}`` each real detector's own full per-bin prediction
-    (``DayaBayDetectorModel.predict``, same real 6-reactor flux, real
-    order-1/M cross section, real IAV+LSNL+Gaussian response). Because
-    every detector shares the identical response/cross-section/efficiency
-    functions in this project's model, a shared multiplicative factor --
-    in particular ``global_normalization`` -- cancels *exactly* in the
-    ratio regardless of its value, and any *residual* mismatch between this
-    project's simplified response and the true one (the LSNL/IAV pull-curve
-    freedom Sections 5.2-5.3 showed is not otherwise absorbable) cancels
-    *approximately*, since it multiplies both the near and far prediction
-    the same way. This is a real, if simplified, version of Daya Bay's own
-    original near/far strategy -- not a full multi-baseline global fit
-    (which would additionally weight each near detector by its own
-    baseline-dependent oscillation deficit), but a substantial
-    simplification relative to a bare absolute-count fit.
+    with ``N_{k,d}`` each detector's own full per-bin prediction
+    (``DayaBayDetectorModel.predict``). Because every detector shares the
+    same response/cross-section/efficiency functions, a shared
+    multiplicative factor -- in particular ``global_normalization`` --
+    cancels exactly in the ratio, and any residual mismatch between this
+    project's simplified response and the true one cancels approximately,
+    since it multiplies both the near and far prediction the same way.
+    This is a simplified version of Daya Bay's own original near/far
+    strategy, not a full multi-baseline global fit.
 
     Parameters
     ----------
     near_models, far_models:
-        ``DayaBayDetectorModel`` instances for
-        ``detector.dayabay.parameters.NEAR_DETECTORS``/``FAR_DETECTORS``
-        respectively, all sharing the same ``oscillation_model`` (hence the
-        same ``free``).
+        ``DayaBayDetectorModel`` instances for ``parameters
+        .NEAR_DETECTORS``/``FAR_DETECTORS`` respectively, all sharing the
+        same ``oscillation_model`` (hence the same ``free``).
     """
 
     near_models: tuple[DayaBayDetectorModel, ...]
@@ -369,13 +333,13 @@ class NearFarRatioDayaBayModel:
         return self.near_models[0].free
 
     def predict(self, theta: torch.Tensor) -> torch.Tensor:
-        """Predict the real far/near per-bin count ratio from ``theta``.
+        """Predict the far/near per-bin count ratio from ``theta``.
 
         Args:
             theta: 1-D free-parameter tensor, shared by every wrapped model.
 
         Returns:
-            Real tensor shaped ``(n_bins,)``, ``N_far(theta) / N_near(theta)``.
+            Tensor shaped ``(n_bins,)``, ``N_far(theta) / N_near(theta)``.
         """
         near_total = sum(model.predict(theta) for model in self.near_models)
         far_total = sum(model.predict(theta) for model in self.far_models)
@@ -385,7 +349,7 @@ class NearFarRatioDayaBayModel:
     def real_observed_ratio(
         *, device: Optional[torch.device] = None, dtype: torch.dtype = torch.float64,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Real observed far/near per-bin count ratio and its propagated 1-sigma uncertainty.
+        """Observed far/near per-bin count ratio and its propagated 1-sigma uncertainty.
 
         Args:
             device, dtype: Target tensor device/dtype.

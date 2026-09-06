@@ -19,33 +19,23 @@
 """
 Differentiable vacuum-medium P_ee(E, L) reactor antineutrino oscillation model.
 
-``VacuumOscillationModel`` is medium physics, not detector physics: any
-reactor experiment (currently only ``detector.dayabay``) wraps this in its
-own composition-layer ``inference_model.py`` rather than duplicating the
-vacuum-propagation path. Mirrors ``tpeanuts.inference.solar_model
-.SolarSMOscillationModel``, but builds ``OscillationParameters`` with
-``antinu=True`` (reactors emit nu_e_bar) and predicts P_ee via
-``tpeanuts.medium.vacuum.probability.vacuum_probability_state`` instead of
-the solar/Earth matter path -- reactor baselines are traversed in vacuum,
-so no medium profile is needed. Getting a nonzero gradient through this
-path at all required removing ``@torch.no_grad()`` from
-``core.common.pmns.PMNS.select_antinu``: for ``antinu=True`` it used to
-compute ``U.conj()`` *inside* a no-grad block, silently detaching every
-mixing-angle gradient (theta12/theta13/theta23/delta) whenever antinu=True
--- invisible in every earlier (neutrino-only) notebook, since the
-``antinu=False`` branch there is a no-op (returns ``U`` unchanged) and
-never actually severed the graph.
+Medium physics, not detector physics: any reactor experiment wraps this in
+its own detector-composition layer instead of duplicating the vacuum-
+propagation path. Builds
+``OscillationParameters`` with ``antinu=True`` (reactors emit nu_e_bar) and
+predicts P_ee via vacuum propagation directly, since reactor baselines are
+traversed in vacuum and need no medium profile.
 
-Like ``SolarSMOscillationModel``, only theta12/theta13/DeltamSq21/DeltamSq3l
-affect P_ee (theta23/delta13 drop out of the same |U_ei|^2 combination,
-confirmed by direct gradient check: d(P_ee)/d(theta23) = d(P_ee)/d(delta)
-= 0 to floating-point precision), so ``FREE_PARAM_KEYS`` mirrors
-``tpeanuts.inference.solar_model.FREE_PARAM_KEYS`` (kept as its
-own copy rather than a cross-medium import: the coincidence that both
-media share the same four names does not make solar and vacuum the same
-package).
+Notes:
+    - Only theta12, theta13, DeltamSq21 and DeltamSq3l affect P_ee; theta23
+      and the CP phase drop out of the survival probability and are held
+      fixed, matching ``model_solar.FREE_PARAM_KEYS`` (kept as its own copy
+      here, since the two media sharing the same four free names is not a
+      reason to import across packages).
 
 Module contents:
+    FREE_PARAM_KEYS
+        The four parameter names ``VacuumOscillationModel`` can free.
     VacuumOscillationModel
         Holds the fixed parameters and predicts P_ee(E, L) from a
         free-parameter tensor, antinu=True vacuum propagation.
@@ -78,7 +68,7 @@ class VacuumOscillationModel:
     """Differentiable SM reactor nu_e_bar survival-probability model.
 
     Same free/fixed structure as
-    ``tpeanuts.inference.solar_model.SolarSMOscillationModel``, but
+    ``tpeanuts.inference.model_solar.SolarSMOscillationModel``, but
     builds ``OscillationParameters(antinu=True)`` and evaluates ``P_ee(E, L)``
     in vacuum (see module docstring).
 

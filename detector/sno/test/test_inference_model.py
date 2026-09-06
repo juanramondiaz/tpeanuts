@@ -24,7 +24,7 @@ import pytest
 import torch
 
 from tpeanuts.detector.sno.inference_model import SNODayNightModel
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.solar.profile import build_solar_medium
 from tpeanuts.source.solar import build_solar_source
 from tpeanuts.util.context import RuntimeContext

@@ -19,56 +19,23 @@
 """
 Differentiable solar-medium P_ee(E) oscillation models.
 
-These models are medium physics, not detector physics: any detector fed by
-solar neutrinos (``detector.borexino``, ``detector.sno``) wraps one of these
-in its own composition-layer ``inference_model.py`` rather than duplicating
-the solar-production/MSW-conversion path. They build a fresh
-``OscillationParameters`` from a 1-D free-parameter tensor on every call (no
-caching across calls), so the computation graph from the free parameters to
-the predicted P_ee stays intact for ``torch.autograd``. They bypass
-``tpeanuts.pipeline.solar`` (whose ``propagate_solar_to_surface`` is wrapped
-in ``@torch.no_grad()``) and call
-``tpeanuts.medium.solar.probability.solar_probability_state`` directly,
-which is not decorated.
+Medium physics, not detector physics: any solar-fed detector wraps one of
+these models in its own detector-composition layer instead of duplicating
+the solar-production/MSW-conversion path. Each model builds a fresh
+``OscillationParameters`` from a 1-D free-parameter tensor on every call, so
+autograd can differentiate the predicted P_ee with respect to it.
 
-Only theta12, theta13, DeltamSq21, and DeltamSq3l affect P_ee (theta23 and
-delta13 drop out of |U_ei|^2 for the standard 3-flavour PMNS parametrisation,
-see ``core.SM.sm_pmns.PMNS_SM.pmns_matrix``'s product structure), so those
-two are held fixed at their preset value and never appear in ``free``.
-
-``SolarNSIOscillationModel`` is the NSI counterpart, adding a single diagonal
-NSI coupling ``eps_ee`` on top of the same four SM parameters. It builds its
-``NSIConfig`` directly from the ``eps_ee`` scalar field
-(``NSIConfig(eps_ee=eps_ee, ...)``): ``NSIConfig.epsilon_tensor_base`` is
-built entirely with differentiable ``torch`` ops (``torch.complex``/
-``torch.stack``, see ``core.BSM.bsm_nsi._hermitian_3x3``), so a
-differentiable ``eps_ee`` tensor stays connected through to ``epsilon``
-without needing ``NSIConfig.from_raw_epsilon`` -- that classmethod remains
-only for the rare case of an ``epsilon`` matrix that does not decompose
-into the ``eps_*`` scalar parametrization at all (see its own docstring),
-which does not apply here.
-Because ``solar_probability_mass`` rejects NSI under
-``method="adiabatic_approximated"`` (its closed-form matter-mixing-angle
-formulas have no NSI generalisation), this model always evaluates
-``solar_probability_state`` with ``method="adiabatic_exact"`` (pointwise
-Hamiltonian diagonalisation) -- see ``medium.solar.adiabatic
-.mass_weights_adiabatic_exact`` and ``core.common.hamiltonian
-.hamiltonian_flavour``, both of which needed their own
-``@torch.no_grad()`` removed (together with ``core.common.potential`` and
-``PMNS.flavour_basis``/``PMNS_SM.outer_block``) for this path to be
-differentiable; ``SolarSMOscillationModel`` above is unaffected by and does
-not require that second round of changes.
-
-``SolarPointModel`` adapts either model to
-``tpeanuts.inference.model.DifferentiableModel``'s single-argument
-``predict(theta)`` contract, for the direct pointwise-P_ee fits
-(``notebooks/inference/inference1_borexino.ipynb``/
-``inference2_borexino_nsi.ipynb``) that evaluate P_ee at a fixed set of
-(source, energy) data points rather than through a detector's binned
-composition layer -- those already bind their own fixed covariates as
-dataclass fields (``detector.borexino.inference_model.BorexinoEventRateModel``,
-``detector.sno.inference_model.SNODayNightModel``) and implement
-``predict(theta)`` directly.
+Notes:
+    - Only theta12, theta13, DeltamSq21 and DeltamSq3l affect P_ee; theta23
+      and the CP phase drop out of the survival probability and are held
+      fixed at their preset value.
+    - ``SolarNSIOscillationModel`` adds a single diagonal NSI coupling,
+      ``eps_ee``, on top of the same four parameters, and always evaluates
+      the exact (pointwise Hamiltonian-diagonalisation) propagation method,
+      since the fast adiabatic approximation has no NSI generalisation.
+    - ``SolarPointModel`` adapts either model to a plain, single-argument
+      ``predict(theta)``, for fits against a fixed set of (source, energy)
+      data points rather than through a detector's binned response.
 
 Module contents:
     FREE_PARAM_KEYS

@@ -19,23 +19,20 @@
 """
 2-D -2 ln L confidence maps: grid scans and Monte-Carlo threshold calibration.
 
-``loglik_grid`` is a reusable version of the by-hand grid loop
-``notebooks/inference/inference2_borexino_nsi.ipynb`` used for its chi2
-landscape: fix (or, with ``profile_others=True``, re-minimize) every
-parameter except two, evaluate the selected ``-2 ln L`` statistic on a
-``(param_x, param_y)`` grid, and draw confidence contours at
-``CHI2_LEVELS_2D``'s Delta(-2 ln L) thresholds (Wilks' theorem, 2 degrees of
-freedom).
+``loglik_grid`` fixes (or, with ``profile_others=True``, re-minimizes) every
+free parameter except two, evaluates the selected ``-2 ln L`` statistic on a
+``(param_x, param_y)`` grid, and draws confidence contours at
+``CHI2_LEVELS_2D``'s asymptotic Delta(-2 ln L) thresholds (Wilks' theorem,
+2 degrees of freedom).
 
-``calibrate_delta_threshold`` checks that Wilks' theorem actually holds at
-a given exposure/statistics level instead of assuming it: it simulates many
-toy datasets at a known truth, refits each, and returns the *empirical*
-quantile of Delta(-2 ln L) between the truth and each toy's own best fit --
-the parametric-bootstrap alternative to ``CHI2_LEVELS_2D``'s asymptotic
-table values, useful whenever Poisson-limited (low-count) statistics put
-the Laplace/Fisher sigma's asymptotic-normality assumption in doubt; the
-same assumption underlies both the Laplace sigma and the chi-square table
-used for grid contours.
+Notes:
+    - ``calibrate_delta_threshold`` checks that Wilks' theorem actually
+      holds at a given exposure/statistics level instead of assuming it: it
+      simulates many toy datasets at a known truth, refits each, and
+      returns the empirical quantile of Delta(-2 ln L) between the truth
+      and each toy's own best fit. Use it whenever low-count, Poisson-
+      limited statistics put the asymptotic-normality assumption behind
+      both the Laplace sigma and ``CHI2_LEVELS_2D`` in doubt.
 
 Module contents:
     CHI2_LEVELS_2D

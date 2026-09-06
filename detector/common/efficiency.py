@@ -16,20 +16,13 @@
 #      June 2026
 # =============================================================================
 
-"""
-Detection/selection efficiency application, in reconstructed-energy space.
+"""Detection efficiencies on a reconstructed-observable grid.
 
-Efficiency (fiducial-volume cuts, trigger, analysis selection) is applied
-*after* ``tpeanuts.detector.common.response.gaussian_response_matrix``
-smearing, not before: analysis cuts act on the reconstructed observable T',
-not the true one T.
-
-Module contents:
+Module functions:
     apply_efficiency(...)
-        Multiply a reconstructed-energy spectrum by an efficiency curve.
+        Multiply a reconstructed spectrum by an efficiency curve.
     step_efficiency(...)
-        A hard energy-threshold efficiency curve (eps=0 below threshold,
-        1 above), the common baseline before any finer-grained cut is added.
+        Evaluate a zero-or-one threshold efficiency on a grid.
 """
 
 from __future__ import annotations

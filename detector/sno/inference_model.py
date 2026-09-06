@@ -68,7 +68,7 @@ from tpeanuts.detector.sno.io import load_coszenith_exposure, total_livetime_day
 import tpeanuts.detector.sno.parameters as sno_parameters
 from tpeanuts.detector.sno.event_rate import cc_event_rate, es_event_rate, nc_event_rate
 from tpeanuts.medium.earth.probability import earth_probability_state
-from tpeanuts.inference.solar_model import SolarSMOscillationModel
+from tpeanuts.inference.model_solar import SolarSMOscillationModel
 from tpeanuts.medium.solar.probability import solar_probability_mass
 from tpeanuts.medium.solar.profile import SolarMediumProfile
 from tpeanuts.source.solar import SolarLineSpectrum, SolarNeutrinoSource

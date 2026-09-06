@@ -16,72 +16,35 @@
 #      June 2026
 # =============================================================================
 
-"""
-Inverse beta decay cross section: nu_e_bar + p -> e+ + n.
-
-The reaction every reactor antineutrino experiment (KamLAND, Daya Bay,
-Double Chooz, RENO, ...) detects through, in two real, published forms:
+"""Inverse beta decay cross sections for nu_e_bar + p -> e+ + n.
 
 - ``sigma_ibd``/``ibd_cross_section_grid``: the zeroth-order (no-recoil)
-  approximation of Vogel & Beacom, Phys. Rev. D60, 053003 (1999) [VB99],
-  Eq. (10)-(11):
+  approximation of Vogel and Beacom, Phys. Rev. D60, 053003 (1999),
+  Eqs. (10)-(11):
 
       sigma(E_nu) ~= sigma0 * (f^2+3g^2) * E_e * p_e,  E_e = E_nu - Delta_np,
                                                         p_e = sqrt(E_e^2 - m_e^2)
 
-  with ``sigma0*(f^2+3g^2) = SIGMA0_IBD_CM2_PER_MEV2`` (util.constant).
-  This neglects O(1/M) recoil, weak-magnetism, and the resulting positron
-  scattering-angle dependence.
+  This neglects order-1/M recoil, weak magnetism and angular dependence.
 - ``sigma_ibd_diff_cos_precise``/``ibd_cross_section_grid_precise``: the
-  full order-1/M formula, VB99 Eq. (13)-(15), which keeps the positron
-  energy's dependence on the antineutrino-positron angle and is valid down
-  to threshold (VB99's own Eq. (18)-(19) "high-energy limit" formula is
-  *not* used here precisely because VB99 states it neglects the threshold,
-  "a large effect" below ~30 MeV -- reactor antineutrinos are all below
-  10 MeV). ``ibd_cross_section_grid_precise`` reproduces VB99's own
-  numerical-integration approach (their Figs. 1-2 "solid line"): it
-  integrates Eq. (14) over cos(theta) on a fixed grid, converting each
-  angular node's positron energy into a prompt-energy contribution via
-  ``tpeanuts.detector.common.response.scatter_add_linear``.
+  order-1/M formula from Eqs. (13)-(15), integrated numerically over the
+  positron angle.
 
-``ibd_cross_section_grid``/``ibd_cross_section_grid_precise`` both return
-the distribution in the experimentally reported prompt energy,
+Both grid functions use the visible prompt energy
 
     E_prompt = T_e+ + 2 m_e = E_e + m_e,
 
-where the ``2 m_e`` (equivalently ``+m_e`` on top of the total positron
-energy ``E_e``) accounts for both annihilation photons. This distinction is
-essential when comparing with reactor prompt-energy spectra.
+where the annihilation photons contribute ``2 m_e``.
 
-Vogel-Beacom's bare ``sigma0`` (VB99 Eq. (9)) does not depend on f/g/f2, so
-``ibd_cross_section_grid_precise`` computes it directly, independent of
-which f/g/f2 values it is then combined with (Daya Bay's own real
-``ibd_constants.yaml`` values, in this project's usage, rather than VB99's
-own slightly older f=1, g=1.26 benchmark values used for Eq. (10)-(11)'s
-0.0952e-42 coefficient):
-
-    sigma0 = G_F^2 cos^2(theta_C) / pi * (1 + Delta_inner^R)
-
-with ``cos(theta_C) = 0.974`` (Cabibbo angle) and the (energy-independent)
-inner radiative correction ``Delta_inner^R ~= 0.024`` (VB99, citing Towner,
-Phys. Rev. C58, 1288 (1998)), converted from natural units via
-``(hbar*c)^2``. This reproduces VB99's own quoted 0.0952e-42 cm^2/MeV^2
-coefficient to ~1% when recombined with VB99's f=1, g=1.26 -- the residual
-difference is these two input-value vintages (Delta_inner^R, cos(theta_C)
-rounding), not a formula error.
-
-Module contents:
+Module functions:
     sigma_ibd(...)
-        Zeroth-order total IBD cross section (see caveat above).
+        Calculate the zeroth-order total cross section.
     ibd_cross_section_grid(...)
-        Zeroth-order differential cross section on an (E_nu_grid, T_grid)
-        pair, ready for ``event_rate.true_observable_spectrum``.
+        Evaluate the zeroth-order prompt-energy distribution on a grid.
     sigma_ibd_diff_cos_precise(...)
-        Order-1/M differential cross section dsigma/dcos(theta), VB99
-        Eq. (14)-(15).
+        Calculate the order-1/M angular differential cross section.
     ibd_cross_section_grid_precise(...)
-        Order-1/M differential cross section on an (E_nu_grid, T_grid)
-        pair, built by numerical cos(theta) integration (see above).
+        Evaluate the order-1/M prompt-energy distribution on a grid.
 """
 
 from __future__ import annotations
@@ -105,8 +68,7 @@ def sigma_ibd(E_nu_MeV: torch.Tensor) -> torch.Tensor:
     """Zeroth-order (no-recoil) total IBD cross section, cm^2.
 
     sigma(E_nu) = sigma0 * E_e * p_e for E_nu > IBD_THRESHOLD_MEV, else 0,
-    with E_e = E_nu - Delta_np and p_e = sqrt(E_e^2 - m_e^2). See module
-    docstring for the reference and the approximation it makes.
+    with E_e = E_nu - Delta_np and p_e = sqrt(E_e^2 - m_e^2).
 
     Args:
         E_nu_MeV: Antineutrino energy, any shape.
@@ -133,8 +95,7 @@ def ibd_cross_section_grid(
     ``E_prompt = E_nu - Delta_np + m_e`` (no-recoil kinematics), represented as
     a triangular kernel one ``T_grid_MeV`` spacing wide so that, for each
     ``E_nu``, integrating the returned column over ``T_grid_MeV`` reproduces
-    ``sigma_ibd(E_nu)`` to the grid's own resolution -- the same numerical
-    stand-in for a delta function ``detector.interaction.deuteron`` uses.
+    ``sigma_ibd(E_nu)`` to the grid's own resolution.
 
     Args:
         E_nu_grid_MeV: True antineutrino energy grid, shape ``(n_E,)``.
@@ -157,7 +118,14 @@ def ibd_cross_section_grid(
 
 
 def _sigma0_bare_cm2_per_mev4() -> float:
-    """Bare sigma0 (VB99 Eq. 9), cm^2/MeV^4, independent of f/g/f2 (see module docstring)."""
+    """Calculate the coupling-independent cross-section coefficient.
+
+    Args:
+        None.
+
+    Returns:
+        Bare Vogel-Beacom coefficient in cm^2/MeV^4.
+    """
     hbarc_MeV_cm = constant.HBARC_MeV_m * 100.0
     sigma0_natural = (
         constant.G_F_MEV_M2 ** 2 * _COS_THETA_CABIBBO ** 2 / math.pi * (1.0 + _DELTA_INNER_RADIATIVE)
@@ -178,10 +146,8 @@ def sigma_ibd_diff_cos_precise(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Order-1/M differential IBD cross section dsigma/dcos(theta), VB99 Eq. (14)-(15).
 
-    ``f``, ``g``, ``f2`` default to Daya Bay's own real published values
-    (``parameters/ibd_constants.yaml`` in the official data release: vector
-    coupling, axial-vector coupling, and the anomalous nucleon isovector
-    magnetic moment). The recoil term (VB99 Eq. 15's ``Gamma``) is evaluated
+    ``f``, ``g`` and ``f2`` are the vector, axial-vector and anomalous
+    isovector magnetic couplings. The recoil term (VB99 Eq. 15's ``Gamma``) is evaluated
     as ``p_e^(0) * Gamma`` in an algebraically rearranged form that removes
     the ``1/v_e^(0)`` terms' apparent singularity at threshold (each such
     term is exactly cancelled by the ``p_e^(0)`` prefactor multiplying
@@ -253,12 +219,9 @@ def ibd_cross_section_grid_precise(
     """Order-1/M differential IBD cross section dsigma/dT, VB99 Eq. (14)-(15).
 
     Built by numerically integrating ``sigma_ibd_diff_cos_precise`` over
-    cos(theta) on a uniform ``n_cos``-point trapezoidal grid -- the same
-    numerical-integration approach VB99 use for their own plotted results
-    (see module docstring) -- and redistributing each angular node's cross-
-    section contribution onto ``T_grid_MeV`` at its order-1/M prompt energy
-    ``E_prompt = E_e1 + m_e`` via
-    ``tpeanuts.detector.common.response.scatter_add_linear``.
+    cos(theta) on a uniform ``n_cos``-point trapezoidal grid. Each angular
+    contribution is redistributed linearly onto ``T_grid_MeV`` at its
+    order-1/M prompt energy, ``E_prompt = E_e1 + m_e``.
 
     Args:
         E_nu_grid_MeV: True antineutrino energy grid, shape ``(n_E,)``.

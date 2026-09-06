@@ -17,56 +17,43 @@
 # =============================================================================
 
 """
-Real Daya Bay detector response: IAV redistribution, LSNL nonlinearity, Gaussian resolution.
+Daya Bay detector response: IAV redistribution, LSNL nonlinearity, Gaussian resolution.
 
-The full real chain, applied in this order to the true prompt-energy
-spectrum before it reaches the analysis binning -- **IAV, then LSNL, then
-Gaussian resolution**, matching the official Daya Bay Collaboration
-analysis pipeline's own stage order (its dagflow/GNA model literally names
-its cumulative-correction nodes ``stages.iav`` -> ``stages.evis`` (IAV +
-LSNL applied) -> ``stages.erec`` (+ resolution); confirmed from the
-Collaboration's own CHEP 2026 presentation on that framework -- an earlier
-version of this module had IAV and LSNL swapped, since corrected):
+Applied in this order to the true prompt-energy spectrum, before it reaches
+the analysis binning -- **IAV, then LSNL, then Gaussian resolution**,
+matching the official Daya Bay analysis pipeline's own stage order:
 
-1. **IAV** (Inner Acrylic Vessel): a real 240x240 energy-redistribution
-   matrix (``detector.dayabay.parameters.IAV_MATRIX``, columns summing to
-   1), capturing the vertex-position-dependent light-collection non-
-   uniformity near the acrylic vessel wall -- applied to the true deposited
-   energy, before the light-yield nonlinearity below (energy lost into the
-   inert acrylic never produces scintillation light, so it cannot be
-   subject to a light-yield nonlinearity curve).
-2. **LSNL** (Liquid Scintillator Non-Linearity): a real multiplicative
-   energy-scale correction ``f(E) = E_reconstructed / E_true_deposited``
-   (``detector.dayabay.parameters.LSNL_CURVE_E_MEV/F``, the official
-   nominal curve), warping the IAV-redistributed energy ``T`` to a
-   nonlinear scale ``T_nl = T * f(T)``.
-3. **Gaussian resolution**: the real 3-term formula
+1. **IAV** (Inner Acrylic Vessel): a 240x240 energy-redistribution matrix
+   (``parameters.IAV_MATRIX``, columns summing to 1), capturing the vertex-
+   position-dependent light-collection non-uniformity near the acrylic
+   vessel wall -- applied before the light-yield nonlinearity below, since
+   energy lost into the inert acrylic never produces scintillation light.
+2. **LSNL** (Liquid Scintillator Non-Linearity): a multiplicative energy-
+   scale correction ``f(E) = E_reconstructed / E_true_deposited``
+   (``parameters.LSNL_CURVE_E_MEV/F``), warping the IAV-redistributed
+   energy ``T`` to a nonlinear scale ``T_nl = T * f(T)``.
+3. **Gaussian resolution**: the 3-term formula
    sigma(E)/E = sqrt(a^2 + b^2/E + c^2/E^2)
-   (``detector.dayabay.parameters.ERES_A/B/C`` -- "spatial/temporal",
-   "photon statistics", and "dark noise" terms respectively), the same
-   photostatistics smearing used before this module was extended.
+   (``parameters.ERES_A/B/C`` -- spatial/temporal, photon-statistics and
+   dark-noise terms respectively).
 
-All three steps are real, independent, official detector-response
-ingredients (the official data release ships them as separate files
-precisely because they are physically distinct effects), composed here as
-sequential, independent linear operators -- a standard simplifying
-assumption when a full joint response covariance is not being reproduced
-(this project does not reproduce the LSNL/IAV pull-curve systematic
-uncertainties either, only their real nominal/central values -- see the
-package module docstring).
+The three steps are independent, official response ingredients, composed
+here as sequential linear operators -- a standard simplification when a
+full joint response covariance is not reproduced (this project uses their
+nominal/central values only, not the LSNL/IAV pull-curve uncertainties).
 
-Because ``detector.common.event_rate.apply_response`` integrates R(T'|T)
-against T via ``torch.trapezoid``, every step above is built as a discrete,
-mass-conserving "transfer" matrix on the shared ``T_GRID_MEV`` grid (0.05
-MeV spacing, matching the IAV matrix's own real binning) and only the final
-*composed* matrix is converted from probability mass to a density (dividing
-by the grid spacing) -- see ``response_matrix``.
+Notes:
+    - Since ``detector.common.event_rate.apply_response`` integrates
+      R(T'|T) against T by trapezoidal rule, each step above is built as a
+      discrete, mass-conserving transfer matrix on the shared
+      ``T_GRID_MEV`` grid, and only the final composed matrix is converted
+      from probability mass to a density (dividing by the grid spacing).
 
 Module contents:
     sigma_MeV(...)
-        sigma(T) on a given true-energy grid, from the real formula.
+        sigma(T) on a given true-energy grid, from the resolution formula.
     response_matrix(...)
-        The full real R(T'|T): IAV redistribution -> LSNL warp -> Gaussian
+        The full R(T'|T): IAV redistribution -> LSNL warp -> Gaussian
         resolution, composed and returned as a density (see above).
 """
 
@@ -103,7 +90,7 @@ def sigma_MeV(
         a, b, c: Resolution-formula coefficients (see module docstring).
 
     Returns:
-        Real tensor shaped ``(n_T,)``, sigma(T) in MeV.
+        Tensor shaped ``(n_T,)``, sigma(T) in MeV.
     """
     T = T_grid_MeV.clamp_min(torch.finfo(T_grid_MeV.dtype).tiny)
     return T * torch.sqrt(a ** 2 + b ** 2 / T + c ** 2 / T ** 2)
@@ -111,17 +98,15 @@ def sigma_MeV(
 
 @torch.no_grad()
 def _lsnl_curves_on_grid(T_grid_MeV: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """Real LSNL nominal + pull curves, linearly interpolated onto ``T_grid_MeV`` (fixed real data).
+    """LSNL nominal + pull curves, linearly interpolated onto ``T_grid_MeV``.
 
     Args:
         T_grid_MeV: True-observable grid, shape ``(n_T,)``.
 
     Returns:
         ``(f0_grid, fk_grid)``: ``f0_grid`` shaped ``(n_T,)`` (nominal
-        curve) and ``fk_grid`` shaped ``(4, n_T)`` (the 4 real pull
-        curves), both constant-extrapolated outside the curves' own real
-        energy range (``detector.dayabay.parameters.LSNL_CURVE_E_MEV/F``,
-        ``LSNL_CURVE_PULLS``).
+        curve) and ``fk_grid`` shaped ``(4, n_T)`` (the 4 pull curves),
+        both constant-extrapolated outside the curves' own energy range.
     """
     T_np = T_grid_MeV.cpu().numpy()
     curve_E_np = LSNL_CURVE_E_MEV.cpu().numpy()
@@ -143,34 +128,31 @@ def _lsnl_warp_matrix(
     T_grid_MeV: torch.Tensor,
     lsnl_pulls: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Real LSNL mass matrix: redistribute each grid point's mass onto its image T_nl = T*f(T).
+    """LSNL mass matrix: redistribute each grid point's mass onto its image T_nl = T*f(T).
 
     Column ``j`` (true energy ``T_grid_MeV[j]``) is split, by linear
     interpolation, between the two ``T_grid_MeV`` points bracketing
-    ``T_nl = T_grid_MeV[j] * f(T_grid_MeV[j])`` -- the same mass-conserving
-    "scatter" as ``detector.common.response.scatter_add_linear``, built here
-    as an explicit ``(n_T, n_T)`` matrix instead (rather than applied to a
-    single spectrum) so it can be composed with the IAV and Gaussian
+    ``T_nl = T_grid_MeV[j] * f(T_grid_MeV[j])``, built as an explicit
+    ``(n_T, n_T)`` matrix so it can be composed with the IAV and Gaussian
     matrices below. ``f`` is the official linear LSNL systematic model,
 
         f(E) = f0(E) + sum_k lsnl_pulls[k] * (f_k(E) - f0(E)),
 
-    with ``f0``/``f_k`` the real nominal/pull curves
-    (``parameters/detector_lsnl.yaml``; see ``_lsnl_curves_on_grid``).
-    Differentiable w.r.t. ``lsnl_pulls`` (the curve interpolation itself is
-    fixed real data, evaluated once with ``@torch.no_grad()``; only the
-    linear combination and the resulting warp-matrix weights carry
-    gradient).
+    with ``f0``/``f_k`` the nominal/pull curves (see
+    ``_lsnl_curves_on_grid``). Differentiable w.r.t. ``lsnl_pulls`` (the
+    curve interpolation itself is fixed data, evaluated once with
+    ``@torch.no_grad()``; only the linear combination and the resulting
+    warp-matrix weights carry gradient).
 
     Args:
         T_grid_MeV: True-observable grid, shape ``(n_T,)``, strictly
             increasing.
-        lsnl_pulls: Real LSNL pull-curve nuisances, shape ``(4,)``, nominal
+        lsnl_pulls: LSNL pull-curve nuisances, shape ``(4,)``, nominal
             (official prior mean) all-zero -- None uses the nominal curve
-            unchanged (equivalent to an all-zero tensor).
+            unchanged.
 
     Returns:
-        Real tensor shaped ``(n_T, n_T)``; each column sums to 1.
+        Tensor shaped ``(n_T, n_T)``; each column sums to 1.
     """
     f0_grid, fk_grid = _lsnl_curves_on_grid(T_grid_MeV)
     if lsnl_pulls is None:
@@ -195,25 +177,24 @@ def _lsnl_warp_matrix(
 
 @torch.no_grad()
 def _iav_mass_matrix(T_grid_MeV: torch.Tensor) -> torch.Tensor:
-    """Embed the real 240x240 IAV matrix into ``T_grid_MeV``'s ``(n_T, n_T)`` grid.
+    """Embed the 240x240 IAV matrix into ``T_grid_MeV``'s ``(n_T, n_T)`` grid.
 
-    ``T_grid_MeV`` must be the real IAV matrix's own 0.05 MeV, 0-12 MeV
-    binning (``detector.dayabay.parameters.T_GRID_MEV``, 241 points = 240
-    real IAV bins' left edges plus the final right edge at 12.0 MeV); the
-    single extra grid point (index 240, T=12.0) is given an identity
-    (no-redistribution) response, since the real IBD prompt-energy spectrum
-    is negligible that far above threshold (see module docstring).
+    ``T_grid_MeV`` must be the IAV matrix's own 0.05 MeV, 0-12 MeV binning
+    (``parameters.T_GRID_MEV``, 241 points = 240 IAV bins' left edges plus
+    the final right edge at 12.0 MeV); the single extra grid point (index
+    240, T=12.0) is given an identity (no-redistribution) response, since
+    the IBD prompt-energy spectrum is negligible that far above threshold.
 
     Args:
         T_grid_MeV: True-observable grid, shape ``(n_T,)``, ``n_T >= 240``.
 
     Returns:
-        Real tensor shaped ``(n_T, n_T)``.
+        Tensor shaped ``(n_T, n_T)``.
     """
     n = T_grid_MeV.shape[0]
     n_iav = IAV_MATRIX.shape[0]
     if n < n_iav:
-        raise ValueError(f"T_grid_MeV must have at least {n_iav} points (the real IAV binning), got {n}.")
+        raise ValueError(f"T_grid_MeV must have at least {n_iav} points (the IAV binning), got {n}.")
     out = torch.zeros((n, n), dtype=T_grid_MeV.dtype, device=T_grid_MeV.device)
     out[:n_iav, :n_iav] = IAV_MATRIX.to(dtype=T_grid_MeV.dtype, device=T_grid_MeV.device)
     if n > n_iav:
@@ -228,26 +209,24 @@ def response_matrix(
     a: float = ERES_A, b: float = ERES_B, c: float = ERES_C,
     lsnl_pulls: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Daya Bay's real response matrix R(T'|T): IAV redistribution -> LSNL warp -> Gaussian resolution.
+    """Daya Bay's response matrix R(T'|T): IAV redistribution -> LSNL warp -> Gaussian resolution.
 
     Each step is built as a discrete, mass-conserving transfer matrix on
-    ``T_grid_MeV`` (see module docstring) and composed by matrix
-    multiplication; only the final, composed matrix is converted from
-    probability mass to the density ``detector.common.event_rate
-    .apply_response`` expects (dividing by the grid spacing).
+    ``T_grid_MeV`` and composed by matrix multiplication; only the final
+    matrix is converted from probability mass to the density
+    ``detector.common.event_rate.apply_response`` expects (dividing by the
+    grid spacing).
 
     Args:
         T_grid_MeV: True-observable grid, shape ``(n_T,)``; must equal
-            ``detector.dayabay.parameters.T_GRID_MEV`` (the real IAV
-            matrix's own binning -- see ``_iav_mass_matrix``).
+            ``parameters.T_GRID_MEV`` (the IAV matrix's own binning).
         Tprime_grid_MeV: Reconstructed-observable grid, shape ``(n_Tp,)``.
         a, b, c: Gaussian resolution-formula coefficients (see ``sigma_MeV``).
-        lsnl_pulls: Real LSNL pull-curve nuisances, shape ``(4,)``; None
-            (default) uses the real nominal LSNL curve unchanged -- see
-            ``_lsnl_warp_matrix``.
+        lsnl_pulls: LSNL pull-curve nuisances, shape ``(4,)``; None
+            (default) uses the nominal LSNL curve unchanged.
 
     Returns:
-        Real tensor shaped ``(n_Tp, n_T)``, a probability density in T'
+        Tensor shaped ``(n_Tp, n_T)``, a probability density in T'
         (trapezoidal-integrating a column over ``Tprime_grid_MeV`` gives
         approximately 1).
     """

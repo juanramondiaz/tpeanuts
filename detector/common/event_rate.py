@@ -16,13 +16,9 @@
 #      June 2026
 # =============================================================================
 
-"""
-The single event-rate folding assembly: flux -> predicted per-bin counts.
+"""Convert neutrino fluxes into predicted event counts.
 
-This module contains the *only* event-rate folding code in the project --
-mirroring ``tpeanuts.core.common.hamiltonian``'s "only Hamiltonian assembly
-code" principle -- so every detector's ``event_rate.py`` composes these same
-four steps rather than reimplementing the folding formula:
+The calculation follows four steps:
 
     dR/dT(T)   = N_target * integral dE_nu [Phi_e(E_nu) dsigma_e/dT(E_nu,T)
                                            + Phi_x(E_nu) dsigma_x/dT(E_nu,T)]
@@ -30,32 +26,22 @@ four steps rather than reimplementing the folding formula:
     dR_det/dT' = eps(T') * dR/dT'(T')                             (efficiency)
     N_i        = exposure * integral_{bin i} dT' dR_det/dT'(T')  (+ N_i^bkg)
 
-``true_observable_spectrum`` takes ``flux_e``/``flux_x`` rather than a
-flavour-resolved flux tensor directly: only the nu_e vs. (nu_mu + nu_tau)
-split matters for a cross section that treats mu/tau identically (true for
-every interaction currently in ``tpeanuts.detector.interaction``), so a
-caller with a full ``(..., n_flavours)`` flux from
-``tpeanuts.core.common.flux.flux_state`` splits it once
-(``flux_e = flux[..., 0]``, ``flux_x = flux[..., 1] + flux[..., 2]``) before
-calling in.
+Continuous spectra are integrated over neutrino energy. Discrete neutrino
+lines are summed without applying an energy quadrature.
 
-Every intermediate tensor here carries the gradient from whichever upstream
-oscillation parameters produced ``flux_e``/``flux_x``; every other argument
-(cross sections, response matrix, efficiency, target, exposure) is a
-grid-only constant multiplied in, so autograd differentiates this exactly
-like any other product of a differentiable factor and detached constants.
-
-Module contents:
+Module functions:
     true_observable_spectrum(...)
-        Fold flux and cross sections, integrate over neutrino energy.
+        Integrate continuous flux and cross sections over neutrino energy.
+    true_observable_spectrum_discrete(...)
+        Sum the contributions from discrete neutrino lines.
     apply_response(...)
-        Convolve with a response/migration matrix.
+        Convolve a true spectrum with a response matrix.
     bin_counts(...)
-        Integrate a reconstructed-energy spectrum into per-bin counts.
+        Integrate a reconstructed spectrum into bins and apply exposure.
     predicted_counts(...)
-        Top-level orchestration: the four steps above, plus
-        ``tpeanuts.detector.common.efficiency.apply_efficiency`` and an
-        optional background.
+        Fold a continuous flux into reconstructed-bin counts.
+    predicted_counts_discrete(...)
+        Fold discrete neutrino lines into reconstructed-bin counts.
 """
 
 from __future__ import annotations
@@ -133,7 +119,26 @@ def true_observable_spectrum_discrete(
     cross_section_x: torch.Tensor,
     n_target: TensorLike,
 ) -> torch.Tensor:
-    """Fold discrete neutrino lines without applying an energy quadrature."""
+    """Fold discrete neutrino-line fluxes into a true-observable spectrum.
+
+    Args:
+        flux_e: Integrated electron-neutrino flux per line, shape
+            ``(..., n_lines)``.
+        flux_x: Integrated muon-plus-tau neutrino flux per line,
+            broadcastable with ``flux_e``.
+        cross_section_e: Electron-neutrino differential cross section for
+            each line and true-observable value, shape ``(n_lines, n_T)``.
+        cross_section_x: Muon/tau-neutrino differential cross section,
+            with the same shape as ``cross_section_e``.
+        n_target: Scalar number of interaction targets.
+
+    Returns:
+        True-observable spectrum shaped ``(..., n_T)``.
+
+    Raises:
+        ValueError: If the cross-section shapes differ or their line axis
+            does not match ``flux_e``.
+    """
     if cross_section_e.shape != cross_section_x.shape:
         raise ValueError("cross_section_e and cross_section_x must share the same shape.")
     if flux_e.shape[-1] != cross_section_e.shape[0]:
@@ -336,7 +341,34 @@ def predicted_counts_discrete(
     *,
     background_counts: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
-    """Forward-fold discrete neutrino lines into reconstructed-bin counts."""
+    """Fold discrete neutrino lines into reconstructed-bin counts.
+
+    Args:
+        flux_e: Integrated electron-neutrino flux per line, shape
+            ``(..., n_lines)``.
+        flux_x: Integrated muon-plus-tau neutrino flux per line,
+            broadcastable with ``flux_e``.
+        cross_section_e: Electron-neutrino differential cross section,
+            shape ``(n_lines, n_T)``.
+        cross_section_x: Muon/tau-neutrino differential cross section,
+            with the same shape as ``cross_section_e``.
+        n_target: Scalar number of interaction targets.
+        T_grid_MeV: True and reconstructed observable grid, shape ``(n_T,)``.
+        response_matrix: Response density, shape ``(n_T, n_T)``.
+        efficiency: Detection efficiency on ``T_grid_MeV``, shape ``(n_T,)``.
+        bin_edges_MeV: Increasing reconstructed-bin edges, shape
+            ``(n_bins + 1,)``.
+        exposure: Scalar factor converting rates into expected counts.
+        background_counts: Optional background counts per reconstructed bin.
+
+    Returns:
+        Predicted signal plus optional background counts, shape
+        ``(..., n_bins)``.
+
+    Raises:
+        ValueError: If the response output axis does not match
+            ``T_grid_MeV``.
+    """
     if response_matrix.shape[0] != T_grid_MeV.shape[0]:
         raise ValueError("The reconstructed-observable grid must equal T_grid_MeV.")
     true_spectrum = true_observable_spectrum_discrete(

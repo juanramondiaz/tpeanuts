@@ -19,7 +19,7 @@
 """
 Differentiable IceCube DeepCore event-count model: real weighted-MC x Earth matter x detector.
 
-``IceCubeDetectorModel`` wraps ``tpeanuts.inference.atmospheric_model
+``IceCubeDetectorModel`` wraps ``tpeanuts.inference.model_atmosphere
 .AtmosphericOscillationModel`` and ``tpeanuts.detector.icecube.event_rate``
 into a ``fit_lbfgs``-compatible ``predict(theta)`` returning real per-bin
 counts. Unlike every other detector model in this project,
@@ -55,7 +55,7 @@ from tpeanuts.detector.icecube.event_rate import (
     prepare_hypersurface_table,
 )
 from tpeanuts.detector.icecube.parameters import DETECTOR_DEPTH_M
-from tpeanuts.inference.atmospheric_model import AtmosphericOscillationModel
+from tpeanuts.inference.model_atmosphere import AtmosphericOscillationModel
 
 FREE_PARAM_KEYS: tuple[str, ...] = ("theta23", "DeltamSq3l", "nu_norm", "mu_norm")
 
