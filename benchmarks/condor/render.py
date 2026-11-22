@@ -279,6 +279,12 @@ def check(directory: Path = GENERATED) -> List[str]:
     return problems
 
 
+def _write(path: Path, text: str) -> None:
+    """Write ``text`` with LF line endings (``Path.write_text(newline=...)`` needs Python 3.10; the login nodes have older)."""
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Command-line entry point.
 
@@ -308,14 +314,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.output_dir.mkdir(parents=True, exist_ok=True)
         for spec in specs:
             target = sub_path(spec, args.output_dir, args.smoke)
-            target.write_text(render(spec, smoke=args.smoke), encoding="utf-8", newline="\n")
+            _write(target, render(spec, smoke=args.smoke))
             print(f"wrote {target}")
         chained = [s for s in specs if args.include_optional or not s.optional]
         if args.chain:
             script = args.output_dir / "submit_all.sh"
-            script.write_text(
-                render_chain(chained, directory=args.output_dir, smoke=args.smoke), encoding="utf-8", newline="\n"
-            )
+            _write(script, render_chain(chained, directory=args.output_dir, smoke=args.smoke))
             print(f"wrote {script}")
         print("submit in this order, each after the previous has finished:")
         for number, spec in enumerate(launch_order(chained), start=1):
