@@ -79,9 +79,11 @@ distribution in the Sun, whereas nuSQuIDS evolves from one production radius. Th
 1. **Environments** (one per backend, as above): `tpeanuts` with a CUDA torch that the node driver supports and
    `pip install -e .`; `peanuts` without torch; `nusquids` with the wheel, plus its astro data
    (`python -m validation.nusquids.fetch_data`). The cluster has internet access, so these installs can be done there.
-2. **Code**: clone or `rsync` the repository (and the original `PEANUTS`) to a filesystem the workers see, then run
-   `python -m benchmarks.nusquids.sync_wsl --manifest-only` there (or before uploading) so that every result carries the
-   fingerprint of the code that produced it.
+2. **Code**: clone or `rsync` the repository (and the original `PEANUTS`) to a filesystem the workers see, or run
+   `benchmarks/condor/setup_envs.sh`, which also creates the environments. `MANIFEST.json`, the fingerprint of the code that
+   every result records, includes the reference `.npz`, so the `export` job (`run.sh export`, the first of the chain) writes it
+   right after the reference; by hand: `python -m benchmarks.tpeanuts.export_reference`, then
+   `python -m benchmarks.nusquids.sync_wsl --manifest-only`.
 3. **Configure**: `cp benchmarks/condor/env.sh.example benchmarks/condor/env.sh` and edit the paths and the activation
    functions (`env.sh` is ignored by git).
 4. **Render the submit files** from the specifications in `benchmarks/suites/<series>/<name>.yaml` (one YAML per benchmark:

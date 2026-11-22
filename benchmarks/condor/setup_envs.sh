@@ -12,7 +12,7 @@
 #   3. env `peanuts`: Python 3.12, numpy/scipy/numba/pandas/mpmath, NO torch; plus a clone of the original PEANUTS
 #   4. env `nusquids`: Python 3.12 (the wheel is py3.12 manylinux), nusquids + numpy, plus its astro data
 #   5. benchmarks/condor/env.sh written from the paths used here (only if it does not exist)
-#   6. MANIFEST.json (code fingerprint), a short import check per environment
+#   6. a short import check per environment (MANIFEST.json is written later by `run.sh export`, after the reference)
 #
 # Variables (override from the shell): CONDA_DIR, PEANUTS_DIR, PEANUTS_URL, NUSQUIDS_DATA_DIR, TORCH_INDEX, PYTHON_VERSION.
 set -euo pipefail
@@ -136,12 +136,8 @@ bench_activate_nusquids() { source "$CONDA_DIR/etc/profile.d/conda.sh"; conda ac
 EOF
     fi
 
-    # ---- 6. fingerprint of the code -----------------------------------------------------------------------------
-    log "MANIFEST.json (code fingerprint)"
-    conda activate tpeanuts
-    (cd "$REPO" && PYTHONPATH="$REPO" python -s -m benchmarks.nusquids.sync_wsl --manifest-only) \
-        || echo "setup_envs.sh: manifest failed (run it by hand: python -m benchmarks.nusquids.sync_wsl --manifest-only)" >&2
-    conda deactivate
+    # MANIFEST.json (the code fingerprint) includes the reference .npz, which does not exist yet: `run.sh export`
+    # (the first job of the chain) writes both, in that order.
 fi
 
 # ---- verification ------------------------------------------------------------------------------------------------

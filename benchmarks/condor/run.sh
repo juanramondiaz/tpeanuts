@@ -2,6 +2,7 @@
 # Run one benchmark backend inside an HTCondor job (or by hand on a login node for a short check).
 #
 # Usage:  run.sh <backend> [arguments of the runner...]
+#   (export also writes MANIFEST.json, the code fingerprint, once the reference file exists)
 #   backend: export | tpeanuts | peanuts | nusquids
 #
 # Each backend uses its own environment, defined in benchmarks/condor/env.sh (copy env.sh.example and edit it); the
@@ -42,7 +43,10 @@ fi
 case "$backend" in
     export)
         bench_activate_tpeanuts
-        exec python -s -m benchmarks.tpeanuts.export_reference "$@"
+        python -s -m benchmarks.tpeanuts.export_reference "$@"
+        # The fingerprint of the code includes the reference file, so it can only be written once that exists; every
+        # measurement of the chain starts after this job and records it (environment["manifest"]).
+        python -s -m benchmarks.nusquids.sync_wsl --manifest-only
         ;;
     tpeanuts)
         bench_activate_tpeanuts
