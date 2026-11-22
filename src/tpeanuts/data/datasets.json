@@ -1,0 +1,3609 @@
+{
+ "schema": 1,
+ "datasets": {
+  "icecube": {
+   "description": "IceCube DeepCore 9-year golden-event oscillation analysis, public data release",
+   "license": "CC0-1.0",
+   "citation": "IceCube Collaboration, Replication Data for: Measurement of atmospheric neutrino mixing with improved IceCube DeepCore calibration and data processing, Harvard Dataverse, V1 (2025), doi:10.7910/DVN/B4RITM; Phys. Rev. D 108, 012014 (2023)",
+   "homepage": "https://doi.org/10.7910/DVN/B4RITM",
+   "files": [
+    {
+     "path": "data.tab",
+     "size": 4091,
+     "sha256": "c1b9baa1bc53f41bb43a4daf7cbeb953c2c6b74c8e13e59afb5764274413671a",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646859"
+    },
+    {
+     "path": "hs_nu_nc_nue_cc.tab",
+     "size": 543327,
+     "sha256": "b60aad105805818191ecc8bdacef920fe662a39a7b64f1b17c5d18ccbbf96dd6",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646854"
+    },
+    {
+     "path": "hs_numu_cc.tab",
+     "size": 543795,
+     "sha256": "e392b277091b98b47ece769fe50976130da5e0e3a0ca1be5ec1d53bec2568ab9",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646858"
+    },
+    {
+     "path": "hs_nutau_cc.tab",
+     "size": 544770,
+     "sha256": "55e1608d05cd5b27891ec052762431b3b0b764b61062de9414712f582e920067",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646853"
+    },
+    {
+     "path": "mc_mu.tab",
+     "size": 5815,
+     "sha256": "af11edbfe0b14f76d5fcb7912f857dd331956deeef3efcba388b17ec3f67a5fd",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646851"
+    },
+    {
+     "path": "mc_nu_nc.tab",
+     "size": 3975602,
+     "sha256": "4ea029d862cb0c67bd0d704af437ebcbda80ed6ac8c57e5db6364c595004e89e",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646850"
+    },
+    {
+     "path": "mc_nue_cc.tab",
+     "size": 6234527,
+     "sha256": "e7040158d7d4194e0d080c653651f4cbe7c7ba78d8a03731032c4f9751d58fc3",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646852"
+    },
+    {
+     "path": "mc_numu_cc.tab",
+     "size": 44626533,
+     "sha256": "0354af4398b5d02004ea0b6631ca81a348bb5d08b406b2670b0abeadaac2bb53",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646856"
+    },
+    {
+     "path": "mc_nutau_cc.tab",
+     "size": 7266105,
+     "sha256": "5558c64dc43acd9c9ad0c0751a1c5d28fef3f3b4d3cc4c632d47c176022627e5",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11646855"
+    },
+    {
+     "path": "readme.md",
+     "size": 7141,
+     "sha256": "0f8e7bbc6059d18376843370e36e98a0cfa69fbc4bd767df694c6d65f861149f",
+     "url": "https://dataverse.harvard.edu/api/access/datafile/11674676"
+    }
+   ]
+  },
+  "honda": {
+   "description": "Honda/HKKM 2014 atmospheric neutrino flux tables (raw .d.gz archive)",
+   "license": "unverified - see DATA_LICENSES.md (cite Honda et al., arXiv:1502.03916)",
+   "citation": "M. Honda et al. (2015), arXiv:1502.03916",
+   "homepage": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/",
+   "files": [
+    {
+     "path": "frj-0305-01-01-solmax.d.gz",
+     "size": 2246,
+     "sha256": "c943db707c18193586546c79fb4b70ac3e1c058b85745933ea54ca2c0c0ba03b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-0305-01-01-solmin.d.gz",
+     "size": 2239,
+     "sha256": "63d1486843b8040980471bb429a13459dfbc04e266e500d987401a09a677c260",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-0305-20-01-mtn-solmax.d.gz",
+     "size": 37007,
+     "sha256": "e65c529c91d03c646d6292f8aa2f5c592e1649f213ea8790f9dd78e7749f10fd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-0305-20-01-mtn-solmin.d.gz",
+     "size": 37017,
+     "sha256": "6d6dcb8eae4967ee73b1f2cee2d241a26fc7e75859b4de3f3d9391aab0360fac",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-0305-20-01-solmax.d.gz",
+     "size": 36573,
+     "sha256": "9dac4c886dd3503e4596bff4561d12a10678a2b3bfa4f5396d8bba872c03a5c9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-0305-20-01-solmin.d.gz",
+     "size": 36673,
+     "sha256": "76bd46ca481366ca4d8e2d6a0dc0644bf2bebd126f5446ed39cabef0bc083ee2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-0305-20-12-mtn-solmax.d.gz",
+     "size": 414654,
+     "sha256": "de53b468770f1407c8f610b3a63f2fdd3a271a236db5b010108b7e537105f3b4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-0305-20-12-mtn-solmin.d.gz",
+     "size": 415071,
+     "sha256": "d3456aaa05c8797cce0025aaad68d22c0285408df0911e4493c2ed25eefdcf7d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-0305-20-12-solmax.d.gz",
+     "size": 414655,
+     "sha256": "c67a87ec96878b46bcefdfb657c89ab6272ad4a4a33bff954efb6c8e82409c25",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "frj-0305-20-12-solmin.d.gz",
+     "size": 415033,
+     "sha256": "9906f867f42840561267036fe3556b829bae50fe51f934d5965b28083823dade",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "frj-0608-01-01-solmax.d.gz",
+     "size": 2252,
+     "sha256": "1823ea8158cec06aa2db9463e98e9b805eb95a039c5c21298b1237f7b2253ece",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-0608-01-01-solmin.d.gz",
+     "size": 2253,
+     "sha256": "e747e5dfbb40aecec58ba670e29f9ce48c4633323f5c531691f40bb8e87b0c5b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-0608-20-01-mtn-solmax.d.gz",
+     "size": 36762,
+     "sha256": "d2fec9974001d81eeec7b184058fc08e11f037f847cb893f73fccc9359095d24",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-0608-20-01-mtn-solmin.d.gz",
+     "size": 36776,
+     "sha256": "663616dc98a09dd11c0a4fbbadd19d4b9aa5743c6dd68a44e9afaf4c4baf6b66",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-0608-20-01-solmax.d.gz",
+     "size": 36584,
+     "sha256": "e2b7aa7a50d6a9093f8ab61dc9f508845a82f6f606be21e4e7711fabc4297b22",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-0608-20-01-solmin.d.gz",
+     "size": 36637,
+     "sha256": "36054282cd4d9b28b22cb14d535372bcfbf8fa1671bceef7de12fadbc38303fd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-0608-20-12-mtn-solmax.d.gz",
+     "size": 415223,
+     "sha256": "e6e22e95dba1a3efa4e186980ac1cd53c3349cb3c09c74cb60920b8cf3c940d1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-0608-20-12-mtn-solmin.d.gz",
+     "size": 415231,
+     "sha256": "beab6028d30ba85e7841c56504549ea23a0be1c7373007ebda661628b7586830",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-0608-20-12-solmax.d.gz",
+     "size": 414591,
+     "sha256": "1850b211565977968adf75c954b0f4b091a63aec795d418c4390040c5101ab3a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "frj-0608-20-12-solmin.d.gz",
+     "size": 414738,
+     "sha256": "0bca080333863fae9cd880671926eae9a3fa007b9f6580719051b75cc1b45720",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "frj-0608-aa-nue.d.gz",
+     "size": 148923,
+     "sha256": "5c59749f7984d9ebfdd9fb8d76a737b2a201351325264a3825b360afa3a4e9e8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "frj-0608-aa-nuebar.d.gz",
+     "size": 148545,
+     "sha256": "6813e20053b9fcec1182da227a6cde197d765dc09a2733daa8acb42b6f82e4d3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "frj-0608-aa-numu.d.gz",
+     "size": 148330,
+     "sha256": "ce9cd929efc74b13044735554d48df85d4ad737c92374dd8921ca9a82b3d63be",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "frj-0608-aa-numubar.d.gz",
+     "size": 148457,
+     "sha256": "ad9ffb38546bf5972c6dd8008c3805f7f2f224630b6faeed5256ed5f67cd6237",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "frj-0608-nue.d.gz",
+     "size": 1703961,
+     "sha256": "037876f30993eee1aa8d41cf4fd9593f2d834a143f664388012e773c4af7bec3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-nue.d.gz"
+    },
+    {
+     "path": "frj-0608-nuebar.d.gz",
+     "size": 1691699,
+     "sha256": "3b8050ec8aaf41fe44da0941dafab7e25a9512631164520bdf773c3f1779c8ba",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-nuebar.d.gz"
+    },
+    {
+     "path": "frj-0608-numu.d.gz",
+     "size": 1757243,
+     "sha256": "e7a0b4df1cf117ea517407594e4ed4d2e06d524c484574d27ce1ad2553e67916",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-numu.d.gz"
+    },
+    {
+     "path": "frj-0608-numubar.d.gz",
+     "size": 1757178,
+     "sha256": "a852d49fdd819b364c4fee95c5f708f7d88c615b1995b597e37ad05e5c12fb51",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0608-numubar.d.gz"
+    },
+    {
+     "path": "frj-0911-01-01-solmax.d.gz",
+     "size": 2256,
+     "sha256": "089d3f8004cdcfff6d27e4d1ae591ebfd9b0cc5ee1d368baeebbca3e3030bef6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-0911-01-01-solmin.d.gz",
+     "size": 2238,
+     "sha256": "798ad5b34856cb85b6b851f9b0877b87fd0847f0f60eba333c62e54458225fd3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-0911-20-01-mtn-solmax.d.gz",
+     "size": 37012,
+     "sha256": "34e41289ff206bfad255393b75636beebe7332aebe7d150c0aa3b8e06318a84b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-0911-20-01-mtn-solmin.d.gz",
+     "size": 36718,
+     "sha256": "bb3dc79516c1cc60262791e7e19885827e7464b5af3e3d9ad265aa2c2887ce8c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-0911-20-01-solmax.d.gz",
+     "size": 36533,
+     "sha256": "b0b88e5481cb4888ea11f46aa78d7425569d998b9dbabfcebdd97fd151aecbe9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-0911-20-01-solmin.d.gz",
+     "size": 36635,
+     "sha256": "4f8db42805dc167bb92610e87c5352261bea9d4d33f76cadf76f9c060b368350",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-0911-20-12-mtn-solmax.d.gz",
+     "size": 414660,
+     "sha256": "324d1a8b1fbe805375550ec6ba6674bc9c6affd7b4aa8c1579a77e52972792a2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-0911-20-12-mtn-solmin.d.gz",
+     "size": 415062,
+     "sha256": "fe96149e1ae255b9b16e6240921bba2a99734836f2b14593c16676761e017315",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-0911-20-12-solmax.d.gz",
+     "size": 414241,
+     "sha256": "2db6fd288dce978c7c48af43045ce6f7078c99f5a853bf9622bc80973cbf9a83",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "frj-0911-20-12-solmin.d.gz",
+     "size": 414687,
+     "sha256": "95c62e26bc2ef88e79d483e4d17642c406d61d7c1a88730ff405ce2db2ba1cac",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "frj-0911-aa-nue.d.gz",
+     "size": 148597,
+     "sha256": "5677e5614f3d69d9f7d3c2946bc0e96b91648b88ddd5c63129409405ba87eafd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "frj-0911-aa-nuebar.d.gz",
+     "size": 148289,
+     "sha256": "a4fc6a73ab9540454faeb9475a0fb618ba22d3e8d1a7337f05d8350fcda3c4c6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "frj-0911-aa-numu.d.gz",
+     "size": 147921,
+     "sha256": "e8796597b4150f43bccd80eff915c5c541f62a1f576f0f7b0ae368c1232469d9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "frj-0911-aa-numubar.d.gz",
+     "size": 148126,
+     "sha256": "12a896013ffe3ea3ade8a50c2e279453a8d1fe588154b42fa105b4e9d9ebbced",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "frj-0911-nue.d.gz",
+     "size": 1702479,
+     "sha256": "f24120caddababd2c7e7f26bf60c60465c4e87b4cc21b375b9597f865770eaa7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-nue.d.gz"
+    },
+    {
+     "path": "frj-0911-nuebar.d.gz",
+     "size": 1689174,
+     "sha256": "0372ef4fe6626a5817784174b974185bdbc415aa5ca7de7bce9477e99e2ceead",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-nuebar.d.gz"
+    },
+    {
+     "path": "frj-0911-numu.d.gz",
+     "size": 1754600,
+     "sha256": "c72fe2a35d6dc005407cb20998b6cb6a467159762dde2fe6a502048f3dd74a74",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-numu.d.gz"
+    },
+    {
+     "path": "frj-0911-numubar.d.gz",
+     "size": 1754175,
+     "sha256": "e89617a4afe166f321a2cb8e8d561bda8fb92eb0ed7ef0ffb134b67b3091849e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-0911-numubar.d.gz"
+    },
+    {
+     "path": "frj-1202-01-01-solmax.d.gz",
+     "size": 2243,
+     "sha256": "2a89be47e6b2743cdeaa5541c55d30b3b7cef12b13770a76db89f38f1c12ddd4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-1202-01-01-solmin.d.gz",
+     "size": 2240,
+     "sha256": "e708d1503720b235a9e75d8d59024b6a30df539bea08c070c392785214b41f66",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-1202-20-01-mtn-solmax.d.gz",
+     "size": 36700,
+     "sha256": "9384be18d0bf64dd3bb0d81fa467ca9c3446869dd28662a9bee75d2433a5e227",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-1202-20-01-mtn-solmin.d.gz",
+     "size": 36642,
+     "sha256": "497abe8a71b180fe028eebde645f33b5577862422eb278e4608ac001d4fa9a18",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-1202-20-01-solmax.d.gz",
+     "size": 36697,
+     "sha256": "68ff5753442d722b1c16d9f668d720a5cefa30828f39bfa84b8a854dfabaa9e0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-1202-20-01-solmin.d.gz",
+     "size": 36649,
+     "sha256": "0bac98b5ac477f3e8de78f67e5239648fb5f430504a0cd44a8a20dafaa0e3a3b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-1202-20-12-mtn-solmax.d.gz",
+     "size": 414832,
+     "sha256": "d0d58d0b59fe3d2b847ea9fc0b962288656c08a38bed86cd9df09c0dfe813fa1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-1202-20-12-mtn-solmin.d.gz",
+     "size": 415657,
+     "sha256": "1450d8dc321be8e1b4d007df3c450d83e104b76ecf356a32df6f4ecb7638b46f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-1202-20-12-solmax.d.gz",
+     "size": 414863,
+     "sha256": "817454f4ca2d9f9a2d2947e882a58586e07d9864160842c9febe048d79865c82",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "frj-1202-20-12-solmin.d.gz",
+     "size": 415128,
+     "sha256": "41d30e8ebf92f39f4865d21741b1c53ff57077c96a9ccaf178fa6c3d132599d3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "frj-1202-aa-nue.d.gz",
+     "size": 148507,
+     "sha256": "b1b89d1560116c5cf0f04630553b4c033570f3b32d4e783845901f97a7fcbb85",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "frj-1202-aa-nuebar.d.gz",
+     "size": 148292,
+     "sha256": "2a41b3b2380c73e7483b8450dec2ab6e1a7e8b7f50432485ee3d64d3fbdfbbf7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "frj-1202-aa-numu.d.gz",
+     "size": 147896,
+     "sha256": "55d4250f57317412d79e0bd8925eceb220c5130f024f4ba47df5630dafdb4fc1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "frj-1202-aa-numubar.d.gz",
+     "size": 148103,
+     "sha256": "10a96a5e1b9c816fcaec41dee5e3da53b6aa6b37e596c22170603dd1941b8803",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "frj-1202-nue.d.gz",
+     "size": 1700306,
+     "sha256": "98f8fba094b407a3f50b7548e8823ef9cc92a615c21fabd384c869c964cdc52b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-nue.d.gz"
+    },
+    {
+     "path": "frj-1202-nuebar.d.gz",
+     "size": 1688529,
+     "sha256": "d859900896e8a5c490a1fb2f84d66fbc9f388c3db0c8d236cef9d5731fd9662c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-nuebar.d.gz"
+    },
+    {
+     "path": "frj-1202-numu.d.gz",
+     "size": 1754309,
+     "sha256": "d5bca72af8e570073315e1dd0082daf0a2b62ac0a2cc44ebf9108d288bd906b6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-numu.d.gz"
+    },
+    {
+     "path": "frj-1202-numubar.d.gz",
+     "size": 1754031,
+     "sha256": "65826b3e8099c0d290799748d922cfd465b958f9e37b4ee660bd5b328a9643ad",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-1202-numubar.d.gz"
+    },
+    {
+     "path": "frj-ally-01-01-solmax.d.gz",
+     "size": 2241,
+     "sha256": "cb347e890dc0c9a0e1749200b76b4b56365c049d9836847650363afeaa210bbf",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-ally-01-01-solmin.d.gz",
+     "size": 2238,
+     "sha256": "805393d2a8563e8fc4f3fec39ed225ccc7baf1611ddc8b958ad8a96d2ac77072",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-ally-20-01-mtn-solmax.d.gz",
+     "size": 36712,
+     "sha256": "fb0fc1450d16e1be071b22f899d22a509bc392cd7b224f9d7cbcc7d392fd2125",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-ally-20-01-mtn-solmin.d.gz",
+     "size": 37009,
+     "sha256": "f11ae2b51d074856b39f1ca3db982eb18eb08a5a742a0bca48e8d2cd4c3f039e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-ally-20-01-solmax.d.gz",
+     "size": 36586,
+     "sha256": "2cad4987de538259b22c81b870793dc9882c099ee9f73535f376b0fbf4145a46",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "frj-ally-20-01-solmin.d.gz",
+     "size": 36596,
+     "sha256": "e3cbc0a4ca70d2954f671cde26d484a8de343b45bf183708a27143d43d49bfe2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "frj-ally-20-12-mtn-solmax.d.gz",
+     "size": 411758,
+     "sha256": "e12f6837f4a4fb5fc6f20344e31ad363a4a0e6e4097d9fc581740a765e07ccaf",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "frj-ally-20-12-mtn-solmin.d.gz",
+     "size": 412403,
+     "sha256": "3dd36cf435d968779db3c10d5ec48453eea3422a1a9dc8945e76c4c168ab1c25",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "frj-ally-20-12-solmax.d.gz",
+     "size": 411681,
+     "sha256": "17e05ee4d66e5f539305dd0ad98dbecfb2d08c30ca5eac12cff0610b3fbae828",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "frj-ally-20-12-solmin.d.gz",
+     "size": 412012,
+     "sha256": "626e14931475e306d71fe4621cce47e290c56600652d51487bbb985470f66c10",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "frj-ally-aa-nue.d.gz",
+     "size": 149131,
+     "sha256": "b964bbc7e0e8a1249d6684f7e11293d815b71d5589815a9e68f4e3356c68b948",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "frj-ally-aa-nuebar.d.gz",
+     "size": 148960,
+     "sha256": "48ccae71e1999cc58463723e32ea0810e4a394f6b9e529624dbf2d7d1739e432",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "frj-ally-aa-numu.d.gz",
+     "size": 147994,
+     "sha256": "2d94c95511f979041583048e527d68554cce02e94975cf23a603e6a03488fafe",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "frj-ally-aa-numubar.d.gz",
+     "size": 148191,
+     "sha256": "c030852f99f44bc5ac509e6346f4040777453456b69cfb4bc8e0c5ee4ac9a7e8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "frj-ally-nue.d.gz",
+     "size": 1747988,
+     "sha256": "4654dfac8091d5166b1439c663c47e2cd5fdad7cb7dfa77d6e3c4fad7e594625",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-nue.d.gz"
+    },
+    {
+     "path": "frj-ally-nuebar.d.gz",
+     "size": 1741443,
+     "sha256": "53ad1bc85c8cb735453c4fa4595e7f61c3a59d07f4c8d389b15032de22b15d25",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-nuebar.d.gz"
+    },
+    {
+     "path": "frj-ally-numu.d.gz",
+     "size": 1754930,
+     "sha256": "598f167a9d38edcb511fb467b31037b6f307d8e048464e5ba176bb86ac6a5497",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-numu.d.gz"
+    },
+    {
+     "path": "frj-ally-numubar.d.gz",
+     "size": 1757162,
+     "sha256": "79689a6dd6659b3c43441a51bca91517cb18d184f678ec1eb4239f5817939f82",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/frj-ally-numubar.d.gz"
+    },
+    {
+     "path": "grn-0305-01-01-solmax.d.gz",
+     "size": 2234,
+     "sha256": "da3783fc84973b7e707dc90818600bd9a6cb4ad29901c60636e00d248b837868",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-0305-01-01-solmin.d.gz",
+     "size": 2238,
+     "sha256": "3f9b4ed3cb54ba537c22c0371f00fa2a90a6af5970682a84208b18f86db8228a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-0305-20-01-mtn-solmax.d.gz",
+     "size": 36679,
+     "sha256": "c672700a120d2306f9900d6349d742733847e8194be4857010ae1397181a9b21",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-0305-20-01-mtn-solmin.d.gz",
+     "size": 36650,
+     "sha256": "7c772baf94fe2cab0a7f82e01999716ee7e25642f335644d40af89191d69ddc7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-0305-20-01-solmax.d.gz",
+     "size": 36909,
+     "sha256": "7730816e405b770c5454a780d169b7df23dc2b35a6318df4c858f0eb5b8f316f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-0305-20-01-solmin.d.gz",
+     "size": 36672,
+     "sha256": "1037e64c3c2e9881a25581753d7a71823e97c3de2ec79d21356a194bcf532b20",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-0305-20-12-mtn-solmax.d.gz",
+     "size": 414875,
+     "sha256": "640b26cba357d2b6931c5296acd0e4876dff5e8482a18b8609a3a4bdefe2beba",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-0305-20-12-mtn-solmin.d.gz",
+     "size": 414960,
+     "sha256": "ab35dc191b34b3cb801a5bb144f382aef073ef5e72b1039089ae0ef9ee338693",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-0305-20-12-solmax.d.gz",
+     "size": 414929,
+     "sha256": "680991439e98717bc364ad75a3ad7352c263c578cc826321b5cb3f6de098790e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "grn-0305-20-12-solmin.d.gz",
+     "size": 415149,
+     "sha256": "3f7196a4677311d226687fc0ff8d34a6b09395946dd6c039469c36a7d8dd7d9c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "grn-0608-01-01-solmax.d.gz",
+     "size": 2243,
+     "sha256": "13a6980393c740f0acfe611af66cbc46dd77ce25a2bbebb1abe92e68f1ae13a4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-0608-01-01-solmin.d.gz",
+     "size": 2245,
+     "sha256": "b6ff65c5a96450bb9382bef0a811d4feeaed20d85fc5086482231425f2a3c22d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-0608-20-01-mtn-solmax.d.gz",
+     "size": 36669,
+     "sha256": "c0dd4cda26135b9af1a8ee5dd91ca2939d840eb3928101cb7003aad52b0907d9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-0608-20-01-mtn-solmin.d.gz",
+     "size": 36971,
+     "sha256": "c01f67eabded6c161a82d775c450cceb66f9190ed9b04c65ed0d9fe6547f2a47",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-0608-20-01-solmax.d.gz",
+     "size": 36663,
+     "sha256": "b9dd0e235770d59c9190e648f318cbd4de2276417d27450043f993701b18cb6a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-0608-20-01-solmin.d.gz",
+     "size": 36587,
+     "sha256": "323e7e35f0fd3a42a663f33f755e68477824ce1fa2bc347b4e165be0484980e7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-0608-20-12-mtn-solmax.d.gz",
+     "size": 415422,
+     "sha256": "7f937c3177003bb8a61fa29a24f467f16d25b177f3f7eb906c56377f0369121c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-0608-20-12-mtn-solmin.d.gz",
+     "size": 415783,
+     "sha256": "d126e0f0c5d496fccdd335f40527b44ad95c7e82274880321b44d61aa8a6ef44",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-0608-20-12-solmax.d.gz",
+     "size": 415040,
+     "sha256": "a32b01481f5a65daf0d19980be40e0d803601178326104e88582bc1518f93fd6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "grn-0608-20-12-solmin.d.gz",
+     "size": 415432,
+     "sha256": "a720848db6dea4d006ed3f9326834340c3467121fe42fedc4056bf13a8c4da98",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "grn-0608-aa-nue.d.gz",
+     "size": 148746,
+     "sha256": "1fa6eace6232e30fe9010443ba92ca7ffbc37b85d7bae7187ff405770ca5340b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "grn-0608-aa-nuebar.d.gz",
+     "size": 148595,
+     "sha256": "eceb3e6937a4451e73b17593b24122c154934df2c18663185fd769c02c52f50a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "grn-0608-aa-numu.d.gz",
+     "size": 148269,
+     "sha256": "0c92673dbd0f4b83561d1314821e90432352cebd20ce85f2fd49712a8260f9d0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "grn-0608-aa-numubar.d.gz",
+     "size": 148456,
+     "sha256": "bb7dfd927253e007f0f7254c2369d732810c743dc0173d6a096678653e0fbdda",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "grn-0608-nue.d.gz",
+     "size": 1703815,
+     "sha256": "9b31f100adba93df43e4ee499f3e72ff1225d15b0210defd8393133b89885129",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-nue.d.gz"
+    },
+    {
+     "path": "grn-0608-nuebar.d.gz",
+     "size": 1691553,
+     "sha256": "56de914947896615029a04cb210fa1f0ce806e1263566cb3248fd97f191c193f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-nuebar.d.gz"
+    },
+    {
+     "path": "grn-0608-numu.d.gz",
+     "size": 1757122,
+     "sha256": "959c83d1d8fac8d19e8baa1bd52541fe694b428ec918cfcd33a568e74d877f23",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-numu.d.gz"
+    },
+    {
+     "path": "grn-0608-numubar.d.gz",
+     "size": 1757267,
+     "sha256": "71a1d63c3898d1f3d1a4ed84cf3992e33e87922c9ceb88d8391b614a0431e48f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0608-numubar.d.gz"
+    },
+    {
+     "path": "grn-0911-01-01-solmax.d.gz",
+     "size": 2241,
+     "sha256": "e02642b4c8f825d34236d14259bb3a605b8a537f0775b0b2eb14749c7ebfc3fa",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-0911-01-01-solmin.d.gz",
+     "size": 2221,
+     "sha256": "f931d9b3dad83bdbd84e2a4444954c8b23f24e66baf24279812e5357d7bba996",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-0911-20-01-mtn-solmax.d.gz",
+     "size": 36622,
+     "sha256": "77c93c7eb6fcf45d62cf00571cec7bba4a835c77483e3508a55d19f71e12f6af",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-0911-20-01-mtn-solmin.d.gz",
+     "size": 36513,
+     "sha256": "0e1179e91b1b8aa33d07fe1dd4f0d4bedd2772c7baddfc3652fbbcb36ee7f18a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-0911-20-01-solmax.d.gz",
+     "size": 36884,
+     "sha256": "854e518a6e6923bff9d8cb98a1f47d60de0d357a98cea0d3b446a6266132b30e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-0911-20-01-solmin.d.gz",
+     "size": 36670,
+     "sha256": "c1f8f97844e95572a5f666003e8f259b98b1beb413b7b54b8de28ef792b8ad1c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-0911-20-12-mtn-solmax.d.gz",
+     "size": 415023,
+     "sha256": "d0adfe2ca2e3ecbe6a9159a4a07d5eb606e7d2991711f234638ddedc95aac169",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-0911-20-12-mtn-solmin.d.gz",
+     "size": 414818,
+     "sha256": "81caefef87a5b56a0be588bf4acd20fc56d1f870541fc3aea7945bf28018f022",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-0911-20-12-solmax.d.gz",
+     "size": 414549,
+     "sha256": "aabaec6437c8032ca092820e6ac90fa6675f8739ab6dc8a887f6d69b5ced61e9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "grn-0911-20-12-solmin.d.gz",
+     "size": 415050,
+     "sha256": "306d0b5d475928382966391c4205cd32648519faa8259570539ec112379311a3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "grn-0911-aa-nue.d.gz",
+     "size": 148574,
+     "sha256": "41302b31879e2b90167e345447f8c5556561654eb6f0c154fe28d259a19bf482",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "grn-0911-aa-nuebar.d.gz",
+     "size": 148338,
+     "sha256": "a009947099917ad95a5ffddd3f13ff24d36f24819b2b62933fef33fcced2a610",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "grn-0911-aa-numu.d.gz",
+     "size": 148285,
+     "sha256": "34ae64643c6ac679dbd0dc2f0aad9814c97afbd6a20f1c41aacedc1799df3f30",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "grn-0911-aa-numubar.d.gz",
+     "size": 148273,
+     "sha256": "ad426a7da1d1fc4ea4d5f035d02255910966cf3f21f270e341f3d5edc93cb900",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "grn-0911-nue.d.gz",
+     "size": 1701751,
+     "sha256": "161200f679508da4d5403d07a196ea41b0a2fa917669b701f75c98a71893dd21",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-nue.d.gz"
+    },
+    {
+     "path": "grn-0911-nuebar.d.gz",
+     "size": 1689070,
+     "sha256": "76fcb10f2183140ababeaaa00f01ad7a195d9de9bf7d8c48f4a8161b1aacfaa3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-nuebar.d.gz"
+    },
+    {
+     "path": "grn-0911-numu.d.gz",
+     "size": 1755335,
+     "sha256": "d7bcbd276510ae374ead69ad33d07b4133079082fcba34c434b8b0d5d649b131",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-numu.d.gz"
+    },
+    {
+     "path": "grn-0911-numubar.d.gz",
+     "size": 1754846,
+     "sha256": "a62a955794c85bf98a5d39e17b402800de650c43c2d07b180ef75c345a184a77",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-0911-numubar.d.gz"
+    },
+    {
+     "path": "grn-1202-01-01-solmax.d.gz",
+     "size": 2248,
+     "sha256": "047f0832127c5282eb059fffcf364284710782b08c2e0043737be1cd2910edfc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-1202-01-01-solmin.d.gz",
+     "size": 2241,
+     "sha256": "ab5a1d38d71657c961a507947e85a18fb0c72b6be508460d11c6e36db84dca37",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-1202-20-01-mtn-solmax.d.gz",
+     "size": 36623,
+     "sha256": "79e32caf8f1bcdc3e832da66b91252d5ee23683d23dfb076f8648abe18fcd318",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-1202-20-01-mtn-solmin.d.gz",
+     "size": 36942,
+     "sha256": "7a45bd737cf73fa280b0290f84cfe73261978d3b34d4742ff5aeeec1007a5c8c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-1202-20-01-solmax.d.gz",
+     "size": 36811,
+     "sha256": "334e9056bc9b8c6ed30cb37e13ab41270cadb8ff48c33ac94fc0b98711a03482",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-1202-20-01-solmin.d.gz",
+     "size": 36559,
+     "sha256": "3c280662c073f99854d267aee4a1f8bccdc84be8570874b2acc14d8bade219f2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-1202-20-12-mtn-solmax.d.gz",
+     "size": 415434,
+     "sha256": "e1b737f49e78ee510395d6fb6391959b98ddfc0a8554a48887c1f44c348d185d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-1202-20-12-mtn-solmin.d.gz",
+     "size": 415488,
+     "sha256": "3748f6955498c911e5274d7fcff9c111793c022f704862a31cebe9d677ac6a06",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-1202-20-12-solmax.d.gz",
+     "size": 415238,
+     "sha256": "d84959d50abd946c0c21f0cf7bcdf2ebdd2c885f820ef9622e44018b1bf14d83",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "grn-1202-20-12-solmin.d.gz",
+     "size": 415876,
+     "sha256": "7145745e0213fcf973974e2e59235062f022fb045b817765c5e1954691ee212e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "grn-1202-aa-nue.d.gz",
+     "size": 148597,
+     "sha256": "e580362493fc082752ed03b0a17c705ebe0f0bfe1dc6d499395be18ab6a34f10",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "grn-1202-aa-nuebar.d.gz",
+     "size": 148249,
+     "sha256": "f16d648f78804aa0a4c55ef201a6f7fff9ff60fbee901ae542b49dcd70ce495a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "grn-1202-aa-numu.d.gz",
+     "size": 148050,
+     "sha256": "613967299a5488af14f401008f5fb7be7da8f36f7bf6eae2638e156672d3a53d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "grn-1202-aa-numubar.d.gz",
+     "size": 148128,
+     "sha256": "11eeb631e98a9ee60fb2f73ba54b1845a2a3f6eec3dd479928fec71f3cede89f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "grn-1202-nue.d.gz",
+     "size": 1701198,
+     "sha256": "6958a383ea93a5a4b3fce1ccf8cf72ae0a831b194048ba570c4458424ab5e1f9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-nue.d.gz"
+    },
+    {
+     "path": "grn-1202-nuebar.d.gz",
+     "size": 1688789,
+     "sha256": "3f9ce2839e4d4d0a614455b7deb30d17823315a0bc91bfdf0866f9dc1a84e847",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-nuebar.d.gz"
+    },
+    {
+     "path": "grn-1202-numu.d.gz",
+     "size": 1754618,
+     "sha256": "862b5c485f3f7dc86f887ef49366f99c3c816f88220821d595bd1929fd518d94",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-numu.d.gz"
+    },
+    {
+     "path": "grn-1202-numubar.d.gz",
+     "size": 1753854,
+     "sha256": "adc6a8254b29ac7a272cb559ed6d8bea3ceb3def02fda23acf67d64127bd0168",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-1202-numubar.d.gz"
+    },
+    {
+     "path": "grn-ally-01-01-solmax.d.gz",
+     "size": 2246,
+     "sha256": "c793c800f06eecae78291179b5db71b5669b922eaf12ef8f8ee837d105fb58b4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-ally-01-01-solmin.d.gz",
+     "size": 2247,
+     "sha256": "1d3ce42677dcb5fb868838359cb33965dae75452e1efaf3a8dd3f63e306a64dc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-ally-20-01-mtn-solmax.d.gz",
+     "size": 36643,
+     "sha256": "ccdea9b882905e9b9e0429640f2dc7c9b3c4f938b983236b0ff4c5c80f6dfb94",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-ally-20-01-mtn-solmin.d.gz",
+     "size": 36762,
+     "sha256": "0a0be26c34b006641422dce000ed545fb754bf4166d168ba8bae7354751f8b6a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-ally-20-01-solmax.d.gz",
+     "size": 36799,
+     "sha256": "97e396de1ee479bd38702fc47f7247814e34c38a3a5a7a3f8d62bf95dc83a5da",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "grn-ally-20-01-solmin.d.gz",
+     "size": 36565,
+     "sha256": "b2330db2258f79885163aabe9100d6815aef2f319280ad9f6d2472a291db4307",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "grn-ally-20-12-mtn-solmax.d.gz",
+     "size": 411661,
+     "sha256": "a8be1446d9b2b94db1251ad888cedb2be85c4eaefdc1c1a51fb4a52726014a48",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "grn-ally-20-12-mtn-solmin.d.gz",
+     "size": 411842,
+     "sha256": "9fe24779d6cf3b2e7eaacfb6d80306f7b84264c818e09dc3e9e59c9babb97134",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "grn-ally-20-12-solmax.d.gz",
+     "size": 411162,
+     "sha256": "1a2af04c87116ecb0bbbc0aefeb789e41001ddb85fc318a3e7ab15a05c292f8e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "grn-ally-20-12-solmin.d.gz",
+     "size": 412079,
+     "sha256": "f730b02eb31790f33b5fd11f59585eebdf942965e235ba3296c23cac0ad4ad87",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "grn-ally-aa-nue.d.gz",
+     "size": 149267,
+     "sha256": "b3ca4feae486881a1c6990f489a9ffe7f69604bb8fd30bbd994e10fd4c537594",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "grn-ally-aa-nuebar.d.gz",
+     "size": 149120,
+     "sha256": "f1323957dbb25e1443c9988cd857c1d8f6ea85ec4b9c6d8782dfa4f8d51f585f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "grn-ally-aa-numu.d.gz",
+     "size": 148051,
+     "sha256": "3d37f77a69fbbfaf221cd7795b5b393e337c2f4013588dba52485e2e2833f513",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "grn-ally-aa-numubar.d.gz",
+     "size": 148418,
+     "sha256": "84ead044445dbc97a4f4681dfdaff253cd00a7003912d095b814493f7b721d73",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "grn-ally-nue.d.gz",
+     "size": 1747825,
+     "sha256": "3b373af32e889d4417d1c95a1e3d1f9787352138ce8dbe959ded2632bc838f58",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-nue.d.gz"
+    },
+    {
+     "path": "grn-ally-nuebar.d.gz",
+     "size": 1740921,
+     "sha256": "9e0c90f4828ce7d8567ef7a8a51a941925caa05d985c6c6c93b3c49d206a2b58",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-nuebar.d.gz"
+    },
+    {
+     "path": "grn-ally-numu.d.gz",
+     "size": 1755289,
+     "sha256": "44612285b87830cd015a301105df8ce39ebad7c59bb2528613447e7448c21281",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-numu.d.gz"
+    },
+    {
+     "path": "grn-ally-numubar.d.gz",
+     "size": 1757773,
+     "sha256": "88bb6cc8fea29b3998b94d0c76127e7895d6bd300a3ca63c56fd4a2688f6143c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/grn-ally-numubar.d.gz"
+    },
+    {
+     "path": "hms-0305-01-01-solmax.d.gz",
+     "size": 2255,
+     "sha256": "f042f32abca0548906c744ead6baa8bb9fe03bb65e1fd4dc292b7573dc068798",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-0305-01-01-solmin.d.gz",
+     "size": 2258,
+     "sha256": "de57c359d1d99329488e1f1147623314649aecbf3c19c4162cb556c5ee2af729",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-0305-20-01-solmax.d.gz",
+     "size": 37040,
+     "sha256": "bac137deacc95e121865816c0dc4d18e96b38caed70a658cc0e1b7e211b73697",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-0305-20-01-solmin.d.gz",
+     "size": 36799,
+     "sha256": "a16ddddbea6a4c12a0a5f02cde2c2774653676ae02a7dd0f603015b6cf52c5b6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-0305-20-12-solmax.d.gz",
+     "size": 412860,
+     "sha256": "3a93657bbd12d15776cc00cf73f02e38687b7fef0a9198a68df56ccb0f2942fe",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "hms-0305-20-12-solmin.d.gz",
+     "size": 412660,
+     "sha256": "0b9f81b10c956717948e2357f9f3523984c3314ea870a419f7330edb4345a099",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "hms-0608-01-01-solmax.d.gz",
+     "size": 2249,
+     "sha256": "e094e682f7d93ddb4c5f1a4cce7f83407951fd44541e94ab1292e88fe2d3b662",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-0608-01-01-solmin.d.gz",
+     "size": 2232,
+     "sha256": "d586c1c3220a25188e74fa55d4b7f4d84b245755494616b4139f857a8da816fa",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-0608-20-01-solmax.d.gz",
+     "size": 37010,
+     "sha256": "0f883f5bd8abdb00f1102362d32e3257db07c68c85a38e9d726640852548c292",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-0608-20-01-solmin.d.gz",
+     "size": 36666,
+     "sha256": "216b0d6be3c8ec6b896d014c038a053b221df89cdff4d14d8320fb8bde7e6cc8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-0608-20-12-solmax.d.gz",
+     "size": 412982,
+     "sha256": "1f332e297056168cbd75014842058bb954392b0974778d73027c3e485c19d5bb",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "hms-0608-20-12-solmin.d.gz",
+     "size": 413530,
+     "sha256": "6a90384eb436aa1ed847a25b6a5512c6e74b6f03e0dd4f9dbb07cc53204b7e96",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "hms-0608-aa-nue.d.gz",
+     "size": 148835,
+     "sha256": "c7b7773f67f1789f15de45c26f1d11c7caf4b00d06249af841847f33629da90a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "hms-0608-aa-nuebar.d.gz",
+     "size": 148552,
+     "sha256": "aaa6f149afb5967f64ae69afde168947bdb10049012dbd8cd9dd9186e59f1a72",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "hms-0608-aa-numu.d.gz",
+     "size": 148098,
+     "sha256": "41aaeac01ea0b976ea90f2adeeb0eeb503116b686766d198c00a80854585b0b3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "hms-0608-aa-numubar.d.gz",
+     "size": 148373,
+     "sha256": "0ecc8f1762ed1e711d62d521b1ad690317fd16945f1b6f24785e63ee038dc96f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "hms-0608-nue.d.gz",
+     "size": 1703780,
+     "sha256": "ef3769e159c02395a4ff14c926ae96e98085728abf33f78268ac764d3c6c3eb8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-nue.d.gz"
+    },
+    {
+     "path": "hms-0608-nuebar.d.gz",
+     "size": 1691050,
+     "sha256": "ffe898f27a79371b61e9dc1a21c208d9adea2b6a60c4a25998028b49af7bbba4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-nuebar.d.gz"
+    },
+    {
+     "path": "hms-0608-numu.d.gz",
+     "size": 1755659,
+     "sha256": "66b340ce1225ac77eb4719a221e06a2712f3338a14592a3e253e3c8a32a9a539",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-numu.d.gz"
+    },
+    {
+     "path": "hms-0608-numubar.d.gz",
+     "size": 1756100,
+     "sha256": "0401fd78d4020834e3d090aa9a1cffef3e1b1bf814a7c6b905cead74b5275584",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0608-numubar.d.gz"
+    },
+    {
+     "path": "hms-0911-01-01-solmax.d.gz",
+     "size": 2248,
+     "sha256": "9ed8a90698bd296914f876b58905c5c11829c334a7f19e9e1248c91d316be65a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-0911-01-01-solmin.d.gz",
+     "size": 2237,
+     "sha256": "f24842c35a650b312d1478ce30ad93ae4517f50a80c53ef67950e32e9c67f410",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-0911-20-01-solmax.d.gz",
+     "size": 36687,
+     "sha256": "84a1e5687b413e5ce9cd8ad6e7572eff780d60386dcff208987f94cabe68a65f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-0911-20-01-solmin.d.gz",
+     "size": 36686,
+     "sha256": "52514f235761b9dc673832f777c1a09cda2129003b3db13bd64eeab8399b9dfe",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-0911-20-12-solmax.d.gz",
+     "size": 412661,
+     "sha256": "84383005b0d8418a86de79b2c797f32e2a24c12ae18fcf30c129669a85bb939d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "hms-0911-20-12-solmin.d.gz",
+     "size": 412874,
+     "sha256": "d70b6bc0cf2bd7344756d6959bc6a7e41e20eaf907d815f72ccbd9334b9096bc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "hms-0911-aa-nue.d.gz",
+     "size": 148803,
+     "sha256": "3bf0548c5aae48de8d2decf1dda342b38e48820169976ced386926e633dcb97f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "hms-0911-aa-nuebar.d.gz",
+     "size": 148212,
+     "sha256": "86a183890024ff618248d532663d7f2b3fed42fbae14aacccf9064bdc6633bdf",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "hms-0911-aa-numu.d.gz",
+     "size": 147769,
+     "sha256": "19eaedc001d8c12a7cf1fee5521a42c44cf640379ef309620a8c8abfcc066303",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "hms-0911-aa-numubar.d.gz",
+     "size": 148185,
+     "sha256": "bc2218b81ef08095275372c9d6eb6133bdcab408fc04dd4172566e028e90e972",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "hms-0911-nue.d.gz",
+     "size": 1702469,
+     "sha256": "c0683824d74536d38ea376413ba3764060d71364d81ec183b3463bdce576f5da",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-nue.d.gz"
+    },
+    {
+     "path": "hms-0911-nuebar.d.gz",
+     "size": 1688652,
+     "sha256": "dad4cc22b8fc1b3dc52cc845f41d6b36532278b94547fef6214fbcd4f1061934",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-nuebar.d.gz"
+    },
+    {
+     "path": "hms-0911-numu.d.gz",
+     "size": 1753294,
+     "sha256": "1da6f3bc728769d4d896e515748286752461e97b9a18c9ff036758418f5e1050",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-numu.d.gz"
+    },
+    {
+     "path": "hms-0911-numubar.d.gz",
+     "size": 1753482,
+     "sha256": "3a764cfdf94c049fe2209c74408f5064f56abbb1419b575fed8b08a7806f3bdb",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-0911-numubar.d.gz"
+    },
+    {
+     "path": "hms-1202-01-01-solmax.d.gz",
+     "size": 2248,
+     "sha256": "b1e016ccc6faa0433a3b6d142b3cd31e60894e58dc4e389c7d3dfcdde987bd66",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-1202-01-01-solmin.d.gz",
+     "size": 2243,
+     "sha256": "e86cff2907d8824ff1400549b31e9f4996966cfdb6d0cf3f58cc62b81e3072e4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-1202-20-01-solmax.d.gz",
+     "size": 36975,
+     "sha256": "cb2798ca71e948798236ca33503e6ae3f163ce927c5796e681c159977dcbe991",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-1202-20-01-solmin.d.gz",
+     "size": 36719,
+     "sha256": "0b926d18a5164888c554d3aaf4dee0c4ef91311dd91ec7c9016b3eeb922d3f30",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-1202-20-12-solmax.d.gz",
+     "size": 413502,
+     "sha256": "8c44cdfbd49671a203e882e2b23e1dff749fec02a5d515bcd4d6610bf4b269c3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "hms-1202-20-12-solmin.d.gz",
+     "size": 413388,
+     "sha256": "371c6f01aeeb7f557f624aa1c17121a27cbdd6e4158971772ef0f38266c1ce6a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "hms-1202-aa-nue.d.gz",
+     "size": 148682,
+     "sha256": "837cdb0aacf17204b6597a6cfd5ef922c68ec45a535b583e432523e0a6d2f6a8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "hms-1202-aa-nuebar.d.gz",
+     "size": 148122,
+     "sha256": "61a3f9102f9b01842f1b280473d931bb4afa51662b102b670ab6e7cc537e57da",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "hms-1202-aa-numu.d.gz",
+     "size": 147666,
+     "sha256": "e04a5046f7c020db88367737efbd08963f068ea83491abce2aa51ca36102cac3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "hms-1202-aa-numubar.d.gz",
+     "size": 147981,
+     "sha256": "9b102b13f88c485a534aba0749c2aca76da1dbdd86163fbe150b4ccc91bceb42",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "hms-1202-nue.d.gz",
+     "size": 1701211,
+     "sha256": "8fe77ded2bb70f19394b41e4ff84c2c85af0f05a699001875ae9c42a600c572f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-nue.d.gz"
+    },
+    {
+     "path": "hms-1202-nuebar.d.gz",
+     "size": 1687844,
+     "sha256": "40238ac568e0e8b40498b4eb377ffaa2ffaa090f21f5edf20a605770f73f301e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-nuebar.d.gz"
+    },
+    {
+     "path": "hms-1202-numu.d.gz",
+     "size": 1752627,
+     "sha256": "0ab2bc65539bf139be96c048e7be69a02942918c0e51fb528ef4b0c1150d326e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-numu.d.gz"
+    },
+    {
+     "path": "hms-1202-numubar.d.gz",
+     "size": 1753335,
+     "sha256": "3cd2bf4fa67cda7dad198a4284024302101c08514cdb3724ecd8e2e64637f63b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-1202-numubar.d.gz"
+    },
+    {
+     "path": "hms-ally-01-01-solmax.d.gz",
+     "size": 2247,
+     "sha256": "44aaa10c5367ad420430381d2858187cb7b12c57bdc37531cb30fd84cc777c36",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-ally-01-01-solmin.d.gz",
+     "size": 2242,
+     "sha256": "765f8b46f2c0f5981ae10c37434acb545f394d69a7ee91873c4127478fcea07f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-ally-20-01-solmax.d.gz",
+     "size": 36681,
+     "sha256": "7e03e44d21b19d9ba2f2760e1d23db411508d1cb3b4f6642ef6c9f89ed1453cf",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "hms-ally-20-01-solmin.d.gz",
+     "size": 36733,
+     "sha256": "13c399f4476ff93e7e5461b0051ba3abd786db2829c9a600bdb796b8161ee055",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "hms-ally-20-12-solmax.d.gz",
+     "size": 409720,
+     "sha256": "bb21c40a9f6dc211e7c5edb2a75b6c4c243aacfbbb982125d6af06a3304fb086",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "hms-ally-20-12-solmin.d.gz",
+     "size": 410068,
+     "sha256": "860ecf7e34503a0e2784e64696b8a3028f9182832b3a56a19ffbc33a918469d1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "hms-ally-aa-nue.d.gz",
+     "size": 149245,
+     "sha256": "0d3e765e6ca0978fa2b71b3b23ec900ca69789e5cf4a2bb2d4223c7d3901895e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "hms-ally-aa-nuebar.d.gz",
+     "size": 149063,
+     "sha256": "7332d2be0f7a550e06bfe19c99ae698db62a058603ecdf1be77233793d1efeba",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "hms-ally-aa-numu.d.gz",
+     "size": 147739,
+     "sha256": "832beeca59c15ee59e0d2b82ae8ad2c6fcd7f30b2e91cb09d875ccceb00fec3f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "hms-ally-aa-numubar.d.gz",
+     "size": 148101,
+     "sha256": "460e926e950e0331406ff84ee2ca18a12e58d7f119062492850552d0a704f5df",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "hms-ally-nue.d.gz",
+     "size": 1748834,
+     "sha256": "2cda0d07e3f06649073a79e9187e028ace017b5d329c47fe050c5a1e6798a602",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-nue.d.gz"
+    },
+    {
+     "path": "hms-ally-nuebar.d.gz",
+     "size": 1741378,
+     "sha256": "4fe04a3e6398cd13b8fe8f4a961c5c9241c1cc1d9c081d44155222453d1ec33d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-nuebar.d.gz"
+    },
+    {
+     "path": "hms-ally-numu.d.gz",
+     "size": 1753009,
+     "sha256": "3d4704cef9326bbccd657615ab4e2f35d23b5d0a464e338dfb84122f04704c77",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-numu.d.gz"
+    },
+    {
+     "path": "hms-ally-numubar.d.gz",
+     "size": 1755658,
+     "sha256": "59155757a3856eb9e30dd6d1691e483fdc1b6fbc80b6f06e81b2bbf40243f88c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/hms-ally-numubar.d.gz"
+    },
+    {
+     "path": "ino-0305-01-01-solmax.d.gz",
+     "size": 2250,
+     "sha256": "0469ee758adb7c5aa8cc026df3719a9102e8cec6f3889e943d477cf490ba229d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-0305-01-01-solmin.d.gz",
+     "size": 2249,
+     "sha256": "eb2665b7f69085414a3b0d572c84094542b0c80805281551bb97b44b5b2a260d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-0305-20-01-mtn-solmax.d.gz",
+     "size": 36480,
+     "sha256": "ac323964d2b64e1f9ac013f35883496ece75234600e1a16d8f7f770541eae0c9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-0305-20-01-mtn-solmin.d.gz",
+     "size": 36721,
+     "sha256": "005f4069dedb8ca39e8dc426a7e1e1b9b5f9bebff9b8dfa1943793501449be47",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-0305-20-01-solmax.d.gz",
+     "size": 36466,
+     "sha256": "dda8be83cfea9e33825434b42a4d7294e24f784e4f7b73420aabd003ce0a0c88",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-0305-20-01-solmin.d.gz",
+     "size": 36430,
+     "sha256": "f76353398d8aca1a5fa0c79f858fb3b330087d986826679ed8b1930b84eeaf58",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-0305-20-12-mtn-solmax.d.gz",
+     "size": 416804,
+     "sha256": "8d0b9cf573956827b6d87d92816889e3a058731d29e7403e21cd518bb44ba1b4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-0305-20-12-mtn-solmin.d.gz",
+     "size": 417095,
+     "sha256": "7a20338fa7d73a6fdfa31ea6b7b6db6f5f8c42f4fb42a3a41bce0cba37a67061",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-0305-20-12-solmax.d.gz",
+     "size": 416872,
+     "sha256": "22c8424d8efa3d265e5ca761dd9f77d793c15f5eb9a3ccb59648b9eb8458d3a0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "ino-0305-20-12-solmin.d.gz",
+     "size": 417046,
+     "sha256": "5bb5d854a54cf126efdfb1b79fe09aeac39267decec14e6ed230c3bdd927fcc4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "ino-0608-01-01-solmax.d.gz",
+     "size": 2238,
+     "sha256": "f8cfa18514ced16992d1328c73c8e0a346d86388f384d599ea0615571f7235cd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-0608-01-01-solmin.d.gz",
+     "size": 2253,
+     "sha256": "ae5c44c3bf4e53994072dbbd9d1fc6d35aeb042e60009efa5a7fac79e5078797",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-0608-20-01-mtn-solmax.d.gz",
+     "size": 36537,
+     "sha256": "d3bda5d5f2e8963caf6f1e72e143abf0a3a0b0e8626e82c835e05056a788db46",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-0608-20-01-mtn-solmin.d.gz",
+     "size": 36785,
+     "sha256": "514e77eb21677b6c70b73af4cc4044647dddfedf2bca32b592cc78a63146691b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-0608-20-01-solmax.d.gz",
+     "size": 36478,
+     "sha256": "6fd1e47e1c5361fd3826867a9662058a99686e0467c2395c09a6777f83421cc4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-0608-20-01-solmin.d.gz",
+     "size": 36471,
+     "sha256": "14726cc9ecf032dcb7a44179528b462dff154d504488a1445c979f96912abfb8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-0608-20-12-mtn-solmax.d.gz",
+     "size": 417525,
+     "sha256": "09e5299a994f06520934978d94140f0677fc62a25c24f3433c34a073e638b1b0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-0608-20-12-mtn-solmin.d.gz",
+     "size": 417802,
+     "sha256": "40e7710670de4d4e951ccbcc588af47ab9aced0e247969369331a784ca15c606",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-0608-20-12-solmax.d.gz",
+     "size": 417651,
+     "sha256": "91a374a9c53773c6adc7bb0065fee37ed9e556ac8c2bbe9ef54744fa1eb4a40b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "ino-0608-20-12-solmin.d.gz",
+     "size": 417366,
+     "sha256": "49d3d676ffc4f4fc058f6a21d784c693c1e7906723d12894ac7dee02fa1a83e0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "ino-0608-aa-nue.d.gz",
+     "size": 148600,
+     "sha256": "dab880762af608f54411158e19e0b8c2e98613316dc99b873e1b5fd6237b0631",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "ino-0608-aa-nuebar.d.gz",
+     "size": 148459,
+     "sha256": "749f9f6ac058c0e804701604afa2e32e6c739c6e38cf993050835a6fe34905b5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "ino-0608-aa-numu.d.gz",
+     "size": 148554,
+     "sha256": "930044d249389ff6b67a821373423cd2d8c422a9634d84597a8f2a2462446092",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "ino-0608-aa-numubar.d.gz",
+     "size": 148389,
+     "sha256": "153282ffa97339ddd46310284b2bc79040fb447ac8f067e5ccc244ecee25174f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "ino-0608-nue.d.gz",
+     "size": 1697664,
+     "sha256": "27938c67b03848574c596eb14388100944e514d03ddcce5b9255715115151300",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-nue.d.gz"
+    },
+    {
+     "path": "ino-0608-nuebar.d.gz",
+     "size": 1684877,
+     "sha256": "3516bbeca9d4383dc42c5ed6f3112bc701d8efbc3f9d72b6e547c3095e639532",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-nuebar.d.gz"
+    },
+    {
+     "path": "ino-0608-numu.d.gz",
+     "size": 1757533,
+     "sha256": "418fc4f4656d63ba6a5a0b170460f82929a0cb59e2eec7d353c6c4d76f28c16a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-numu.d.gz"
+    },
+    {
+     "path": "ino-0608-numubar.d.gz",
+     "size": 1756793,
+     "sha256": "a19de35172cc2286a31e08f466382b938e42a118443ec38c9586871536b0cafb",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0608-numubar.d.gz"
+    },
+    {
+     "path": "ino-0911-01-01-solmax.d.gz",
+     "size": 2249,
+     "sha256": "ce92115b23f2f1751d99fba4ffa29d9fd5f01ceeca0c2388996ede4d618cbf38",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-0911-01-01-solmin.d.gz",
+     "size": 2238,
+     "sha256": "44a297d030fa5adf76501be80dbc5da9f45f6307a2f448dca4cc26320cd6350a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-0911-20-01-mtn-solmax.d.gz",
+     "size": 36704,
+     "sha256": "b31ad8d63709b05eaeaa46ff5fda499968149db89a0439fbe152dcdfd2d1753f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-0911-20-01-mtn-solmin.d.gz",
+     "size": 36783,
+     "sha256": "7e489f6b6e67c454c269b740432cf5604cc4f2d829d846b6ea52703564afcee4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-0911-20-01-solmax.d.gz",
+     "size": 36439,
+     "sha256": "01832e2c79e6daa06cbaba94f85430ae49a1ff93880a7d59c8a0a6d155ce6f7b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-0911-20-01-solmin.d.gz",
+     "size": 36432,
+     "sha256": "a3a096f4493a5473c5af4cb8f2ce3335a7eb0a76c875253080c4c1f3e28df84f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-0911-20-12-mtn-solmax.d.gz",
+     "size": 416987,
+     "sha256": "1d2a733e8e6c79f8055d9ad73e30c893f005b5fd43375798922d874edb46a92e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-0911-20-12-mtn-solmin.d.gz",
+     "size": 416953,
+     "sha256": "fe7c24d64c6475dc280ebc4a2a617544e94eb48706bb1454ff11aecddaa6f8b2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-0911-20-12-solmax.d.gz",
+     "size": 416953,
+     "sha256": "db4c784b5912d51a1e221d70733d974b93a97bb970e35bcd8c7a18fdb7ed6c83",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "ino-0911-20-12-solmin.d.gz",
+     "size": 417087,
+     "sha256": "88149dfbbd545174c349ca93c6a9bb6bf64c32443d960998f462f769492d45fc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "ino-0911-aa-nue.d.gz",
+     "size": 148628,
+     "sha256": "e461288673d0ed88750901fbeaa6a14ef728a32a347eac10a662ac31762bbd29",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "ino-0911-aa-nuebar.d.gz",
+     "size": 148366,
+     "sha256": "670f97a00728c785e0e7c8a9156aa80a612cff8715475071b132ad4201c0e9dc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "ino-0911-aa-numu.d.gz",
+     "size": 148214,
+     "sha256": "2d20e2b79cfacd71e8de1b3352cbdb93fa7c96e1af21080085689dcaffae177d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "ino-0911-aa-numubar.d.gz",
+     "size": 148594,
+     "sha256": "5c49aa4056c06ef68f14367e3ed192aef00fba4a77ae06dea18c2edb0beda610",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "ino-0911-nue.d.gz",
+     "size": 1696830,
+     "sha256": "cbe7ebe11ee9d602bb67b211e5d8e565c2c9ed0551c81a1ee0beb0cbabe46fea",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-nue.d.gz"
+    },
+    {
+     "path": "ino-0911-nuebar.d.gz",
+     "size": 1684333,
+     "sha256": "5b4160849562a08f7631797dd2ab5928307fd4db881203f07149033a7f027ae3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-nuebar.d.gz"
+    },
+    {
+     "path": "ino-0911-numu.d.gz",
+     "size": 1758149,
+     "sha256": "dd4830226dbd637f94af98dccf6dcf5886c543bb7e6c9dfdcb30d7e04dee6420",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-numu.d.gz"
+    },
+    {
+     "path": "ino-0911-numubar.d.gz",
+     "size": 1757187,
+     "sha256": "79a85dd8402d72f39a9bfd6e898c433c1d4f2a2eb26406fcf3b55a95c855e79d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-0911-numubar.d.gz"
+    },
+    {
+     "path": "ino-1202-01-01-solmax.d.gz",
+     "size": 2238,
+     "sha256": "78be22639fddd75986785ea43be0528887510b568697f435e2576e5fecbcfcf0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-1202-01-01-solmin.d.gz",
+     "size": 2227,
+     "sha256": "0fec332f9a826765547069f4c96d534b49c340be0ce613b1d996c9f831a8dc14",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-1202-20-01-mtn-solmax.d.gz",
+     "size": 36485,
+     "sha256": "cba286c9b9fc8778464ddb5553502929a3179c7d800d3f27bcec9f7abd748c7b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-1202-20-01-mtn-solmin.d.gz",
+     "size": 36465,
+     "sha256": "178d8b51a04513aa11f9acb85834d24dd4339dafca8cb1d26586150abf0159a9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-1202-20-01-solmax.d.gz",
+     "size": 36468,
+     "sha256": "850f9786fc226f96252e2df4eb09adc527d4deb2e305769912fe6950ec66e143",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-1202-20-01-solmin.d.gz",
+     "size": 36417,
+     "sha256": "e6c4727553738f25ad93175d7fad31c680e32504250ae79a259618a73172a043",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-1202-20-12-mtn-solmax.d.gz",
+     "size": 417487,
+     "sha256": "6b337cca67b6d03673313dc50a4d28733f7e53c2410a04e4d54788c8ea67d52f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-1202-20-12-mtn-solmin.d.gz",
+     "size": 417892,
+     "sha256": "cd88d3932b544f719dd5e3279e2b92ff9d1f15b80738810d28a430abb68a8c8a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-1202-20-12-solmax.d.gz",
+     "size": 417128,
+     "sha256": "120157b09d3d88df5f58ef1f73d4185b595bd639fd94aa78a8cc60dd4826496e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "ino-1202-20-12-solmin.d.gz",
+     "size": 417280,
+     "sha256": "5e9189d7909b22508ab6ee81845271b7c17a1bcda4fae0eef4d1ec752af8b681",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "ino-1202-aa-nue.d.gz",
+     "size": 148468,
+     "sha256": "144c1d88b191f575e27f998154a7312d5880f4af174d146df66c4f7b7aa1b3b5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "ino-1202-aa-nuebar.d.gz",
+     "size": 148170,
+     "sha256": "8b612e89efdfb65fca67918905cc00d73da1beb098d871bd6deeef50c46a53ce",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "ino-1202-aa-numu.d.gz",
+     "size": 148237,
+     "sha256": "498f9e2ab2210683eff690011755998b300e7ff16b54ddd7dcd5044e97cb634f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "ino-1202-aa-numubar.d.gz",
+     "size": 148370,
+     "sha256": "fbd071a89b9de6fb4a3c138be6b7dfaf2118cdde609ae284fd8345514ec81a1a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "ino-1202-nue.d.gz",
+     "size": 1697134,
+     "sha256": "5debb09fc2f8b584925812c19a8400560ffe5f58f8ce6a366eb5f3b2919aca7d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-nue.d.gz"
+    },
+    {
+     "path": "ino-1202-nuebar.d.gz",
+     "size": 1685424,
+     "sha256": "f05cad9e1dc10baa1397e20ad784445a28827547381315e712b1955706ae3624",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-nuebar.d.gz"
+    },
+    {
+     "path": "ino-1202-numu.d.gz",
+     "size": 1757352,
+     "sha256": "d209c8f101bfc64d4c463229d2077a73824836845bb4e7fd2cef5e225c3757be",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-numu.d.gz"
+    },
+    {
+     "path": "ino-1202-numubar.d.gz",
+     "size": 1756554,
+     "sha256": "90c4351a18330d2412fe9716f725530bc47f1d1784aff759ce27e6d66e0aa8f4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-1202-numubar.d.gz"
+    },
+    {
+     "path": "ino-ally-01-01-solmax.d.gz",
+     "size": 2236,
+     "sha256": "7b5d0e57207bc66f3649233373237e35f4f5c45e52a6854e949cb1d5a380383d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-ally-01-01-solmin.d.gz",
+     "size": 2246,
+     "sha256": "891de61a69167297603459d9f99916c85629b57c8097957d7c2b731ab191b2f2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-ally-20-01-mtn-solmax.d.gz",
+     "size": 36719,
+     "sha256": "ba1beaab2a440ba91e3942e08ecb21c3fc6de5c67113ffc5778596876ae97d96",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-ally-20-01-mtn-solmin.d.gz",
+     "size": 36496,
+     "sha256": "675e65445c4d3270822b9c130d4522e10c2f5ee36b5da6d8708c405bb26efb0a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-ally-20-01-solmax.d.gz",
+     "size": 36450,
+     "sha256": "ad0ffc24a76d34aa13c3c592484445d933e0af04adab386b7893783625c20c2f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "ino-ally-20-01-solmin.d.gz",
+     "size": 36608,
+     "sha256": "b62396ed4abf15d2e7ac517c07f55803da33904e7b959d85fca3cf8bbaa1a627",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "ino-ally-20-12-mtn-solmax.d.gz",
+     "size": 414126,
+     "sha256": "6baeb7d69043c3fc91df0ddc17c78eb86411ae7ad94cee12785688282b8effb7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "ino-ally-20-12-mtn-solmin.d.gz",
+     "size": 414123,
+     "sha256": "936298617b85652e36889f7ab1e87292051e21f74babd1824c5e4aae9ac2bcf6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "ino-ally-20-12-solmax.d.gz",
+     "size": 414075,
+     "sha256": "712bc71dc7525310113e2a230200e58a7693113674ca18647ee94fd8cd1eda4a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "ino-ally-20-12-solmin.d.gz",
+     "size": 414354,
+     "sha256": "bf2fd94c59904f7c57d360ae6c98d0a15823444b3cc8219be550593ff18792ea",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "ino-ally-aa-nue.d.gz",
+     "size": 149101,
+     "sha256": "77acb40b23681d0b2db3435d52f942bf7263ada9be3497da95b06016eddd4170",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "ino-ally-aa-nuebar.d.gz",
+     "size": 149035,
+     "sha256": "2c0038c08d5c2ef3b9e7e3f66a4b06e2bf20df3530b6e0681aa281b7e2151a20",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "ino-ally-aa-numu.d.gz",
+     "size": 148223,
+     "sha256": "136da6ae14bbc26f04f1710b17fdde024a14fbcc1d0518bdd78e164135fcfbb5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "ino-ally-aa-numubar.d.gz",
+     "size": 148516,
+     "sha256": "329b9837c1604d9034134228abbac5473737305b2917786b4e3614d2ca55fe82",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "ino-ally-nue.d.gz",
+     "size": 1747245,
+     "sha256": "5b04f85e48fe06a80fe7562314a051e10d1cd1ae6764e5833ae2bbefd83b520c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-nue.d.gz"
+    },
+    {
+     "path": "ino-ally-nuebar.d.gz",
+     "size": 1740645,
+     "sha256": "6aea0e9d84b10f059108952cd6e18410a1f5c31e2841a20e081b7810129b21e0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-nuebar.d.gz"
+    },
+    {
+     "path": "ino-ally-numu.d.gz",
+     "size": 1758243,
+     "sha256": "e8d94515d09ea77b4b3ea19deb5070df6eb4e47cb3e988b62a782b6b09f3367c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-numu.d.gz"
+    },
+    {
+     "path": "ino-ally-numubar.d.gz",
+     "size": 1760476,
+     "sha256": "abfb5525b0df20851885d9159899e26b82410d7e88f3900387c5be466b19f7a1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/ino-ally-numubar.d.gz"
+    },
+    {
+     "path": "juno-ally-01-01-solmax.d.gz",
+     "size": 2240,
+     "sha256": "808ef3c01d9beb85aedfb2f674379e01d528debf69f27556535f737cc5df74c7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "juno-ally-01-01-solmin.d.gz",
+     "size": 2245,
+     "sha256": "0f353aa7dd33c87bb9c61b0b767f61ccb3d53f7b4d7c2c468c5b90cd5abc8516",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "juno-ally-20-01-solmax.d.gz",
+     "size": 36424,
+     "sha256": "bf4fe95dea38a71d4884b051130c89227bf7d170c261861f7e74d2e1c5716da9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "juno-ally-20-01-solmin.d.gz",
+     "size": 36742,
+     "sha256": "2ac9ee31e3c58f453f6fc187da94d751beb0e4484ce66456316a1c6e7630e1cc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "juno-ally-20-12-solmax.d.gz",
+     "size": 412637,
+     "sha256": "847c7b269f8b0007a1c9b529faa2caeb06de1491f633828a7650e0aba0929b6a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "juno-ally-20-12-solmin.d.gz",
+     "size": 412298,
+     "sha256": "23035ee6f2dfc821363efd06bb28ed8ad07cf792534fa0016d2acbd724ec5b1a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "juno-ally-nuebar-aa.d.gz",
+     "size": 158530,
+     "sha256": "651ac55b2368d4d740abe20153ccf08514aa34bf3c3dc578babb28bde425999c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-nuebar-aa.d.gz"
+    },
+    {
+     "path": "juno-ally-nuebar.d.gz",
+     "size": 1857524,
+     "sha256": "43d9a97591790d2c16ce479f16aa1ce2c654e6aa8083102542755ea0d674cf46",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-nuebar.d.gz"
+    },
+    {
+     "path": "juno-ally-numu-aa.d.gz",
+     "size": 158768,
+     "sha256": "687c120e1299912f1b1c8d75907ec75a34b620f4682e946b94c537bdec6dd4cc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-numu-aa.d.gz"
+    },
+    {
+     "path": "juno-ally-numu.d.gz",
+     "size": 1870969,
+     "sha256": "b63b0d56ee4984f58f4f3edc5ef5804882d6bc79bd21aee9709ab27e9a85f12a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-numu.d.gz"
+    },
+    {
+     "path": "juno-ally-numubar-aa.d.gz",
+     "size": 158813,
+     "sha256": "ccf17dda98f93c2b48f2e1cf4d019615d3e28e5d31c9f8f1a96310c6a1cd89d9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-numubar-aa.d.gz"
+    },
+    {
+     "path": "juno-ally-numubar.d.gz",
+     "size": 1870660,
+     "sha256": "252a912cf22cbd36fb8793241b3e1e0581b0fac89083ec84fcb8876e35bc68fc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/juno-ally-numubar.d.gz"
+    },
+    {
+     "path": "kam-0305-01-01-solmax.d.gz",
+     "size": 2246,
+     "sha256": "78ff10757d3f5d4de2b9931b05787cd7e5e5f1201b433d096ae3e0ae38e872ba",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-0305-01-01-solmin.d.gz",
+     "size": 2230,
+     "sha256": "f8d732faa1a7d9423ad75d83f5501e99b4fd8158db9640b405362f5bf231312a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-0305-20-01-mtn-solmax.d.gz",
+     "size": 36424,
+     "sha256": "fc8a3d303971c171450cc1d6dfadd256a8b8e7263bd3606f918795199cfe69ce",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-0305-20-01-mtn-solmin.d.gz",
+     "size": 36487,
+     "sha256": "fe0683c6a4a1b2a858feb1457fc846f5174cc9df8743e9b1a2867be2e6c53155",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-0305-20-01-solmax.d.gz",
+     "size": 36835,
+     "sha256": "64a4afba724da0ce3ed2b78878541243e8290476be33d13dd302065eddc1024d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-0305-20-01-solmin.d.gz",
+     "size": 36526,
+     "sha256": "345236adbf2fa347094138a88c0cc00b5d18a02c9ec97b816dd70c909cb186f5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-0305-20-12-mtn-solmax.d.gz",
+     "size": 415892,
+     "sha256": "63ddb2c4c06f089f131470562752f4c4e8d9f6d7e3f4bc3f4b8db337ec6b320e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-0305-20-12-mtn-solmin.d.gz",
+     "size": 416119,
+     "sha256": "a07a287830f2329bf3ec246bc99e3823467a9481a38e17c6988807852de34bb8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-0305-20-12-solmax.d.gz",
+     "size": 416484,
+     "sha256": "719092222bf8ef2790705597dd9cfd0a1c083110d38f82eb2f5a9cf325dabc36",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "kam-0305-20-12-solmin.d.gz",
+     "size": 416816,
+     "sha256": "64831973d3f7e989d194a916a4b876e5abcc83ef5df39516930cdf0ed9e67352",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "kam-0608-01-01-solmax.d.gz",
+     "size": 2238,
+     "sha256": "5191134fb13ec92960e7b20289ae835876b3413a2e4dd9a18b3859ff675193f8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-0608-01-01-solmin.d.gz",
+     "size": 2243,
+     "sha256": "7dedd9a7d5c5996e527059da354fb537b6e6c500e76b1230c6de168885f6fee2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-0608-20-01-mtn-solmax.d.gz",
+     "size": 36591,
+     "sha256": "af84a835ca2cada8551d324e4aa4c6648b2de8cc06be15c40ad44e44e5ad211a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-0608-20-01-mtn-solmin.d.gz",
+     "size": 36916,
+     "sha256": "aec90bd1443a2f56ea863213c23258ef4d17569d1311a2e2da549c1916de9910",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-0608-20-01-solmax.d.gz",
+     "size": 36467,
+     "sha256": "c6812445998e2e634a6bbf1949cb831dd81fcb2376a511cf14f67768e2b6d732",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-0608-20-01-solmin.d.gz",
+     "size": 36535,
+     "sha256": "2f8b7c15feca6d2ebb1632455a80c183bc685a7cc74bb1c7049144c01f4bbdac",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-0608-20-12-mtn-solmax.d.gz",
+     "size": 417061,
+     "sha256": "151759c2ec4addfa6ecbcfb8c0994a448346da1f449d3a8a774c400f68a30ef0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-0608-20-12-mtn-solmin.d.gz",
+     "size": 417030,
+     "sha256": "26e9e1ce2b11c1a84e65bd1fb7fa76fd11a0c6360529009868812b98f5c67266",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-0608-20-12-solmax.d.gz",
+     "size": 416834,
+     "sha256": "2c5b151d6939c2a9bf179881da462b3c0d2113ddad62bbccb86f83da3f03d4bc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "kam-0608-20-12-solmin.d.gz",
+     "size": 416808,
+     "sha256": "60ea17309c5ab24bd7d6499ab3821be0b803a8995cb4c227f770c8907e095628",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "kam-0608-aa-nue.d.gz",
+     "size": 148704,
+     "sha256": "968f6572104622e4106e4e34169a975afaf0f3859aef2e20225e22578a6904c7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "kam-0608-aa-nuebar.d.gz",
+     "size": 148386,
+     "sha256": "0adcd2baeb6f6aa26507ef7a54187e5e3a3906f0d796eabf09021dbd6d0d463c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "kam-0608-aa-numu.d.gz",
+     "size": 148323,
+     "sha256": "c1364693ba2c4f81be0da1410858be69c0cc568fa46e21b81b144706498ea004",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "kam-0608-aa-numubar.d.gz",
+     "size": 148629,
+     "sha256": "bef743c4007eb38532a7a7664b507f86cd7e02701291712a1a83c7c5296e1415",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "kam-0608-nue.d.gz",
+     "size": 1700874,
+     "sha256": "8ab702688f34a3d74fade4a076297646ec73ede16353bbef6e15230e797c453f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-nue.d.gz"
+    },
+    {
+     "path": "kam-0608-nuebar.d.gz",
+     "size": 1688718,
+     "sha256": "e593e0b6fc72cdd0b9bf51fe6d72622575c028e488fe57f7f5e6105bb7c08f31",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-nuebar.d.gz"
+    },
+    {
+     "path": "kam-0608-numu.d.gz",
+     "size": 1757980,
+     "sha256": "2c118917aa7b17eb3f45c005cd6f92a749a96fffaf9ba5092cd388d214d0b893",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-numu.d.gz"
+    },
+    {
+     "path": "kam-0608-numubar.d.gz",
+     "size": 1757395,
+     "sha256": "d6caaf59f5b72aa43ffaa6b86f3349fb116a2dd72eed86eeaf481c0bf5277e59",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0608-numubar.d.gz"
+    },
+    {
+     "path": "kam-0911-01-01-solmax.d.gz",
+     "size": 2236,
+     "sha256": "2085249eb77f89ca8dfaced0292507511fe18472a6bd6d0f716f23ba13691ad8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-0911-01-01-solmin.d.gz",
+     "size": 2250,
+     "sha256": "f016845df5a4462d70f8145f96acfcf5753be3d3d36ce8b8957aa63b4dec4159",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-0911-20-01-mtn-solmax.d.gz",
+     "size": 36853,
+     "sha256": "2112076cd07b225f0cc4f48f0db8474bc0f4739d9499c540215e4de7a4c6fb18",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-0911-20-01-mtn-solmin.d.gz",
+     "size": 36551,
+     "sha256": "a6c1a0c14589da4a43e0817a1face87251a74c5ba9a8902e821ad17a4870f48e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-0911-20-01-solmax.d.gz",
+     "size": 36411,
+     "sha256": "20daa7da8c6ab606aaf1e0bc2afa88058d00017aad7c95be7eea6661a77e0dac",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-0911-20-01-solmin.d.gz",
+     "size": 36439,
+     "sha256": "509e495be9cd62feedb2a675c8faa882090e1d83f407a8c58e1659e16ecad1c1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-0911-20-12-mtn-solmax.d.gz",
+     "size": 416415,
+     "sha256": "317dca187eab9cc13df07ca4eadeb47b432f0a1ca584e76de56ae69cae05bdd8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-0911-20-12-mtn-solmin.d.gz",
+     "size": 416548,
+     "sha256": "9ec0c724a53eaf75c280d18e128efb8c4b156e2d9b35e43ce8e2f5af8d98657d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-0911-20-12-solmax.d.gz",
+     "size": 415774,
+     "sha256": "30b5a6ce38efe55a34dde36227a9bf457f91d67046c96156889e0c1295bd051b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "kam-0911-20-12-solmin.d.gz",
+     "size": 416536,
+     "sha256": "3345dd45529ba4b7c239b005ccd4a2853e2bcb20ab1f45e08435905173f0d0dc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "kam-0911-aa-nue.d.gz",
+     "size": 148555,
+     "sha256": "adc680d4178e94a1fd1e5f991c95a93d7956693a70fcc5f2c81ec9306e1cace3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "kam-0911-aa-nuebar.d.gz",
+     "size": 148265,
+     "sha256": "7306bd76937405b2345ed6d8faf2f630f88802ee8474be61e29616e01098130a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "kam-0911-aa-numu.d.gz",
+     "size": 148240,
+     "sha256": "82cadc1ce0cbe073b4b7fcf3579db4502b2fe9218b30d0b26ae0b91a48512d90",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "kam-0911-aa-numubar.d.gz",
+     "size": 148408,
+     "sha256": "4c6b66386885f37ad9aa017cfccc119ff2c2ab8133e4d80bf64ba0fc3c975f9b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "kam-0911-nue.d.gz",
+     "size": 1699990,
+     "sha256": "07460a91f79edd7be79c7ef9bb29272e880e9667f036a04a9133dfc9998730e0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-nue.d.gz"
+    },
+    {
+     "path": "kam-0911-nuebar.d.gz",
+     "size": 1686788,
+     "sha256": "f16985c428c887456783830b10ce23639dbd1d872ef598742c54164dcd4e8b74",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-nuebar.d.gz"
+    },
+    {
+     "path": "kam-0911-numu.d.gz",
+     "size": 1756979,
+     "sha256": "9f5b6455b38d142032923d1e3c470aa8c606db7d0a5430c6c6007f9959c01f5e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-numu.d.gz"
+    },
+    {
+     "path": "kam-0911-numubar.d.gz",
+     "size": 1756215,
+     "sha256": "df58d9ae3340259b8218fcce3dadc8be2b1dabece2afb676e05bb1babc597e48",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-0911-numubar.d.gz"
+    },
+    {
+     "path": "kam-1202-01-01-solmax.d.gz",
+     "size": 2243,
+     "sha256": "d3f1fa99f0dfdba982695a7df03dbd0b9fbb96f7756c3d650195373cf1f2c867",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-1202-01-01-solmin.d.gz",
+     "size": 2240,
+     "sha256": "af8e1cd1c1d0edf15f2ee3a218102ba1590351e84c41d7185f78c0ace70e4ecd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-1202-20-01-mtn-solmax.d.gz",
+     "size": 36565,
+     "sha256": "2ec0f558d0140cdb0c8e5cd11afd9502baded93620668dbf0dc7fbb4faed3d00",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-1202-20-01-mtn-solmin.d.gz",
+     "size": 36534,
+     "sha256": "d9603aa75b59b19a7387aa0499b457300b89770cfb58b5391a103078b57423cd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-1202-20-01-solmax.d.gz",
+     "size": 36824,
+     "sha256": "e39226c8b3e7eef7c26b0d359e632816cec02c42311296602fee93fd8b099298",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-1202-20-01-solmin.d.gz",
+     "size": 36543,
+     "sha256": "708eed549d7841ae44309fa8f6dd6f86a65b93f4b89008a7d453596b68c21209",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-1202-20-12-mtn-solmax.d.gz",
+     "size": 417036,
+     "sha256": "58410f7332ab79476371895d88a2e650bd567d072b6daf7a6b5e64e3df6b5575",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-1202-20-12-mtn-solmin.d.gz",
+     "size": 417052,
+     "sha256": "ca4e7153bd721f627126c8cec3456e37e31e666edbdfcadda583ae76a9e505b2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-1202-20-12-solmax.d.gz",
+     "size": 416683,
+     "sha256": "19adfa4825e8b1cebacafa1670d8639bdec96c2e00d070bf915845c7412e77be",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "kam-1202-20-12-solmin.d.gz",
+     "size": 416890,
+     "sha256": "17f3ffdeed6accf538cee86ed068f626ff4cb9b82e386acaeb5f5948207095f9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "kam-1202-aa-nue.d.gz",
+     "size": 148594,
+     "sha256": "57d36548bc7c1b0ef14eee206e153fce45b2cb7961358366e223847328ecdda8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "kam-1202-aa-nuebar.d.gz",
+     "size": 148199,
+     "sha256": "b750119204ad5b2e9a436d2d805fb468d5307a98d6db5e61b71ca1338e639b2a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "kam-1202-aa-numu.d.gz",
+     "size": 148177,
+     "sha256": "d55f63ef67e52ec9571a3875f6543cdd19732191c45a8b46e667f0f33947bfef",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "kam-1202-aa-numubar.d.gz",
+     "size": 148281,
+     "sha256": "6f7eb8cb22bb5d94feac266b34ba5119eeb58145e3ede882245ad4cc099a6b31",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "kam-1202-nue.d.gz",
+     "size": 1699909,
+     "sha256": "635bd6b33a60ede2f94aaaecb1aa1a5203f309959bc530fd54fe33b95d7043e9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-nue.d.gz"
+    },
+    {
+     "path": "kam-1202-nuebar.d.gz",
+     "size": 1687450,
+     "sha256": "54f2faa9dbc167b9ab79d7c955a25168b2b7f0d9543ff0d51305dbb117d2fef1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-nuebar.d.gz"
+    },
+    {
+     "path": "kam-1202-numu.d.gz",
+     "size": 1756185,
+     "sha256": "0c608e4f453cebcebb6c5cdb0e4927b64d28600a0eba6edb43507fc467a5333f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-numu.d.gz"
+    },
+    {
+     "path": "kam-1202-numubar.d.gz",
+     "size": 1756388,
+     "sha256": "c3738eaf76200a98394717ef87826c05c7aaa8f390a637042030943ad9aca17c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-1202-numubar.d.gz"
+    },
+    {
+     "path": "kam-ally-01-01-solmax.d.gz",
+     "size": 2235,
+     "sha256": "cf47911df29790f9022cf80300368015d1c5a8d1aabeecb9e65d0df7267ae1c5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-ally-01-01-solmin.d.gz",
+     "size": 2238,
+     "sha256": "6c5f5586f78a59142fa485f856305afc6970c9296083eeb544849bcba2af24e1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-ally-20-01-mtn-solmax.d.gz",
+     "size": 36623,
+     "sha256": "0add5e6a8637144e82a67bf164a9770dc477f5975fff852570d459d85614759e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-01-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-ally-20-01-mtn-solmin.d.gz",
+     "size": 36576,
+     "sha256": "f165c9d9a3a6d91e0e17498a27f88ec897c4e0a51d2f718a005f17fa2ed52dd6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-01-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-ally-20-01-solmax.d.gz",
+     "size": 36588,
+     "sha256": "7581ae5ad428b024e310f6a182a2fb606dd9c0e85fb102e76dada6cd6f17f0c2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "kam-ally-20-01-solmin.d.gz",
+     "size": 36857,
+     "sha256": "c710db5515afd1e4d93b4a247fd2d8e1c03136ca8c8262b9dee21b35093c969d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "kam-ally-20-12-mtn-solmax.d.gz",
+     "size": 413835,
+     "sha256": "01785748e62b260fdc7b72e2c14bd4b522ff44057ddfd9aee220c7bf1c487b2f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-12-mtn-solmax.d.gz"
+    },
+    {
+     "path": "kam-ally-20-12-mtn-solmin.d.gz",
+     "size": 413642,
+     "sha256": "c08acdf1cae494f49852278c1aaf4c61aa27c4fc2a8d6365c945c691e5e9c32b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-12-mtn-solmin.d.gz"
+    },
+    {
+     "path": "kam-ally-20-12-solmax.d.gz",
+     "size": 413230,
+     "sha256": "86cb2b011dafe845cafb3a6c62afca3f18446dae3cc58bc26af416260c5dbbc2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "kam-ally-20-12-solmin.d.gz",
+     "size": 413545,
+     "sha256": "2f5d99d2f33d0f0b32140bc204211d7feac7031e803a8ca05abcdfeec8c45c40",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "kam-ally-aa-nue.d.gz",
+     "size": 149224,
+     "sha256": "e3f89588de7935ef05f60f4565f2a85f0c05e06201206defbae6a70c47d206c0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "kam-ally-aa-nuebar.d.gz",
+     "size": 149271,
+     "sha256": "1b81a840746c8f610232e4f4a8318d26038ab69e7e9c2c0e248882eaefd0434f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "kam-ally-aa-numu.d.gz",
+     "size": 148247,
+     "sha256": "8c0bb94d9955559214e1d4b2cfcc81746b2c30b592a5c8f94226cd55cb2caf3f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "kam-ally-aa-numubar.d.gz",
+     "size": 148275,
+     "sha256": "ef55658c959cea6d8bad0bac35a66181d1904bf361d4745bb22b317109ac5626",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "kam-ally-nue.d.gz",
+     "size": 1747775,
+     "sha256": "b00b1c29794b3b5a3625f3a7d72a9863266c93ff147ae1994e470145b06c70ac",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-nue.d.gz"
+    },
+    {
+     "path": "kam-ally-nuebar.d.gz",
+     "size": 1741582,
+     "sha256": "8e3cc117def9c72378ae0dc5c96c1848d8b59e80205534bb508fdaa5f2cc50a4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-nuebar.d.gz"
+    },
+    {
+     "path": "kam-ally-numu.d.gz",
+     "size": 1757217,
+     "sha256": "f8f817aa10a47d1e3439f0045be4ee940b92fb63c286310da72b3f42e8d8adea",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-numu.d.gz"
+    },
+    {
+     "path": "kam-ally-numubar.d.gz",
+     "size": 1759356,
+     "sha256": "93bc8e51b64cc11898c0b9351a27c5acd3b1c9ee221d29d64a2bb79d21a51e58",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/kam-ally-numubar.d.gz"
+    },
+    {
+     "path": "pyh-0305-01-01-solmax.d.gz",
+     "size": 2243,
+     "sha256": "937108686314a580fb4c18805709dd8a62f8da415ac4daee87025cbfe9433e6e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0305-01-01-solmin.d.gz",
+     "size": 2240,
+     "sha256": "efe4fda1a789023e0c0e98c9ceca5ac6bcc0c83fd2194f3d5ea4624d7df8b0a4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0305-20-01-solmax.d.gz",
+     "size": 36938,
+     "sha256": "01dba86c3eb8241a52707706bfc94fadbcfd59dc2e80f78d087d1b00fde373d4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0305-20-01-solmin.d.gz",
+     "size": 36656,
+     "sha256": "f37bf06dec0fe0241366d964e817d947553f9b196af9a48cbbc410e5a34c4142",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0305-20-12-solmax.d.gz",
+     "size": 412300,
+     "sha256": "c8e3a7760d55f013910455066bcf26c6ed6322b19e16767a7178e87dd31b4b62",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0305-20-12-solmin.d.gz",
+     "size": 412271,
+     "sha256": "088d9280c2de3bdf79fb7081a604d0387785ce95397beecb6c9759d064a59042",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0608-01-01-solmax.d.gz",
+     "size": 2240,
+     "sha256": "03fbd021c0538508cd92ae797eb7dc52182c763456908f821cfd9e19a1e595de",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0608-01-01-solmin.d.gz",
+     "size": 2233,
+     "sha256": "36ad348476cf26e30e7ccecab2cbdeea1b3fd330e05358a28d6d403cc5792dae",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0608-20-01-solmax.d.gz",
+     "size": 36678,
+     "sha256": "f8144fbef1d2a3361269f6e679920107bea8516613985e034424458dd0edf36b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0608-20-01-solmin.d.gz",
+     "size": 37040,
+     "sha256": "15db78863b4406ca9ff6163598854796745cf9031a766080f7b52c0174b7e2b5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0608-20-12-solmax.d.gz",
+     "size": 412469,
+     "sha256": "4fc6aa1aab2ae43bcf171f811701dedfc550a6b1640ef26cf9884e7aaa811fc9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0608-20-12-solmin.d.gz",
+     "size": 412805,
+     "sha256": "cd9b5fcd5882998fcd91ad23368067c3175aecd18525bc2b64caefadd5e78771",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0608-aa-nue.d.gz",
+     "size": 149044,
+     "sha256": "5958f6a44076ec7e2c69d71af1f81e6c271d4e1bd3fcc4f768d05f80435e7108",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "pyh-0608-aa-nuebar.d.gz",
+     "size": 148739,
+     "sha256": "7ccd1560735184419e019996f89abfc42c8ff34c45c5261fe914c0891d9fd675",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-0608-aa-numu.d.gz",
+     "size": 148234,
+     "sha256": "d9c8a0c2db0e8202049948c8450995db3884bf213dc9fc84eea0b10436545e69",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "pyh-0608-aa-numubar.d.gz",
+     "size": 148429,
+     "sha256": "df22f7e2f00915022483e56e291b7636abd7af24ecfbf3c8ffb5feaed556411e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "pyh-0608-nue.d.gz",
+     "size": 1705023,
+     "sha256": "859d32d3790a6f0379ea5e0ec6b42521d6acf81d2396d0ebc783b556fe60b600",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-nue.d.gz"
+    },
+    {
+     "path": "pyh-0608-nuebar.d.gz",
+     "size": 1691127,
+     "sha256": "19e43f67fec6cab9928d790486f0d559c6f1408aea9902a52701172bd3e6b718",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-0608-numu.d.gz",
+     "size": 1756541,
+     "sha256": "c2dae7e419c9ea383533db32e3464cddf0c16087c00289ebd4da552f58012a15",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-numu.d.gz"
+    },
+    {
+     "path": "pyh-0608-numubar.d.gz",
+     "size": 1756953,
+     "sha256": "21a4fd06c9466a21ab5031e120eb057292e982f722056ac046a2e0b5958e5d92",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0608-numubar.d.gz"
+    },
+    {
+     "path": "pyh-0911-01-01-solmax.d.gz",
+     "size": 2248,
+     "sha256": "0f8b3eb811baa037e00e2c13da1cc99a0996cbcaf1cd19483f199b459a040866",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0911-01-01-solmin.d.gz",
+     "size": 2237,
+     "sha256": "a274482deafe2e1bac456f6e2ed3d89c9f01d3a52e5bd4901627eb81f0a9552d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0911-20-01-solmax.d.gz",
+     "size": 36704,
+     "sha256": "ff3534151ba080d1af3893c767742206c845f298870a7b8ca808311159476f63",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0911-20-01-solmin.d.gz",
+     "size": 36723,
+     "sha256": "af655a44a8d22bcaaa178a1dc72515d926d889f346d95580d0c144c4ae0fb4e6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0911-20-12-solmax.d.gz",
+     "size": 412283,
+     "sha256": "38de5692479150ad5cf2063d8e6613fa3f5032704142e08765ea16d357312090",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "pyh-0911-20-12-solmin.d.gz",
+     "size": 412643,
+     "sha256": "dc35cf9e896f591f20c0b4e96bc7ef6558105698cc2c040da21bc5384f4feb7c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "pyh-0911-aa-nue.d.gz",
+     "size": 148766,
+     "sha256": "a1f07e4116d95df411857bcdb4640880ad85913368bfc243218cf4343fd0d170",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "pyh-0911-aa-nuebar.d.gz",
+     "size": 148241,
+     "sha256": "a333beaded1f2fd66441864b5ba99e2e1123bbc9fd683ce4093e95a4af01cf8d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-0911-aa-numu.d.gz",
+     "size": 147799,
+     "sha256": "655ff3a23a22ccc5a0ae67b2cb2a298311f009a9a0cacb75bc48a3f754e9d91c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "pyh-0911-aa-numubar.d.gz",
+     "size": 148253,
+     "sha256": "7d1ac641d240371a9765c839dcc3cccd0a10b2c26c6be2478656cc4563e1cffb",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "pyh-0911-nue.d.gz",
+     "size": 1700874,
+     "sha256": "c494c635048d13b1b45dc363d9fa14c3d121460c12a06335bdc48fad0d4e9b43",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-nue.d.gz"
+    },
+    {
+     "path": "pyh-0911-nuebar.d.gz",
+     "size": 1687633,
+     "sha256": "ffff2942af30c3bf716155c04a38c2a82c556341801c2ebe923edcaf184a6ed0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-0911-numu.d.gz",
+     "size": 1750929,
+     "sha256": "95a37f0a8fcd2f60ffa2a392b2798c67abf54e680c9d01f6e4e9595daaab5ca5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-numu.d.gz"
+    },
+    {
+     "path": "pyh-0911-numubar.d.gz",
+     "size": 1752575,
+     "sha256": "48757a3e95bc6c4f05f1c65347ca4a68bcf89963970eb9322d56814d6c487516",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-0911-numubar.d.gz"
+    },
+    {
+     "path": "pyh-1202-01-01-solmax.d.gz",
+     "size": 2255,
+     "sha256": "d70748d521294263a5683113b2ad996c470fdc004ebc06a5f9e475c932af0550",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-1202-01-01-solmin.d.gz",
+     "size": 2255,
+     "sha256": "1013ea5ccf63f590c55ec1f36deb2bb0118054ec8f628bbdcb1876e9c4759a6f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-1202-20-01-solmax.d.gz",
+     "size": 36762,
+     "sha256": "bd4f24e4ec4d400a1ced5f8a7a046825c1800d1c98cb31ff9552e82cea1a7c0e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-1202-20-01-solmin.d.gz",
+     "size": 37075,
+     "sha256": "ece070778e55c5874b4a53937936a4667e1c48a579d0183daf48c4e5f64148e5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-1202-20-12-solmax.d.gz",
+     "size": 412774,
+     "sha256": "21710c34df3a3f98893a9b4ca2a6f0b167bd3168cb1193792f4363991938aa85",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "pyh-1202-20-12-solmin.d.gz",
+     "size": 412727,
+     "sha256": "aefc98225f8fa5b41766dc3ff2cec8fe2c70390fb13a586d75d2b0ea57fcd0d8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "pyh-1202-aa-nue.d.gz",
+     "size": 148387,
+     "sha256": "0921c19a0f68e49ae9612257b17ae435c8f6b814c07f5fa12f4add99cb452754",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "pyh-1202-aa-nuebar.d.gz",
+     "size": 147873,
+     "sha256": "ad757dd097e14837e437c4d58614cf0f21c0b3c661e6c3fea79c31df2f6411b3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-1202-aa-numu.d.gz",
+     "size": 147507,
+     "sha256": "61498e6d7be92a206e8e5534d796351c22d02a98be7c3379bffd7bdbb897e786",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "pyh-1202-aa-numubar.d.gz",
+     "size": 147819,
+     "sha256": "c05ece99a9728facd981b3f7eef2180aad9f5a69c888f0f6d65896e13f1b61b9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "pyh-1202-nue.d.gz",
+     "size": 1698484,
+     "sha256": "d5e04a1ed71fe230c831caa4328caaa0589fca662230ff603d1225f279c6c2f7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-nue.d.gz"
+    },
+    {
+     "path": "pyh-1202-nuebar.d.gz",
+     "size": 1684948,
+     "sha256": "181178dba9640028d3a9e38023104f878906cab55b3dd635258b60a013ed86b6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-1202-numu.d.gz",
+     "size": 1749358,
+     "sha256": "8e3d58cb8a9ae6938bb7acf30fc2c52fe68a4607e842e75a2622ed7b4ea7f494",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-numu.d.gz"
+    },
+    {
+     "path": "pyh-1202-numubar.d.gz",
+     "size": 1749947,
+     "sha256": "4a0dff567be5fe47e8c217892f11ffe3cdce1385b96ea236bf6fd99931ab0364",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-1202-numubar.d.gz"
+    },
+    {
+     "path": "pyh-ally-01-01-solmax.d.gz",
+     "size": 2231,
+     "sha256": "d568888dcfc51ec609f13f6ec8c11d7ad090feb190681bb388ef0af96b6b7413",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-ally-01-01-solmin.d.gz",
+     "size": 2230,
+     "sha256": "0db8b401546100c04b78330fe3a3668300dd51267c57558918db4f4d4f60d68c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-ally-20-01-solmax.d.gz",
+     "size": 36724,
+     "sha256": "ef7d9fa57da485410d317b4b48ef14c3fb1f10ccc789f88457d9e98f960db073",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "pyh-ally-20-01-solmin.d.gz",
+     "size": 37011,
+     "sha256": "6f923c020c20e8fa2a18e3aed64859fce4943b8916eac01f3aa20f23b0ff9a2e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "pyh-ally-20-12-solmax.d.gz",
+     "size": 409355,
+     "sha256": "78691caeaa4e6a6ba9091e8f9d7d7eece9b9b804771e3c31ca06a7de3d8f198b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "pyh-ally-20-12-solmin.d.gz",
+     "size": 409489,
+     "sha256": "d92104de4fc8d7ae5bb1c1b9af2b598c0866ab964aa1edfe0b3349ea099b41f5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "pyh-ally-aa-nue.d.gz",
+     "size": 149269,
+     "sha256": "2b66d2da9a69ae06e2da8895e74b895fd4105c869674b2dfd47864b59b5d53c3",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "pyh-ally-aa-nuebar.d.gz",
+     "size": 149148,
+     "sha256": "cab560b47e431d682cf59553a3b019fcfc1e700ed19c6a6dc6b08f4c8097f820",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-ally-aa-numu.d.gz",
+     "size": 147751,
+     "sha256": "5522e42bb6781eee632f64b6508dd4a6b620bc9742fae9c0f33e3a7ac18d2788",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "pyh-ally-aa-numubar.d.gz",
+     "size": 148222,
+     "sha256": "993caf0d60d2cb8ed567768822c1f905fc5f6ddb48e091a5d2377c7d99a63535",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "pyh-ally-nue.d.gz",
+     "size": 1747217,
+     "sha256": "84a5ce95c9fa09a529f6c9e5ec07769a9a09ca80dcf601fcff6268d6903ec9c2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-nue.d.gz"
+    },
+    {
+     "path": "pyh-ally-nuebar.d.gz",
+     "size": 1740155,
+     "sha256": "a14e338ac30d132f267fa34fc518992bd1e42060d3021cdf8135d0259253b46c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-nuebar.d.gz"
+    },
+    {
+     "path": "pyh-ally-numu.d.gz",
+     "size": 1751763,
+     "sha256": "7b899f1d950aaee5be7fa0e894073bee78cb752fc7e2cc705d43734c1f5b3551",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-numu.d.gz"
+    },
+    {
+     "path": "pyh-ally-numubar.d.gz",
+     "size": 1755019,
+     "sha256": "5e42fff39a4ace4cd72fbea114f8e5014678cd5360e22a8b0a9364761e915444",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/pyh-ally-numubar.d.gz"
+    },
+    {
+     "path": "sno-0305-01-01-solmax.d.gz",
+     "size": 2242,
+     "sha256": "01252e8c429e0bc6a97c62ec43cc00b997064e55befc0efb3168d474b3aabd04",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-0305-01-01-solmin.d.gz",
+     "size": 2226,
+     "sha256": "3486e19a237942d77594b811860a97039da4506458492886e7ed9aa63c24ee35",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-0305-20-01-solmax.d.gz",
+     "size": 36995,
+     "sha256": "fc1ccf46cba198933c2cdb2eb8f7ee7e9ff2baa8d631703b5b4365168d74ef5e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-0305-20-01-solmin.d.gz",
+     "size": 36673,
+     "sha256": "4349739daf0d09b6e691870e57ed197f5953b9d69583719d38a407cad5b5333e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-0305-20-12-solmax.d.gz",
+     "size": 412891,
+     "sha256": "b09869d73b5b95c267b905a4a3f188795352074bd828a48480d7e7e1d59d4e73",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "sno-0305-20-12-solmin.d.gz",
+     "size": 413323,
+     "sha256": "4ede6d473d513b3ed0a8eacd712a64f5f95bc5382e3d0774b3ac8dafa407b03e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "sno-0608-01-01-solmax.d.gz",
+     "size": 2242,
+     "sha256": "22eb23e41dd7bcb5be2528795fd4a13a347eb606f1162c037df346cbb693b02d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-0608-01-01-solmin.d.gz",
+     "size": 2244,
+     "sha256": "1163fa198ecad31642692231e54de37aab52ffd5c1e582f724999afc94ccca82",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-0608-20-01-solmax.d.gz",
+     "size": 36653,
+     "sha256": "e3130d175ce29067db1b2563fc838dece2df4830a6472ada2ef905bcf58cde77",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-0608-20-01-solmin.d.gz",
+     "size": 36620,
+     "sha256": "97210bf7d2cec861daada20b8923133e53275258e549654b786ddc7551b49ddd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-0608-20-12-solmax.d.gz",
+     "size": 413598,
+     "sha256": "607cb50cc88fe9b31c3b65f36358da991bbd0d54700961550807ad5b2e893c73",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "sno-0608-20-12-solmin.d.gz",
+     "size": 414015,
+     "sha256": "d763243022546b3a196936272e3753f0f88013de14f64a481725552661a60b70",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "sno-0608-aa-nue.d.gz",
+     "size": 148861,
+     "sha256": "d67947e4afa6fbcfb7707d970299eebf732e26d89f176abf208ecb4efa475343",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "sno-0608-aa-nuebar.d.gz",
+     "size": 148366,
+     "sha256": "62cd5244bb8a27b122d93ff3ca4a582981eb11473fee98027d7cc4a9afc0ab17",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "sno-0608-aa-numu.d.gz",
+     "size": 147884,
+     "sha256": "581de7d69ed906b1c0f75297f6b23a2aa4a0974554ac4f10634bbbda1f95036c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "sno-0608-aa-numubar.d.gz",
+     "size": 148358,
+     "sha256": "d5ebafbb3f22da9ba92ed7f6e368eae275f611422357dd7e7f416077fa292f85",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "sno-0608-nue.d.gz",
+     "size": 1704151,
+     "sha256": "9051154378994a939115674bc67cf2ec4950ea64f83c01a9ca475216612db2cc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-nue.d.gz"
+    },
+    {
+     "path": "sno-0608-nuebar.d.gz",
+     "size": 1690946,
+     "sha256": "a7017b6f2c41a5595aed347691134f0fd68bc3c1a6c3d3524074a71c6f19c336",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-nuebar.d.gz"
+    },
+    {
+     "path": "sno-0608-numu.d.gz",
+     "size": 1755789,
+     "sha256": "c4c740ccf402c41ce9413db9b7f1c1ae937560cad6343aba98a89d1497f179a8",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-numu.d.gz"
+    },
+    {
+     "path": "sno-0608-numubar.d.gz",
+     "size": 1756613,
+     "sha256": "fb124614d4b68dff1ad41bedc15bd787b76c16a2bf85748e4ac59e5325ae366a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0608-numubar.d.gz"
+    },
+    {
+     "path": "sno-0911-01-01-solmax.d.gz",
+     "size": 2255,
+     "sha256": "7a33e845459e2ad875f24e69653f44ae676179d179112ae228e0c6a1e7f5d364",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-0911-01-01-solmin.d.gz",
+     "size": 2249,
+     "sha256": "d8000466fed44d9f0c05b9d294f284a1706ae62af1b1abaf225c65a555556754",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-0911-20-01-solmax.d.gz",
+     "size": 36745,
+     "sha256": "1708c308512bb4294ce1d2574b082488d1fef31da900f98427ccf6e800936f7e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-0911-20-01-solmin.d.gz",
+     "size": 36732,
+     "sha256": "e9fabeefadaad93ae3025e8e6b671b473fb219fdc22a013ed2e5b19f0f1bd4d5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-0911-20-12-solmax.d.gz",
+     "size": 412828,
+     "sha256": "5026b53c84e447b2d775e6ebc4700a536c8a823df65b07974f2e994ac8742a32",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "sno-0911-20-12-solmin.d.gz",
+     "size": 412914,
+     "sha256": "0bb3960cfcdb14022a52a4714eb508a3a12a12def6e06652feb5d82d9740d78c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "sno-0911-aa-nue.d.gz",
+     "size": 148651,
+     "sha256": "e07a232f7923fa307ced05663b3a4da709cdd37ca92e87d18e6896780b0f8fef",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "sno-0911-aa-nuebar.d.gz",
+     "size": 148368,
+     "sha256": "fe659f12bf065224af7cb20165cb0048c50a19929183aa96f4b2a8b54395109c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "sno-0911-aa-numu.d.gz",
+     "size": 147799,
+     "sha256": "435e2aec1742f793a27c87e0ca1324baf4d9a85609d6eb713c21bca432470890",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "sno-0911-aa-numubar.d.gz",
+     "size": 148300,
+     "sha256": "bb7c73f0af9326171996c5ba1905f4eb4123958b8a8623d96a0357a1f989b1a9",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "sno-0911-nue.d.gz",
+     "size": 1702458,
+     "sha256": "ab7ad7d453dd5ec5ecabf143b7d5dec2bbf95a4c2afb6e980d7d2ec395907b8f",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-nue.d.gz"
+    },
+    {
+     "path": "sno-0911-nuebar.d.gz",
+     "size": 1688682,
+     "sha256": "338f734b53c7b6ad44c57b60e1f4c887c8511cdc6e9f838fb37fd487d4cd9148",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-nuebar.d.gz"
+    },
+    {
+     "path": "sno-0911-numu.d.gz",
+     "size": 1753045,
+     "sha256": "c3d52a8c7313094d3cb80a66f2b81930937028bef64ff687e065f297bac577c6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-numu.d.gz"
+    },
+    {
+     "path": "sno-0911-numubar.d.gz",
+     "size": 1753411,
+     "sha256": "11ecec141ee2ca1189177b79698d901ba8f43a4c0de5324f49ccc0d96f837687",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-0911-numubar.d.gz"
+    },
+    {
+     "path": "sno-1202-01-01-solmax.d.gz",
+     "size": 2233,
+     "sha256": "fa39aed3546a6c07986e5c70d615e5062ce8738fe3ede29bf8161de15e1c3eca",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-1202-01-01-solmin.d.gz",
+     "size": 2242,
+     "sha256": "5674b782d4cbfb30848bb34aff864517bb6e5ccab60fc362fd5024a5f7419229",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-1202-20-01-solmax.d.gz",
+     "size": 36987,
+     "sha256": "3698c611d536d798b6537b0af30a6c251e91590dbbc03986200842552d7aa642",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-1202-20-01-solmin.d.gz",
+     "size": 36705,
+     "sha256": "09c084822d8eb07d4ce99f5d80d8412c45d37cc261b61ec251b01cfe4d3fc039",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-1202-20-12-solmax.d.gz",
+     "size": 413228,
+     "sha256": "4717199758521501d296a5a4bcc1be7fcd1a65ebd6ba54b7c144b2e638b14055",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "sno-1202-20-12-solmin.d.gz",
+     "size": 413729,
+     "sha256": "7e4d7a97d3b6ec62da6abd39daa39a852ad281e14b48d9c03bb837cbb22de81a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "sno-1202-aa-nue.d.gz",
+     "size": 148455,
+     "sha256": "efd14d1f8c62ca18903ac2d97a3d394163344e91f83d12114827b402fb66fbbe",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "sno-1202-aa-nuebar.d.gz",
+     "size": 148250,
+     "sha256": "18047297aab512bf8dcbfdb5f0185d384f58688482b197794fca34af3e4cbba7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "sno-1202-aa-numu.d.gz",
+     "size": 147651,
+     "sha256": "7670a0143f182cb8ea5949015bcefb784ac5d65c91f8db859a9954cf54bfb1b6",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "sno-1202-aa-numubar.d.gz",
+     "size": 148036,
+     "sha256": "f4ebf057dfbd8c49748f8068afdb8936fe1b0d53531cb8facd81c40fbfea365b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "sno-1202-nue.d.gz",
+     "size": 1700944,
+     "sha256": "17f5ddc8e4caf739453585c68e281e7867acc157a9134750b5048e64dd849297",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-nue.d.gz"
+    },
+    {
+     "path": "sno-1202-nuebar.d.gz",
+     "size": 1687911,
+     "sha256": "9e01842811ab506d91493e5310b80660a96d4f7ecf6f3e158fefc440e25b2899",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-nuebar.d.gz"
+    },
+    {
+     "path": "sno-1202-numu.d.gz",
+     "size": 1752572,
+     "sha256": "0dcbc24f7b42225b92ba1a688b8dd3aad7c95acffae9ec60e384ed0529319008",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-numu.d.gz"
+    },
+    {
+     "path": "sno-1202-numubar.d.gz",
+     "size": 1752789,
+     "sha256": "ad42b31e90a2e1010e457ddea5f96c848fa6847dbe903f6133af254fbe679587",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-1202-numubar.d.gz"
+    },
+    {
+     "path": "sno-ally-01-01-solmax.d.gz",
+     "size": 2231,
+     "sha256": "93e3cbb3a5827a2c87864da155557b255297e786f54b8c7965e67ebdc3ec79bc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-ally-01-01-solmin.d.gz",
+     "size": 2232,
+     "sha256": "b116bb1c9d2a5b6d0531546f559737ad7e8aadfa30809aa04fce71265fc03851",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-ally-20-01-solmax.d.gz",
+     "size": 36975,
+     "sha256": "5708996c5c3742d0a4417177804a5683096b3ee3710163780f1b189c1f8187cd",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "sno-ally-20-01-solmin.d.gz",
+     "size": 36712,
+     "sha256": "32819e6117d34dbf44b510630e9db4ac8e0a241f30e96cc11f6e9f4f9e89bd98",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "sno-ally-20-12-solmax.d.gz",
+     "size": 409858,
+     "sha256": "7f238265e43e398d05a767c46d4cb65f5dbf1f5d9a36d3bc194914226beff076",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "sno-ally-20-12-solmin.d.gz",
+     "size": 410392,
+     "sha256": "98aa99b7fb82250b58cdf5090676498f1e2c315ff958e9bf28c7e365b4a2b550",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "sno-ally-aa-nue.d.gz",
+     "size": 149486,
+     "sha256": "45e65a4d28a3b3e697b361a783b5c842e020a00c9f41ef576f8749a2ef47cbfe",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "sno-ally-aa-nuebar.d.gz",
+     "size": 149108,
+     "sha256": "b8e737bef9743face38f3b7ac21b3b5c76bbf3a68a81c7a02671ead6119c8d73",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "sno-ally-aa-numu.d.gz",
+     "size": 147737,
+     "sha256": "f4e1ecde03a385e3f3eb9507dd9c11ac3fadadfc9aa296eac5256e0a9fe007eb",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "sno-ally-aa-numubar.d.gz",
+     "size": 148070,
+     "sha256": "aeeadcf59295cc83b5eb1ad8b4c2d7a5e8b2a18bdb6d770594e2891171b68df5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "sno-ally-nue.d.gz",
+     "size": 1748669,
+     "sha256": "6c1503100084bc35f5d937445c0c02109c8f88c82414ae298359d6ac965f2f2c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-nue.d.gz"
+    },
+    {
+     "path": "sno-ally-nuebar.d.gz",
+     "size": 1741399,
+     "sha256": "af7dbfd9711161192e48e666762020d4b88d7db22bc7b6b553591a06122c9511",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-nuebar.d.gz"
+    },
+    {
+     "path": "sno-ally-numu.d.gz",
+     "size": 1752811,
+     "sha256": "d6648b6d8f1b88dc4d67cc7e96dfd924921f97abad266b5b15dc66ae49be3585",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-numu.d.gz"
+    },
+    {
+     "path": "sno-ally-numubar.d.gz",
+     "size": 1755806,
+     "sha256": "babc665916aa90de5eb3e2b738452cc6565506b6e3dddab99e9161c5e6e36cee",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/sno-ally-numubar.d.gz"
+    },
+    {
+     "path": "spl-0305-01-01-solmax.d.gz",
+     "size": 2260,
+     "sha256": "6af19f0dfbae24845e7b85a0fc5759fb1533f94ffd2ef0ae342401df0b73f08e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0305-01-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-0305-01-01-solmin.d.gz",
+     "size": 2254,
+     "sha256": "dccfb575682ac06b8f2e3240983abee3730a43de8519606090016a7953015db2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0305-01-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-0305-20-01-solmax.d.gz",
+     "size": 36813,
+     "sha256": "d7c336048ff42ec26de86415c73f9ff5bd0f2eae158ad957f047fb3b95799d60",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0305-20-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-0305-20-01-solmin.d.gz",
+     "size": 37172,
+     "sha256": "2720b0bd8a78cd8e202404586100d919d172b82ddc054c223d6b68dc6d186627",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0305-20-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-0305-20-12-solmax.d.gz",
+     "size": 411412,
+     "sha256": "ebf16a28b8ae5e261205d10a4371ce0055d0e47b5b39b78cad1b9268e08f9952",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0305-20-12-solmax.d.gz"
+    },
+    {
+     "path": "spl-0305-20-12-solmin.d.gz",
+     "size": 411580,
+     "sha256": "eb6cf6195809019f5bfbb108e776e91d2fe467694d392ae573e01dd5722829c7",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0305-20-12-solmin.d.gz"
+    },
+    {
+     "path": "spl-0608-01-01-solmax.d.gz",
+     "size": 2252,
+     "sha256": "fe944947dfb7148b78957d6165102a50bb9a0004c64207b232562bb18efe2bf2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-01-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-0608-01-01-solmin.d.gz",
+     "size": 2244,
+     "sha256": "f357094d7c1b14c13882b3067d52eb227976ac13bce9714648347a482687d55e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-01-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-0608-20-01-solmax.d.gz",
+     "size": 36984,
+     "sha256": "624f75d0cc12d99bfccc834a38dd88ee2e193a20e7953c02479a1ecef5d5091b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-20-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-0608-20-01-solmin.d.gz",
+     "size": 37201,
+     "sha256": "bfcc2014ae3c32c0ab1d61d1d5a4fc330cf288eabff4905be31fcbc7c2e0de34",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-20-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-0608-20-12-solmax.d.gz",
+     "size": 411322,
+     "sha256": "de38cef5764cb19b036068612a90400916caa69e6171753a3b4828f889462523",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-20-12-solmax.d.gz"
+    },
+    {
+     "path": "spl-0608-20-12-solmin.d.gz",
+     "size": 411472,
+     "sha256": "d97c5dd658c0c54f7ebd3c9291aba45ff6dcf65b00c2f9a0e6e012df20759524",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-20-12-solmin.d.gz"
+    },
+    {
+     "path": "spl-0608-aa-nue.d.gz",
+     "size": 147634,
+     "sha256": "47af9c91438d54abdde5c1b409e31f09b96e507c261d1a6e6dfa7c75127a61c2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-aa-nue.d.gz"
+    },
+    {
+     "path": "spl-0608-aa-nuebar.d.gz",
+     "size": 147127,
+     "sha256": "fa18f1dea40af7f61b59da74f92235f1753d2aca00a9b06cd031067b724f7cdc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-aa-nuebar.d.gz"
+    },
+    {
+     "path": "spl-0608-aa-numu.d.gz",
+     "size": 147028,
+     "sha256": "914f2800c6d89ea98c822ad10041c0c876bdff0d4cea366ec6b0871f97a82abc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-aa-numu.d.gz"
+    },
+    {
+     "path": "spl-0608-aa-numubar.d.gz",
+     "size": 147325,
+     "sha256": "f67c9ccb1786541b9897c4d48bdab6c4c21c525a8d6e3449ad4cad78e6f2b497",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-aa-numubar.d.gz"
+    },
+    {
+     "path": "spl-0608-nue.d.gz",
+     "size": 1690717,
+     "sha256": "b450aa4b57138d87b45beb140b7e01ce056a56ee30315fb648c4b1fea1059325",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-nue.d.gz"
+    },
+    {
+     "path": "spl-0608-nuebar.d.gz",
+     "size": 1676173,
+     "sha256": "536ab84f9a23f80aae4dacee568cb4036226779de0c0f0aa40a89e239792b585",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-nuebar.d.gz"
+    },
+    {
+     "path": "spl-0608-numu.d.gz",
+     "size": 1742753,
+     "sha256": "48f382114d7faed9e18f458802dab073d2507553f55f5f02cc74081e9391ee73",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-numu.d.gz"
+    },
+    {
+     "path": "spl-0608-numubar.d.gz",
+     "size": 1742669,
+     "sha256": "f7621558f874a5899c57914d3210ccf43dcdaa199b69d415829a7498c24e8be0",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0608-numubar.d.gz"
+    },
+    {
+     "path": "spl-0911-01-01-solmax.d.gz",
+     "size": 2245,
+     "sha256": "ceb4860ac523998023d0ccd6e0c6558a18461923fe21bec5e886450804c5ab18",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-01-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-0911-01-01-solmin.d.gz",
+     "size": 2247,
+     "sha256": "2d9942cd571bd6f88255da3cb8204947a3a3ff04b9dfeef75913f387144d8945",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-01-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-0911-20-01-solmax.d.gz",
+     "size": 36949,
+     "sha256": "7e929f875882e2c9e3a579da3c058af6807bc3369f41eda3d6a6471c6729ce66",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-20-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-0911-20-01-solmin.d.gz",
+     "size": 36918,
+     "sha256": "8cc7f9dfd90d4a3f65d26a1df4f31323199a3d239dac52778bcb13dd5f68483d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-20-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-0911-20-12-solmax.d.gz",
+     "size": 411101,
+     "sha256": "7b012eef9aa4e5df95bf43b46faf62d4318382ffe0e04574aab6efd800e01eee",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-20-12-solmax.d.gz"
+    },
+    {
+     "path": "spl-0911-20-12-solmin.d.gz",
+     "size": 411082,
+     "sha256": "578d5cb3c4772398bd7f064a025d09dfed6cb17aea9afadac4acb41d70b75d93",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-20-12-solmin.d.gz"
+    },
+    {
+     "path": "spl-0911-aa-nue.d.gz",
+     "size": 148528,
+     "sha256": "99fee770cfbd0f4a716c4b75c44e47e870e6c733c63fe76c2bea86e254ff5095",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-aa-nue.d.gz"
+    },
+    {
+     "path": "spl-0911-aa-nuebar.d.gz",
+     "size": 147984,
+     "sha256": "0add709fef0606c3d71d83481441338f1e2e35b5579d927b73269de6951cc290",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-aa-nuebar.d.gz"
+    },
+    {
+     "path": "spl-0911-aa-numu.d.gz",
+     "size": 147993,
+     "sha256": "d9a2bc3041a2103ef46548419a396d9d94a5deb338548fa3d7534982d9e6489c",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-aa-numu.d.gz"
+    },
+    {
+     "path": "spl-0911-aa-numubar.d.gz",
+     "size": 148030,
+     "sha256": "e18d3ba52fcf3d002acc261fdadcc9ab84020716fbac733cd24c3403ad1539a1",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-aa-numubar.d.gz"
+    },
+    {
+     "path": "spl-0911-nue.d.gz",
+     "size": 1697819,
+     "sha256": "fab5d1d3cf79a72108ffdbe766940e9f1f7815d87b28ac55dc812b0706e41f99",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-nue.d.gz"
+    },
+    {
+     "path": "spl-0911-nuebar.d.gz",
+     "size": 1682965,
+     "sha256": "c69045b25aa505795bf26257198488e7fb7db7a6037ae96b7ed590894526051b",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-nuebar.d.gz"
+    },
+    {
+     "path": "spl-0911-numu.d.gz",
+     "size": 1752074,
+     "sha256": "80abdb4c135cf952dfbe980b4ac0f80e73f919c8edde304cc0603806c829d233",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-numu.d.gz"
+    },
+    {
+     "path": "spl-0911-numubar.d.gz",
+     "size": 1750872,
+     "sha256": "4821f99717b90bb122e061e2656a08ca460a56c1da6c833617a38ff35f21927d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-0911-numubar.d.gz"
+    },
+    {
+     "path": "spl-1202-01-01-solmax.d.gz",
+     "size": 2241,
+     "sha256": "c9c4431f8aebd3db1e4bec99ec6c1d134195b3fef2d223d019e269f601fe6e2e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-01-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-1202-01-01-solmin.d.gz",
+     "size": 2242,
+     "sha256": "d799dd4fec7f38eafcb9bed8f105dbdf35173e9a5550ec1f30db62b2857f4e90",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-01-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-1202-20-01-solmax.d.gz",
+     "size": 37170,
+     "sha256": "80aa1c4c4a0a316c313ab6063a52e8fc3389ebee71ac63a4437ee831425c9915",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-20-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-1202-20-01-solmin.d.gz",
+     "size": 36854,
+     "sha256": "e4319b52016af6d83934fa87478d089dc078d4130a44f00557d08c4f22a2136a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-20-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-1202-20-12-solmax.d.gz",
+     "size": 410828,
+     "sha256": "2118da391e798e91c2d8408f6d1f0545d53dd608042bb3f75ac8be90a6dc0a7a",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-20-12-solmax.d.gz"
+    },
+    {
+     "path": "spl-1202-20-12-solmin.d.gz",
+     "size": 411351,
+     "sha256": "cedfa6519528471ee38ea558807b5d674a1b6c07d6f99121ba6a9a21a7dcdc79",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-20-12-solmin.d.gz"
+    },
+    {
+     "path": "spl-1202-aa-nue.d.gz",
+     "size": 148871,
+     "sha256": "c8ede1c6b21022721a7ff6d8fbc6c5baf98deacfe4e6e4c00ba4d97a8012bcdf",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-aa-nue.d.gz"
+    },
+    {
+     "path": "spl-1202-aa-nuebar.d.gz",
+     "size": 148537,
+     "sha256": "18a79ef80887338b1f9efffa8757fe847b4c505f70f76c3f4ef2b137663bfe24",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-aa-nuebar.d.gz"
+    },
+    {
+     "path": "spl-1202-aa-numu.d.gz",
+     "size": 148136,
+     "sha256": "587f1ee884cd1d6483b546b56757d7750a7aa32a346cf29528b0a0c887e38dab",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-aa-numu.d.gz"
+    },
+    {
+     "path": "spl-1202-aa-numubar.d.gz",
+     "size": 148358,
+     "sha256": "ae618b3d1c4c1b5dc41856101c084767379d59e298a07961700e0943c9855e26",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-aa-numubar.d.gz"
+    },
+    {
+     "path": "spl-1202-nue.d.gz",
+     "size": 1701588,
+     "sha256": "9edabcc166435ff3852fec4ec0f82ccdda65b4f4f68fc9b2225f31dd1d0afb62",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-nue.d.gz"
+    },
+    {
+     "path": "spl-1202-nuebar.d.gz",
+     "size": 1688089,
+     "sha256": "7065ba329d09e1863cec01067a86e1fb0dded7e34ebaadd00e1349ac668f938d",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-nuebar.d.gz"
+    },
+    {
+     "path": "spl-1202-numu.d.gz",
+     "size": 1756144,
+     "sha256": "0d67c0c04882ed064f549bde9fbf1e7a8c68bfa6d9dfa667a32247e83b8f47df",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-numu.d.gz"
+    },
+    {
+     "path": "spl-1202-numubar.d.gz",
+     "size": 1755739,
+     "sha256": "d884fdddea4e84b7c0a7a3ef756fc9265d9f4d7b47c5ea14e886a7f1a7a777b2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-1202-numubar.d.gz"
+    },
+    {
+     "path": "spl-ally-01-01-solmax.d.gz",
+     "size": 2226,
+     "sha256": "67061ebab4638abcbbbeb394a610dda1b8b38b6443ed0221fed387c95daae590",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-01-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-ally-01-01-solmin.d.gz",
+     "size": 2233,
+     "sha256": "42900ca560089560d58b34f3c081c70d0a7ba294aba92e5ea8c043e8cd8c2c61",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-01-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-ally-20-01-solmax.d.gz",
+     "size": 36878,
+     "sha256": "45c784b53cc9ee78f9d57a827ba40e0ad7a89e09391a14037cb9f04079e34b70",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-20-01-solmax.d.gz"
+    },
+    {
+     "path": "spl-ally-20-01-solmin.d.gz",
+     "size": 36884,
+     "sha256": "88eead263d1d8a356c54cdae80038f3e93ddd0368bedeb464e352632aae51cc5",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-20-01-solmin.d.gz"
+    },
+    {
+     "path": "spl-ally-20-12-solmax.d.gz",
+     "size": 408244,
+     "sha256": "9794870e7926a6d7f796f3cf2b4568c6f51f6aa0b525627b2f97c9409471bd52",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-20-12-solmax.d.gz"
+    },
+    {
+     "path": "spl-ally-20-12-solmin.d.gz",
+     "size": 407467,
+     "sha256": "e51932735f63ded7acd2ce15c2afc75aea9877c7e480da0d5897ab124085f320",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-20-12-solmin.d.gz"
+    },
+    {
+     "path": "spl-ally-aa-nue.d.gz",
+     "size": 148856,
+     "sha256": "3a399ab7496236d0dae7d0d5d68b0b4ece64d8de26a5d44e6b7defa7eaa1e541",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-aa-nue.d.gz"
+    },
+    {
+     "path": "spl-ally-aa-nuebar.d.gz",
+     "size": 148643,
+     "sha256": "7e185e2955a848878affabbb0d3a58f6f88d7f0fa98da71f8cd9c53a1af1c007",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-aa-nuebar.d.gz"
+    },
+    {
+     "path": "spl-ally-aa-numu.d.gz",
+     "size": 147650,
+     "sha256": "ebcb81f73b0a9b57ca1643675f1b73e1ef5c58e7eca864cfe40d6d94edde99f4",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-aa-numu.d.gz"
+    },
+    {
+     "path": "spl-ally-aa-numubar.d.gz",
+     "size": 147874,
+     "sha256": "22ec09aea9288fe088603a2f08d2c5694a692b5795790f316256b8a3e68dc7f2",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-aa-numubar.d.gz"
+    },
+    {
+     "path": "spl-ally-nue.d.gz",
+     "size": 1741258,
+     "sha256": "7ab1c0e89615435c79f178b2ab1aec6753dcaaa043959e29a132b60696fc91ea",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-nue.d.gz"
+    },
+    {
+     "path": "spl-ally-nuebar.d.gz",
+     "size": 1733440,
+     "sha256": "123048ac303ff42bb7f638c424fbe3a91c46be6d399e9db7b923185db910e1fc",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-nuebar.d.gz"
+    },
+    {
+     "path": "spl-ally-numu.d.gz",
+     "size": 1748960,
+     "sha256": "e754d8b346f975f3cdbeea99bd6be62f6fa860c897c97045ed1358c368c2391e",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-numu.d.gz"
+    },
+    {
+     "path": "spl-ally-numubar.d.gz",
+     "size": 1751075,
+     "sha256": "af1e55d86c38d63863dd784150754961bdd500c4e0f61d940d8a10a6a6d2ca45",
+     "url": "http://www-rccn.icrr.u-tokyo.ac.jp/mhonda/public/nflx2014/spl-ally-numubar.d.gz"
+    }
+   ]
+  }
+ }
+}

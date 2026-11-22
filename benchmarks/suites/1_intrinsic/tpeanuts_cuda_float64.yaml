@@ -1,0 +1,13 @@
+# tpeanuts on the GPU in float64: the GPU-against-CPU row. The whole grid (max_points 0), as the GPU is what makes it possible.
+name: tpeanuts_cuda_float64
+series: 1_intrinsic
+backend: tpeanuts
+description: tpeanuts, GPU, float64, numerical and perturbative methods over the whole catalogue
+methods: [numerical, analytic_perturbative]
+device: cuda
+dtype: float64
+repeats: 7
+max_points: 0
+smoke: {repeats: 3, max_points: 1000}
+cost: {class: expensive}
+condor: {request_cpus: 4, request_memory: 32 GB, request_gpus: 1, after: [1_intrinsic/tpeanuts_cpu_float64]}

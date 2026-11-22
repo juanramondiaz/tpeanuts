@@ -1,0 +1,21 @@
+tpeanuts
+Copyright (c) Juan Ramon Diaz Santos and contributors. Released under GPL-3.0-or-later (see LICENSE).
+
+This package redistributes, or can download, third-party data. The full provenance, license status and
+redistribution policy of each dataset are in DATA_LICENSES.md. Attributions required by the data licenses:
+
+* Daya Bay Collaboration, "Full Data Release of the Daya Bay Reactor Neutrino Experiment", v1.0.0, Zenodo,
+  doi:10.5281/zenodo.17587229 (2025), licensed under CC BY 4.0
+  (https://creativecommons.org/licenses/by/4.0/). Changes: converted from the tsv.bz2 tier to csv; values
+  unchanged. Please also cite F. P. An et al. (Daya Bay Collaboration), Phys. Rev. Lett. 130, 161802 (2023).
+
+* Y. Herrera and A. Serenelli, "Standard Solar Models B23 / SF-III", v1.2, Zenodo,
+  doi:10.5281/zenodo.10822316 (2023), licensed under CC BY 4.0. Only the AGSS09 variant is used; no changes
+  to the values.
+
+* IceCube Collaboration, "Replication Data for: Measurement of atmospheric neutrino mixing with improved
+  IceCube DeepCore calibration and data processing", Harvard Dataverse, doi:10.7910/DVN/B4RITM (2025),
+  CC0 1.0. Downloaded on request, not redistributed in the package. Citing it is good practice.
+
+Other datasets (PREM, B16 and Bahcall solar tables, Nakamura cross sections, SNO, SNO-II, Borexino, Honda/HKKM)
+must be cited as listed in DATA_LICENSES.md.

@@ -1,0 +1,16 @@
+{
+  "provider": "legacy",
+  "solar_model": "B16",
+  "reference": "Vinyoles et al., Astrophys. J. 835, 202 (2017)",
+  "arxiv": "1611.09867",
+  "models": [
+    "AGSS09met",
+    "GS98"
+  ],
+  "default_variant": "AGSS09met",
+  "note": "Canonical tables converted from files bundled with legacy PEANUTS; originals retained in raw/.",
+  "spectrum_defaults": {
+    "8B": "Winter et al.",
+    "7Be": "combined thermally broadened lines: 0.862 MeV (89.7%) and 0.384 MeV (10.3%)"
+  }
+}

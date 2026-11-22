@@ -1,0 +1,15 @@
+# The numerical (ODE) mode of the original PEANUTS takes about 100 s per point, so it is checked on two points and timed on
+# one. Optional: it is not part of the standard sequence; submit it alone, when wanted.
+name: peanuts_numerical_cpu_float64
+series: 3_peanuts
+backend: peanuts
+description: original PEANUTS, numerical mode, one point per scenario
+optional: true
+scenarios: [earth, solar_earth]
+modes: [numerical]
+repeats: 3
+max_points: 20000
+max_points_numerical: 1
+smoke: {repeats: 1}
+cost: {class: expensive}
+condor: {request_cpus: 1, request_memory: 16 GB, after: [0_reference/reference]}

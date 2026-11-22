@@ -1,0 +1,11 @@
+# The original PEANUTS in its analytical mode, one thread: paired with the analytic_perturbative method of tpeanuts.
+name: peanuts_analytical_cpu_float64
+series: 3_peanuts
+backend: peanuts
+description: original PEANUTS, analytical mode, one thread, float64
+modes: [analytical]
+repeats: 7
+max_points: 20000
+smoke: {repeats: 3, max_points: 100}
+cost: {class: expensive}
+condor: {request_cpus: 1, request_memory: 16 GB, after: [1_intrinsic/tpeanuts_cuda_float32]}

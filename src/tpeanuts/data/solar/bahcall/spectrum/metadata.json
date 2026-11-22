@@ -1,0 +1,21 @@
+{
+  "provider": "bahcall",
+  "observable": "ideal solar-neutrino line spectrum",
+  "energy_unit": "MeV",
+  "normalization": "discrete line weights sum to one",
+  "thermal_broadening_included": false,
+  "sources": {
+    "7Be": {
+      "files": ["lines_7Be.csv", "line_7Be_ground.csv", "line_7Be_excited.csv"],
+      "reference": "J. N. Bahcall, Phys. Rev. D 49, 3923 (1994)",
+      "doi": "10.1103/PhysRevD.49.3923",
+      "arxiv": "astro-ph/9401024",
+      "note": "Two ideal electron-capture lines. Solar thermal broadening and the approximately 1.29 keV mean energy shift are not applied."
+    },
+    "pep": {
+      "files": ["line_pep.csv"],
+      "reference": "J. N. Bahcall, Neutrino Astrophysics (Cambridge University Press, 1989)",
+      "note": "Ideal monoenergetic representation; solar thermal line shape is not applied."
+    }
+  }
+}

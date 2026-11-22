@@ -1,0 +1,8 @@
+# The probabilities of tpeanuts on the checking grid: the file every other backend is compared with before it is timed.
+# It leaves benchmarks/results/reference_tpeanuts.npz (not a CSV) and must have finished before any measurement starts.
+name: reference
+series: 0_reference
+backend: export
+description: tpeanuts reference probabilities (.npz) that the PEANUTS and nuSQuIDS runs check against
+cost: {class: expensive}
+condor: {request_cpus: 4, request_memory: 8 GB}

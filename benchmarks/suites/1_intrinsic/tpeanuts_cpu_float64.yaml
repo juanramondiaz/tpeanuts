@@ -1,0 +1,16 @@
+# tpeanuts on the CPU in float64 with a fixed number of threads: the CPU-against-CPU row of the comparison.
+# Both methods run: numerical pairs with nuSQuIDS and the numerical mode of the original, analytic_perturbative with its
+# analytical mode (benchmarks.report matches them on options.paired_method). A method that cannot take a size is recorded as
+# failed, not dropped. max_points bounds the grids; 0 would run the whole catalogue.
+name: tpeanuts_cpu_float64
+series: 1_intrinsic
+backend: tpeanuts
+description: tpeanuts, CPU, float64, numerical and perturbative methods over the catalogue
+methods: [numerical, analytic_perturbative]
+device: cpu
+dtype: float64
+repeats: 7
+max_points: 1000000
+smoke: {repeats: 3, max_points: 1000}
+cost: {class: expensive}
+condor: {request_cpus: 8, request_memory: 32 GB, after: [0_reference/reference]}

@@ -1,0 +1,133 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]   # >=77: SPDX license expression + license-files (PEP 639)
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tpeanuts"
+version = "0.1.0"
+description = "Modular, extensible neutrino propagation engine: SM, sterile 3+N, NSI, Dirac/Majorana, magnetic moment, and decoherence over a shared density-matrix formalism."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "NOTICE", "DATA_LICENSES.md"]   # the code license, third-party notices, data terms
+authors = [{ name = "Juan Ramón Díaz Santos", email = "diazjuan@alumni.uv.es" }]
+keywords = ["neutrino", "oscillations", "matter effects", "MSW", "PyTorch", "GPU", "sterile neutrinos", "NSI"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Typing :: Typed",
+]
+requires-python = ">=3.11"
+# torch: the default PyPI wheel on Windows is CPU-only; for CUDA install torch first from the
+# matching index, e.g. ``pip install torch --index-url https://download.pytorch.org/whl/cu126``.
+dependencies = [
+    "torch",
+    "numpy",
+    "scipy",
+    "platformdirs",
+]
+
+[project.optional-dependencies]
+msis = ["pymsis"]                 # NRLMSIS atmospheric density backend
+examples = ["matplotlib"]          # figures of the scripts in examples/ (run with --plot)
+notebooks = ["matplotlib", "pandas", "jupyterlab", "ipykernel", "nbformat", "nbclient", "jupytext"]   # the tutorial notebooks
+docs = ["sphinx>=8", "furo", "myst-parser", "sphinx-copybutton", "matplotlib"]   # build the documentation in docs/
+mceq = ["MCEq", "crflux"]         # atmospheric flux (cascade equations) backend
+nusquids = ["nusquids"]           # external cross-check; its PyPI wheel ships no data files,
+                                  # run ``python -m validation.nusquids.fetch_data`` and set NUSQUIDS_DATA_DIR
+# test tooling: coverage, parallel runs (-n auto), per-test timeouts, random order (disable with -p no:randomly)
+test = ["pytest", "pytest-cov", "pytest-xdist", "pytest-timeout", "pytest-randomly"]
+dev = ["pytest", "pytest-cov", "pytest-xdist", "pytest-timeout", "pytest-randomly", "ruff", "mypy"]
+all = ["pymsis", "MCEq", "crflux", "nusquids", "pytest", "pytest-cov", "pytest-xdist", "pytest-timeout", "pytest-randomly"]
+
+[project.urls]
+Repository = "https://github.com/juanramondiaz/tpeanuts"
+Documentation = "https://tpeanuts.readthedocs.io"   # placeholder until the docs are published
+Issues = "https://github.com/juanramondiaz/tpeanuts/issues"
+Changelog = "https://github.com/juanramondiaz/tpeanuts/blob/main/CHANGELOG.md"
+
+[project.scripts]
+tpeanuts-data = "tpeanuts.data.cli:main"   # list / fetch / verify / build the downloadable datasets
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tpeanuts = ["py.typed"]      # PEP 561: the package is type-annotated (mypy-clean)
+"tpeanuts.data" = ["**/*"]   # the small redistributable tables shipped in the wheel
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]                  # lets tests import the repo-level ``validation`` package
+addopts = "--import-mode=importlib --strict-markers --strict-config -ra -p pytester"  # no __init__.py files needed under tests/
+timeout = 900   # seconds per test (pytest-timeout); the slowest legitimate test takes ~4 min
+filterwarnings = [
+    # A warning raised from tpeanuts code is a bug to fix, not noise to ignore.
+    "error::DeprecationWarning:tpeanuts",
+    "error::FutureWarning:tpeanuts",
+    "error::RuntimeWarning:tpeanuts",
+    "error::UserWarning:tpeanuts",
+]
+markers = [
+    'requires_data(*names): needs downloaded or generated data (skipped when absent; TPEANUTS_REQUIRE_DATA=1 makes it fail)',
+    'requires_nusquids: needs the real nuSQuIDS bindings (skipped where they are not installed)',
+    'slow: takes minutes (SNO-II fits, MCEq solves); deselect with -m "not slow"',
+    'gpu: CUDA parametrization of the context fixture; deselect with -m "not gpu"',
+]
+
+[tool.coverage.run]
+source = ["tpeanuts"]            # measure the package, not the tests or the validation scripts
+branch = true
+parallel = true                  # one data file per process (pytest-xdist), combined afterwards
+relative_files = true            # paths relative to the repository, comparable across machines
+
+[tool.coverage.report]
+precision = 1
+show_missing = false
+exclude_also = [
+    'if TYPE_CHECKING:',
+    'raise NotImplementedError',
+    '@overload',
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.html]
+directory = "htmlcov"
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["v1_0"]
+
+[tool.ruff.lint]
+# UP (pyupgrade) deliberately not selected: it would rewrite Optional[X]/Union[X, Y]/
+# Dict/List to the modern X | None / X | Y / dict/list syntax and drop the mandatory
+# "# -*- coding: utf-8 -*-" header line, both of which are this project's own
+# established, deliberate conventions (see feedback_v2_code_header_convention),
+# not oversights -- enabling UP is a separate style decision, not a lint-cleanup one.
+select = ["E", "F", "W", "I", "B", "C4"]
+ignore = [
+    "E741",  # ambiguous variable name (l, I, O) -- physics code legitimately uses these
+    "C408",  # dict(key=value, ...) instead of {"key": value, ...} -- used deliberately for
+             # large preset/kwargs tables (config/presets.py etc.) where it reads cleaner
+             # without a wall of quoted keys; not a correctness or style-consistency issue
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["F401"]  # test files re-import fixtures/symbols not always used directly
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+explicit_package_bases = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true
+exclude = ["^v1_0/"]

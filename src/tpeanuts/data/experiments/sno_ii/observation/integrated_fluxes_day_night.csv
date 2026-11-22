@@ -1,0 +1,4 @@
+channel,day_flux,day_sigma_stat,day_sigma_syst,night_flux,night_sigma_stat,night_sigma_syst
+NC,4.81,0.31,0.39,5.02,0.29,0.41
+ES,2.17,0.14,0.14,2.52,0.32,0.16
+CC_integral,1.73,0.09,0.10,1.64,0.08,0.09

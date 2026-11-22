@@ -1,0 +1,9 @@
+# Raw outputs of each run; versioned baselines go in baselines/.
+results/*
+!results/.gitkeep
+condor/env.sh
+condor/logs/*
+!condor/logs/.gitkeep
+
+condor/generated/*
+!condor/generated/.gitkeep
