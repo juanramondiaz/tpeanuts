@@ -9,7 +9,7 @@
 #   1. miniconda in $CONDA_DIR, if conda is not there yet
 #   2. env `tpeanuts`: Python 3.12, torch (CUDA 12.6 wheel: the nodes have driver 580 = CUDA 13.0), this repository
 #      installed editable (src/ layout)
-#   3. env `peanuts`: Python 3.12, numpy/scipy/numba/pandas/mpmath, NO torch; plus a clone of the original PEANUTS
+#   3. env `peanuts`: Python 3.12, numpy/scipy/numba/pandas<3/mpmath, NO torch; plus a clone of the original PEANUTS
 #   4. env `nusquids`: Python 3.12 (the wheel is py3.12 manylinux), nusquids + numpy, plus its astro data
 #   5. benchmarks/condor/env.sh written from the paths used here (only if it does not exist)
 #   6. a short import check per environment (MANIFEST.json is written later by `run.sh export`, after the reference)
@@ -89,7 +89,9 @@ if want peanuts; then
     export PYTHONNOTUSERSITE=1
     log "peanuts: numerical stack (no torch)"
     python -m pip install --upgrade pip
-    python -m pip install numpy scipy numba pandas mpmath
+    # pandas < 3: the original PEANUTS reads its tables with read_csv(delim_whitespace=True), removed in pandas 3.0
+    # (and its bare `except` reports that as "the solar model file does not exist or is corrupted").
+    python -m pip install numpy scipy numba "pandas<3" mpmath
     conda deactivate
     if [[ -d "$PEANUTS_DIR/.git" ]]; then
         log "PEANUTS checkout exists in $PEANUTS_DIR ($(git -C "$PEANUTS_DIR" rev-parse --short HEAD)); kept"
