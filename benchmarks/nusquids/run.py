@@ -50,6 +50,8 @@ Module contents:
         The array of the reference file each scenario is checked against.
     run_benchmarks(...)
         Check and time the scenarios and return the ``ResultSet``.
+    parse_scenario_limits(...)
+        Read the ``SCENARIO=LIMIT`` items of ``--max-points-scenario``.
     main(...)
         Command-line entry point.
 """
@@ -106,6 +108,7 @@ def run_benchmarks(
     repeats: int = 7,
     smoke: bool = False,
     max_points: int = DEFAULT_MAX_POINTS,
+    max_points_by_scenario: Optional[Dict[str, int]] = None,
     label: str = "nusquids",
     reference_meta: Optional[Dict[str, Any]] = None,
     backend_factory: Any = NuSQuIDSBackend,
@@ -118,6 +121,9 @@ def run_benchmarks(
         repeats: Timed repeats per phase (the protocol value is 7).
         smoke: Use the reduced sizes.
         max_points: Skip the cases with more (energy x nadir) points than this; 0 means no limit.
+        max_points_by_scenario: Own limit of the scenarios named here, instead of ``max_points``. The cost per point
+            differs by orders of magnitude (the Earth at MeV against the atmosphere at GeV), so one limit cannot
+            suit both.
         label: Name of the run.
         reference_meta: Metadata of the reference file, recorded in the environment of the result.
         backend_factory: ``NuSQuIDSBackend``, or a stand-in with the same constructor and ``evaluate``.
@@ -126,9 +132,10 @@ def run_benchmarks(
         The validated result set.
 
     Raises:
-        ValueError: If a scenario name is unknown.
+        ValueError: If a scenario name is unknown, in ``scenarios`` or in ``max_points_by_scenario``.
     """
-    unknown = [name for name in scenarios if name not in SCENARIOS]
+    limits = dict(max_points_by_scenario or {})
+    unknown = [name for name in (*scenarios, *limits) if name not in SCENARIOS]
     if unknown:
         raise ValueError(f"unknown scenarios {unknown}; expected a subset of {sorted(SCENARIOS)}.")
     environment_record = environment.capture_environment(packages=("numpy", "nusquids"))
@@ -144,7 +151,7 @@ def run_benchmarks(
                 reference=reference,
                 repeats=repeats,
                 smoke=smoke,
-                max_points=max_points,
+                max_points=limits.get(name, max_points),
                 backend_factory=backend_factory,
             )
         )
@@ -223,6 +230,27 @@ def _run_scenario(
     return out
 
 
+def parse_scenario_limits(items: Sequence[str]) -> Dict[str, int]:
+    """Read ``["earth=2000", "atmosphere=0"]`` into ``{"earth": 2000, "atmosphere": 0}``.
+
+    Args:
+        items: ``SCENARIO=LIMIT`` strings.
+
+    Returns:
+        The limits by scenario.
+
+    Raises:
+        ValueError: If an item is not ``name=integer`` with an integer >= 0.
+    """
+    limits: Dict[str, int] = {}
+    for item in items:
+        name, separator, value = item.partition("=")
+        if not separator or not name or not value.isdigit():
+            raise ValueError(f"expected SCENARIO=LIMIT with a non-negative integer, got {item!r}")
+        limits[name] = int(value)
+    return limits
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Command-line entry point: check, time, print a summary and write the JSON under ``benchmarks/results``."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -232,6 +260,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--threads", type=int, default=DEFAULT_THREADS, help="CPU threads of the process")
     parser.add_argument("--smoke", action="store_true", help="the reduced sizes of quick runs")
     parser.add_argument("--max-points", type=int, default=DEFAULT_MAX_POINTS, help="skip larger grids; 0 for no limit")
+    parser.add_argument(
+        "--max-points-scenario",
+        nargs="*",
+        default=[],
+        metavar="SCENARIO=LIMIT",
+        help="own point limit of a scenario instead of --max-points (e.g. earth=2000 atmosphere=1000000; 0 for none)",
+    )
     parser.add_argument("--label", default="nusquids_cpu_float64")
     parser.add_argument("--output", type=Path, default=None, help=".csv or .json (default: results/<label>.json)")
     results.add_spec_arguments(parser)
@@ -245,6 +280,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         repeats=args.repeats,
         smoke=args.smoke,
         max_points=args.max_points,
+        max_points_by_scenario=parse_scenario_limits(args.max_points_scenario),
         label=args.label,
         reference_meta=meta,
     )

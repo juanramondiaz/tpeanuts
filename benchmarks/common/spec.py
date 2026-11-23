@@ -34,8 +34,10 @@ The CSV is written next to the YAML unless ``output.dir`` says otherwise.
 
 Fields (see ``Spec``): ``name`` and ``series`` (they must agree with the file name and its folder), ``backend``
 (``tpeanuts``, ``peanuts``, ``nusquids`` or ``export`` for the tpeanuts reference file), ``scenarios``, ``methods``
-(tpeanuts) or ``modes`` (peanuts), ``device``, ``dtype``, ``repeats``, ``max_points``, ``smoke`` (the overrides of a
-quick run), ``output``, ``cost`` (``cheap`` runs on demand from a notebook, ``expensive`` only on the cluster)
+(tpeanuts) or ``modes`` (peanuts), ``device``, ``dtype``, ``repeats``, ``max_points`` (and, for nuSQuIDS,
+``max_points_by_scenario``: a limit per scenario, because the cost per point differs by orders of magnitude between the
+Earth at MeV and the atmosphere at GeV), ``smoke`` (the overrides of a quick run), ``output``, ``cost``
+(``cheap`` runs on demand from a notebook, ``expensive`` only on the cluster)
 and ``condor`` (resources and the specifications that must have finished first). A key that does not apply to
 the backend, or that the schema does not know, is an error, so a misspelt option is never ignored silently.
 
@@ -83,7 +85,7 @@ _COMMON_KEYS = ("name", "series", "backend", "description", "optional", "output"
 _BACKEND_KEYS = {
     "tpeanuts": ("scenarios", "methods", "device", "dtype", "nsteps", "repeats", "max_points", "threads", "label"),
     "peanuts": ("scenarios", "modes", "repeats", "max_points", "max_points_numerical", "label"),
-    "nusquids": ("scenarios", "repeats", "max_points", "threads", "label"),
+    "nusquids": ("scenarios", "repeats", "max_points", "max_points_by_scenario", "threads", "label"),
     "export": ("nsteps",),
 }
 _MEMORY = re.compile(r"^\d+ ?(MB|GB|TB)$")
@@ -212,6 +214,8 @@ class Spec:
         repeats: Timed repetitions of each case.
         max_points: Grids above this many points are skipped; 0 means no limit.
         max_points_numerical: The same limit for the numerical mode of PEANUTS.
+        max_points_by_scenario: nuSQuIDS only. ``{scenario: limit}``; a scenario listed here uses its own limit instead
+            of ``max_points`` (0 means no limit). A quick run ignores it and uses the ``max_points`` of ``smoke``.
         threads: CPU threads; the CPUs requested when ``None`` (tpeanuts) and 1 for the single-thread backends.
         label: Name of the run; the specification name when empty.
         smoke: Overrides applied to a quick run (``repeats``, ``max_points``, ``max_points_numerical``).
@@ -233,6 +237,7 @@ class Spec:
     repeats: int = 7
     max_points: Optional[int] = None
     max_points_numerical: Optional[int] = None
+    max_points_by_scenario: Dict[str, int] = field(default_factory=dict)
     threads: Optional[int] = None
     label: str = ""
     smoke: Dict[str, int] = field(default_factory=dict)
@@ -290,6 +295,16 @@ class Spec:
         for key in ("max_points", "max_points_numerical", "nsteps", "threads"):
             if key in accepted and key in data:
                 kwargs[key] = _integer(data[key], f"{where}: {key}", minimum=0 if key.startswith("max_p") else 1)
+        if "max_points_by_scenario" in accepted and data.get("max_points_by_scenario") is not None:
+            per_scenario = data["max_points_by_scenario"]
+            if not isinstance(per_scenario, Mapping) or not per_scenario:
+                raise SpecError(f"{where}: max_points_by_scenario must be a non-empty mapping scenario: limit")
+            kwargs["max_points_by_scenario"] = {
+                _choice(name, tuple(SCENARIOS), f"{where}: max_points_by_scenario"): _integer(
+                    limit, f"{where}: max_points_by_scenario.{name}", minimum=0
+                )
+                for name, limit in per_scenario.items()
+            }
         if backend in ("peanuts", "nusquids") and kwargs.get("threads", 1) != 1:
             raise SpecError(f"{where}: {backend} is single-threaded by construction; threads must be 1")
         if backend in ("tpeanuts", "peanuts", "nusquids") and "max_points" not in data:
@@ -360,6 +375,9 @@ class Spec:
         }
         if smoke:
             values.update(self.smoke)
+        elif self.max_points_by_scenario:
+            # Only when set, so the hash of every other specification is unchanged; a quick run never uses it.
+            values["max_points_by_scenario"] = dict(sorted(self.max_points_by_scenario.items()))
         return values
 
     def spec_hash(self, smoke: bool = False) -> str:
@@ -425,6 +443,8 @@ class Spec:
         argv += ["--repeats", str(eff["repeats"]), "--max-points", str(eff["max_points"])]
         if self.backend == "peanuts" and eff["max_points_numerical"] is not None:
             argv += ["--max-points-numerical", str(eff["max_points_numerical"])]
+        if self.backend == "nusquids" and eff.get("max_points_by_scenario"):
+            argv += ["--max-points-scenario", *(f"{k}={v}" for k, v in eff["max_points_by_scenario"].items())]
         if smoke:
             argv.append("--smoke")
         label = self.run_label + ("_smoke" if smoke else "")

@@ -1,11 +1,14 @@
 # nuSQuIDS, one thread, float64. Each case is checked against the tpeanuts reference before it is timed. Solar scenarios are
-# recorded as unavailable. At MeV energies the Earth takes about 0.4-1 s per point, hence the small max_points.
+# recorded as unavailable. The cost per point depends on the energy: at MeV (the Earth, solar grid) it is about 0.4-1 s, so the
+# Earth keeps a small limit; at GeV (the atmosphere) it is about 2 ms, so the atmosphere reaches 10^6 points (1000 x 1000),
+# roughly 30 min per repetition. max_points is the limit of the scenarios not listed in max_points_by_scenario.
 name: nusquids_cpu_float64
 series: 2_nusquids
 backend: nusquids
 description: nuSQuIDS, one thread, float64, paired with the numerical method of tpeanuts
 repeats: 7
 max_points: 2000
+max_points_by_scenario: {earth: 2000, atmosphere: 1000000}
 smoke: {repeats: 3, max_points: 50}
 cost: {class: expensive}
 condor: {request_cpus: 1, request_memory: 8 GB, after: [3_peanuts/peanuts_analytical_cpu_float64]}

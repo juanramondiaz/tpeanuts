@@ -5,7 +5,7 @@ backend: peanuts
 description: original PEANUTS, analytical mode, one thread, float64
 modes: [analytical]
 repeats: 7
-max_points: 20000
+max_points: 1000000
 smoke: {repeats: 3, max_points: 100}
 cost: {class: expensive}
 condor: {request_cpus: 1, request_memory: 16 GB, after: [1_intrinsic/tpeanuts_cuda_float32]}

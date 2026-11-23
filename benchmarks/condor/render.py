@@ -280,7 +280,7 @@ def check(directory: Path = GENERATED) -> List[str]:
 
 
 def _write(path: Path, text: str) -> None:
-    """Write ``text`` with LF line endings (``Path.write_text(newline=...)`` needs Python 3.10; the login nodes have older)."""
+    """Write ``text`` with LF endings (``Path.write_text(newline=...)`` needs Python 3.10, which login nodes lack)."""
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
 
